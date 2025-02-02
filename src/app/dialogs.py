@@ -8,6 +8,10 @@ from transtoken import AppError, TransToken
 
 
 DEFAULT_TITLE = TransToken.ui('BEEmod')
+# Here to allow reuse, and for WX to use builtin if possible.
+TRANS_BTN_SKIP = TransToken.ui('Skip')
+TRANS_BTN_DISCARD = TransToken.ui('Discard')
+TRANS_BTN_QUIT = TransToken.ui('Quit')
 
 
 class Icon(Enum):
@@ -79,6 +83,19 @@ class Dialogs(Protocol):
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError
 
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Literal["a", "b", "c"] | None:
+        """Show a message box with 2 or 3 custom buttons."""
+        raise NotImplementedError
+
     async def prompt(
         self,
         message: TransToken,
@@ -120,6 +137,19 @@ async def test_generic_msg(dialog: Dialogs) -> None:
     assert await dialog.ask_yes_no_cancel(tt("Press no")) is False
     assert await dialog.ask_yes_no_cancel(tt("Press cancel")) is None
     assert await dialog.ask_yes_no_cancel(tt("Press X")) is None
+
+    left = tt("Left")
+    mid = tt("Center")
+    right = tt("Right")
+
+    assert await dialog.ask_custom(tt("Press Left"), left, right) == "a"
+    assert await dialog.ask_custom(tt("Press Right"), left, right) == "b"
+    # assert await dialog.ask_custom(tt("Press X"), left, right) is None
+
+    assert await dialog.ask_custom(tt("Press Left for info"), left, mid, right, icon=Icon.INFO) == "a"
+    assert await dialog.ask_custom(tt("Press Center for question"), left, mid, right, icon=Icon.QUESTION) == "b"
+    assert await dialog.ask_custom(tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING) == "c"
+    # assert await dialog.ask_custom(tt("Press X for error"), left, mid, right, icon=Icon.ERROR) is None
 
 
 async def test_generic_prompt(dialog: Dialogs) -> None:

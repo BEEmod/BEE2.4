@@ -1,6 +1,6 @@
 """A consistent interface for dialog boxes."""
 from __future__ import annotations
-from typing import override
+from typing import Literal, override
 
 from tkinter import commondialog, filedialog, simpledialog, ttk
 from tkinter.font import Font
@@ -242,6 +242,46 @@ class QueryValidator(tk.Toplevel):
         return self.result
 
 
+class CustomMessagebox:
+    """Implements a custom messagebox with 2 or 3 buttons."""
+    result: Literal["a", "b", "c"] | None
+    def __init__(
+        self,
+        parent: tk.Toplevel | tk.Tk,
+        title: TransToken, message: TransToken,
+        lbl_1: TransToken, lbl_2: TransToken, lbl_3: TransToken | None,
+    ) -> None:
+        self.result = None
+        self.event = trio.Event()
+
+        self.win = win = tk.Toplevel(parent)
+        win.wm_protocol('WM_DELETE_WINDOW', self.event_func(None))
+        win.title(str(title))
+        win.transient(parent)
+        win.grab_set()
+        win.columnconfigure(0, weight=1)
+        win.columnconfigure(1, weight=1)
+        win.columnconfigure(2, weight=1)
+
+        label = ttk.Label(win, text=str(message))
+        label.grid(row=0, column=0, columnspan=3, sticky='ew', padx=8, pady=(8, 4))
+        btn_1 = ttk.Button(win, text=str(lbl_1), command=self.event_func("a"))
+        btn_1.grid(row=1, column=0, padx=4, pady=(4, 8))
+        btn_2 = ttk.Button(win, text=str(lbl_2), command=self.event_func("b"))
+        btn_2.grid(row=1, column=1, padx=4, pady=(4, 8))
+        if lbl_3 is not None:
+            btn_3 = ttk.Button(win, text=str(lbl_3), command=self.event_func("c"))
+            btn_3.grid(row=1, column=2, padx=4, pady=(4, 8))
+
+    def event_func(self, result: Literal["a", "b", "c"] | None) -> Callable[[], None]:
+        """Make a handler for each button."""
+        def func() -> None:
+            """The handler."""
+            self.result = result
+            self.event.set()
+        return func
+
+
 class TkDialogs(Dialogs):
     """The class allows passing through a parent window."""
     INFO = Icon.INFO
@@ -316,6 +356,28 @@ class TkDialogs(Dialogs):
             return None
         else:
             raise ValueError(res)
+
+    @override
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Literal["a", "b", "c"] | None:
+        # Icon ignored, can't use.
+        with suppress_screens():
+            box = CustomMessagebox(self.parent, title, message, button_1, button_2, button_3)
+            if self.parent is TK_ROOT:
+                # Force to be centered and visible - the root might be hidden if doing an early add-game.
+                TK_ROOT.deiconify()
+            center_onscreen(box.win)
+            await box.event.wait()
+            box.win.destroy()
+            return box.result
 
     @override
     async def prompt(

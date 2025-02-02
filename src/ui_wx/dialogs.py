@@ -1,5 +1,5 @@
 """A consistent interface for dialog boxes."""
-from typing import override
+from typing import Literal, override
 
 from collections.abc import Callable
 
@@ -243,6 +243,42 @@ class WxDialogs(Dialogs):
                 return None
             case error:
                 raise ValueError(error)
+
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Literal["a", "b", "c"] | None:
+        """Show a message box with custom buttons."""
+        # TODO: Stock IDs, if ever used with eligible tokens.
+        box = _messagebox(
+            style=wx.CANCEL | (wx.YES_NO if button_3 is not None else wx.OK),
+            parent=self.parent,
+            message=message,
+            title=title,
+            icon=icon,
+            detail='',
+        )
+        if button_3 is not None:
+            changed = box.SetYesNoCancelLabels(str(button_1), str(button_2), str(button_3))
+        else:
+            changed = box.SetOKCancelLabels(str(button_1), str(button_2))
+        if not changed:
+            # Need to make a generic implementation here.
+            raise NotImplementedError("No custom buttons for this platform?")
+        match box.ShowModal():
+            case wx.ID_YES | wx.ID_OK:
+                return "a"
+            case wx.ID_NO:
+                return "b"
+            case wx.ID_CANCEL:
+                return "c" if button_3 is not None else "b"
+
 
     @override
     async def prompt(
