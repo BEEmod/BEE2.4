@@ -56,9 +56,6 @@ class ConfInfo[DataT: 'Data']:
 type VersionMismatchList = list[tuple[ConfInfo | str, int]]
 type VersionMismatchResult = Literal['skip', 'discard', 'quit']
 TRANS_MISMATCH_TITLE = TransToken.ui('Version Mismatch')
-TRANS_MISMATCH_BTN_SKIP = TransToken.ui('Skip')
-TRANS_MISMATCH_BTN_DISCARD = TransToken.ui('Discard')
-TRANS_MISMATCH_BTN_QUIT = TransToken.ui('QUIT')
 TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
     'The palette "{name}" has unknown config versions for the following sections:'
 )
@@ -92,15 +89,15 @@ class VersionMismatchPrompt(Protocol):
     ) -> VersionMismatchResult: ...
 
 
-async def ask_version_mismatch(
-    func: VersionMismatchPrompt,
+def build_version_mismatch_prompt(
     sections: VersionMismatchList,
     can_skip: bool,
     pal_name: str | None,
-) -> bool:
-    """Check whether this config should continue to be used."""
+) -> TransToken:
+    """Build the text to describe a version mismatch."""
+    section = TransToken.untranslated('- {name}')
     sections = [
-        (info.name if isinstance(info, ConfInfo) else info)
+        section.format(name=info.name if isinstance(info, ConfInfo) else info)
         for info, version in sections
     ]
     if pal_name is not None:
@@ -110,17 +107,7 @@ async def ask_version_mismatch(
         msg = TRANS_MISMATCH_CONF_MESSAGE
         prompt = TRANS_MISMATCH_CONF_PROMPT
         assert not can_skip, "Primary config can't be skipped?"
-    match await func(msg, prompt, sections, can_skip):
-        case 'skip':
-            assert can_skip, 'Skipped but not allowed to.'
-            return False
-        case 'discard':
-            return True
-        case 'quit':
-            LOGGER.info('Quitting due to config mismatch.')
-            sys.exit()
-        case err:
-            assert_never(err)
+    return TransToken.untranslated('\n').join([msg, *sections, prompt])
 
 
 class Data(abc.ABC):
@@ -508,14 +495,14 @@ class ConfigSpec:
             LOGGER.debug('Discarding conf {}[{}]', info.name, data_id)
             self._current = new_conf
 
-    def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool]:
+    def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool, VersionMismatchList]:
         """Parse a configuration file into individual data.
 
-        The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
-        and so should be resaved.
+        * The new config is returned, alongside a bool indicating if it was upgraded
+        and so should be resaved, and a list of any unknown/new sections.
         """
         if 'version' not in kv:  # New conf format
-            return self._parse_legacy(kv), True
+            return self._parse_legacy(kv), True, []
 
         version = kv.int('version')
         if version != 1:
@@ -523,16 +510,18 @@ class ConfigSpec:
 
         conf = Config()
         upgraded = False
+        unknown: VersionMismatchList = []
         for child in kv:
             if child.name == 'version':
                 continue
+            version = child.int('_version', 1)
             try:
                 cls = self._name_to_type[child.name]
             except KeyError:
                 LOGGER.warning('Unknown config section type "{}"!', child.real_name)
+                unknown.append((child.name, version))
                 continue
             info = cls.get_conf_info()
-            version = child.int('_version', 1)
             try:
                 del child['_version']
             except LookupError:
@@ -543,6 +532,7 @@ class ConfigSpec:
                     'which is higher than the supported version ({})!',
                     info.name, version, info.version
                 )
+                unknown.append((info, version))
                 # Don't try to parse, it'll be invalid.
                 continue
             elif version != info.version:
@@ -577,7 +567,8 @@ class ConfigSpec:
                     )
                 else:
                     conf = conf.with_value(data)
-        return conf, upgraded
+
+        return conf, upgraded, unknown
 
     def _parse_legacy(self, kv: Keyvalues) -> Config:
         """Parse the old config format."""
@@ -594,27 +585,22 @@ class ConfigSpec:
                 conf = conf.with_cls_map(cls, {})
         return conf
 
-    def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool]:
+    def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool, VersionMismatchList]:
         """Parse a configuration file in the DMX format into individual data.
 
         * The format name and version parsed from the DMX file should also be supplied.
         * The new config is returned, alongside a bool indicating if it was upgraded
-        and so should be resaved.
+        and so should be resaved, and a list of any unknown/new sections.
         """
         if fmt_name != DMX_NAME or fmt_version not in [1]:
             raise ValueError(f'Unknown config {fmt_name} v{fmt_version}!')
 
         conf = Config()
         upgraded = False
+        unknown: VersionMismatchList = []
         for attr in dmx.values():
             if attr.name == 'name' or attr.type is not DMXTypes.ELEMENT:
                 continue
-            try:
-                cls = self._name_to_type[attr.name.casefold()]
-            except KeyError:
-                LOGGER.warning('Unknown config section type "{}"!', attr.name)
-                continue
-            info = cls.get_conf_info()
             child = attr.val_elem
             try:
                 if not child.type.startswith('Conf_v'):
@@ -622,13 +608,22 @@ class ConfigSpec:
                 version = int(child.type.removeprefix('Conf_v'))
             except ValueError:
                 LOGGER.warning('Invalid config section version "{}"', child.type)
+                unknown.append((attr.name, 0))
                 continue
+            try:
+                cls = self._name_to_type[attr.name.casefold()]
+            except KeyError:
+                LOGGER.warning('Unknown config section type "{}"!', attr.name)
+                unknown.append((attr.name, version))
+                continue
+            info = cls.get_conf_info()
             if version > info.version:
                 LOGGER.warning(
                     'Config section "{}" has version {}, '
                     'which is higher than the supported version ({})!',
                     info.name, version, info.version
                 )
+                unknown.append((info, version))
                 # Don't try to parse, it'll be invalid.
                 continue
             elif version != info.version:
@@ -672,7 +667,7 @@ class ConfigSpec:
                     )
                 else:
                     conf = conf.with_value(parsed)
-        return conf, upgraded
+        return conf, upgraded, unknown
 
     def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
         """Build out a configuration file from some data.
