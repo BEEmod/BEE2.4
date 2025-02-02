@@ -1,6 +1,7 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, TypeGuard, Literal, Final, cast
+
+from typing import IO, TypeGuard, Literal, Final, assert_never, cast
 
 from collections.abc import Iterator, Sequence
 from uuid import UUID, uuid4, uuid5
@@ -9,10 +10,12 @@ import shutil
 import zipfile
 import random
 import io
+import sys
 
 from srctools import Keyvalues, NoKeyError, KeyValError
 import srctools.logger
 
+from app.dialogs import Dialogs, TRANS_BTN_QUIT, TRANS_BTN_SKIP, TRANS_BTN_DISCARD
 from transtoken import TransToken
 from consts import DefaultItems
 import config
@@ -236,7 +239,7 @@ def validate_y(y: int) -> TypeGuard[VertInd]:
 
 class FutureVersionError(Exception):
     """Raised if a palette is from a future version."""
-    def __init__(self, version: int) -> None:
+    def __init__(self, version: str) -> None:
         super().__init__(f'Unknown version {version}!')
         self.version = version
 
@@ -300,7 +303,12 @@ class Palette:
         return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, kv: Keyvalues, path: str) -> tuple[Palette, bool]:
+    async def parse(
+        cls,
+        kv: Keyvalues,
+        path: str,
+        dialogs: Dialogs,
+    ) -> tuple[Palette, bool]:
         """Parse a palette from a file.
 
         The returned boolean indicates if it should be resaved.
@@ -308,6 +316,7 @@ class Palette:
         needs_upgrade = False
         version = kv.int('version', 1)
         name = kv['Name', '??']
+        readonly = kv.bool('readonly')
 
         items: ItemPos = {}
 
@@ -339,7 +348,7 @@ class Palette:
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
         else:
-            raise FutureVersionError(version)
+            raise FutureVersionError(str(version))
 
         if version != CUR_VERSION:
             needs_upgrade = True
@@ -361,7 +370,26 @@ class Palette:
         except NoKeyError:
             settings = None
         else:
-            settings, upgraded_settings = config.PALETTE.parse_kv1(settings_conf)
+            settings, upgraded_settings, unknown = config.PALETTE.parse_kv1(settings_conf)
+            if unknown:
+                message = config.build_version_mismatch_prompt(
+                    unknown, can_skip=not readonly, pal_name=name,
+                )
+                match await dialogs.ask_custom(
+                    message,
+                    TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
+                    None if readonly else TRANS_BTN_SKIP,
+                    cancel=0,
+                ):
+                    case 0:
+                        sys.exit()
+                    case 1:
+                        pass  # Continue
+                    case 2:
+                        raise FutureVersionError('<configs>')
+                    case never:
+                        assert_never(never)
+
             if upgraded_settings:
                 needs_upgrade = True
 
@@ -370,7 +398,7 @@ class Palette:
             items,
             trans_name=trans_name,
             group=kv['group', ''],
-            readonly=kv.bool('readonly'),
+            readonly=readonly,
             filename=os.path.basename(path),
             uuid=uuid,
             settings=settings,
