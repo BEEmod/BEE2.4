@@ -1,6 +1,6 @@
 """Keeps track of which games are known, and allows adding/removing them."""
 from __future__ import annotations
-from typing import Self
+from typing import Self, TypeGuard
 
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -13,7 +13,8 @@ import webbrowser
 from tkinter import filedialog
 import tkinter as tk
 
-from srctools import EmptyMapping, Keyvalues
+from srctools import EmptyMapping, FileSystemChain, Keyvalues
+from srctools.game import Game as GameInfo
 import srctools.logger
 import srctools.fgd
 import attrs
@@ -33,6 +34,7 @@ import loadScreen
 import packages
 import utils
 import config
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -56,6 +58,12 @@ EXE_SUFFIX = (
     ''
 )
 
+# Maps steam IDs to the associated mod folder.
+MOD_FOLDERS = {
+    utils.STEAM_IDS['APTAG']: 'aperturetag',
+    utils.STEAM_IDS['PORTAL2']: 'portal2',
+}
+
 
 @attrs.define(eq=False)
 class Game:
@@ -75,6 +83,9 @@ class Game:
     # read in from a previous BEE install, and so has created the DLC3 folder even though it's
     # not marked with our marker file.
     unmarked_dlc3_vpk: bool = attrs.field(default=False, eq=False)
+
+    # Cached filesystem for this game.
+    fsys: FileSystemChain | None = attrs.field(default=None, init=False)
 
     @property
     def root_path(self) -> trio.Path:
@@ -151,6 +162,14 @@ class Game:
         """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
 
+    def get_filesystem(self) -> FileSystemChain:
+        """Load the filesystem for this game."""
+        if self.fsys is not None:
+            return self.fsys
+        ginfo = GameInfo(self.abs_path(MOD_FOLDERS.get(self.steamID, 'portal2')))
+        self.fsys = ginfo.get_filesystem()
+        return self.fsys
+
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
         if config.APP.get_cur_conf(GenOptions).preserve_resources:
@@ -213,6 +232,11 @@ class Game:
             return appman.find_key('AppState').find_key('UserConfig')['language']
         except LookupError:
             return ''
+
+
+def is_valid_game(game: Game | None) -> TypeGuard[Game]:
+    """Predicate checking the game is not None."""
+    return game is not None
 
 
 async def update_export_text() -> None:
