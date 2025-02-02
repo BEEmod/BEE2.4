@@ -6,7 +6,7 @@ from collections.abc import Callable
 import trio
 import wx
 
-from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
+from app.dialogs import DEFAULT_TITLE, Btn3, Dialogs, Icon, validate_non_empty
 from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 from ui_wx.wid_transtoken import set_text, set_win_title
@@ -251,34 +251,52 @@ class WxDialogs(Dialogs):
         button_2: TransToken,
         button_3: TransToken | None = None,
         *,
+        cancel: Btn3,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-    ) -> Literal["a", "b", "c"] | None:
+    ) -> Btn3:
         """Show a message box with custom buttons."""
+        buttons: list[tuple[TransToken, Btn3]] = [
+            (button_1, 0),
+            (button_2, 1),
+        ]
+        has_three = False
+        if button_3 is not None:
+            has_three = True
+            buttons.append((button_3, 2))
+        elif cancel == 2:
+            raise ValueError("Button 3 is missing but set as cancel button?")
+        # Now move the cancel button to the end to line up.
+        buttons.append(buttons.pop(cancel))
+
         # TODO: Stock IDs, if ever used with eligible tokens.
         box = _messagebox(
-            style=wx.CANCEL | (wx.YES_NO if button_3 is not None else wx.OK),
+            style=wx.CANCEL | (wx.YES_NO if has_three else wx.OK),
             parent=self.parent,
             message=message,
             title=title,
             icon=icon,
             detail='',
         )
-        if button_3 is not None:
-            changed = box.SetYesNoCancelLabels(str(button_1), str(button_2), str(button_3))
-        else:
-            changed = box.SetOKCancelLabels(str(button_1), str(button_2))
+        match buttons:
+            case [(first, _), (second, _), (third, _)]:
+                changed = box.SetYesNoCancelLabels(str(first), str(second), str(third))
+            case [(first, _), (second, _)]:
+                changed = box.SetOKCancelLabels(str(first), str(second))
+            case _:
+                raise AssertionError(buttons)
         if not changed:
-            # Need to make a generic implementation here.
+            # Use wx.GenericMessageDialog?
             raise NotImplementedError("No custom buttons for this platform?")
         match box.ShowModal():
             case wx.ID_YES | wx.ID_OK:
-                return "a"
+                return buttons[0][1]
             case wx.ID_NO:
-                return "b"
+                return buttons[1][1]
             case wx.ID_CANCEL:
-                return "c" if button_3 is not None else "b"
-
+                return buttons[-1][1]
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def prompt(

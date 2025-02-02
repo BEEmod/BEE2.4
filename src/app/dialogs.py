@@ -7,6 +7,7 @@ from enum import Enum
 from transtoken import AppError, TransToken
 
 
+type Btn3 = Literal[0, 1, 2]
 DEFAULT_TITLE = TransToken.ui('BEEmod')
 # Here to allow reuse, and for WX to use builtin if possible.
 TRANS_BTN_SKIP = TransToken.ui('Skip')
@@ -90,10 +91,14 @@ class Dialogs(Protocol):
         button_2: TransToken,
         button_3: TransToken | None = None,
         *,
+        cancel: Btn3,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-    ) -> Literal["a", "b", "c"] | None:
-        """Show a message box with 2 or 3 custom buttons."""
+    ) -> Btn3:
+        """Show a message box with 2 or 3 custom buttons.
+
+        The button passed to cancel will be returned if the X is pressed.
+        """
         raise NotImplementedError
 
     async def prompt(
@@ -118,6 +123,7 @@ class Dialogs(Protocol):
 
 async def test_generic_msg(dialog: Dialogs) -> None:
     """Test the dialog implementation for messageboxes."""
+    import pytest
     # No need to translate tests.
     tt = TransToken.untranslated
 
@@ -142,14 +148,20 @@ async def test_generic_msg(dialog: Dialogs) -> None:
     mid = tt("Center")
     right = tt("Right")
 
-    assert await dialog.ask_custom(tt("Press Left"), left, right) == "a"
-    assert await dialog.ask_custom(tt("Press Right"), left, right) == "b"
-    # assert await dialog.ask_custom(tt("Press X"), left, right) is None
+    with pytest.raises(ValueError):
+        await dialog.ask_custom(tt("Invalid cancellation"), left, right, cancel=2)
 
-    assert await dialog.ask_custom(tt("Press Left for info"), left, mid, right, icon=Icon.INFO) == "a"
-    assert await dialog.ask_custom(tt("Press Center for question"), left, mid, right, icon=Icon.QUESTION) == "b"
-    assert await dialog.ask_custom(tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING) == "c"
-    # assert await dialog.ask_custom(tt("Press X for error"), left, mid, right, icon=Icon.ERROR) is None
+    assert await dialog.ask_custom(tt("Press Left for info"), left, right, icon=Icon.INFO, cancel=0) == 0
+    assert await dialog.ask_custom(tt("Press Right for question"), left, right, icon=Icon.QUESTION, cancel=1) == 1
+    assert await dialog.ask_custom(tt("Press X for warning"), left, right, icon=Icon.WARNING, cancel=0) == 0
+    assert await dialog.ask_custom(tt("Press X for error"), left, right, icon=Icon.ERROR, cancel=1) == 1
+
+    cancel: Literal[0, 1, 2]
+    for cancel in (0, 1, 2):
+        assert await dialog.ask_custom(tt("Press Left for info"), left, mid, right, icon=Icon.INFO, cancel=cancel) == 0
+        assert await dialog.ask_custom(tt("Press Center for question"), left, mid, right, icon=Icon.QUESTION, cancel=cancel) == 1
+        assert await dialog.ask_custom(tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING, cancel=cancel) == 2
+        assert await dialog.ask_custom(tt("Press X for error"), left, mid, right, icon=Icon.ERROR, cancel=cancel) == cancel
 
 
 async def test_generic_prompt(dialog: Dialogs) -> None:
