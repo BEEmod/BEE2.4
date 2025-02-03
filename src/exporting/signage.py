@@ -6,7 +6,10 @@ from typing import Final
 from pathlib import Path
 
 from PIL import Image
-from srctools import Keyvalues
+from srctools.filesys import VPKFileSystem
+
+from aioresult import ResultCapture
+from srctools import FileSystem, FileSystemChain, Keyvalues
 from srctools.vtf import VTF, ImageFormats, VTFFlags
 import srctools.logger
 import trio.to_thread
@@ -23,6 +26,7 @@ from . import STEPS, ExportData, StepResource
 
 LOGGER = srctools.logger.get_logger(__name__)
 SIGN_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage.vtf'
+SIGN_ANT_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage_antline.vtf'
 
 TRANS_MISSING_SELECTED = TransToken.ui('Selected signage "{id}" does not exist.')
 TRANS_MISSING_CHILD = TransToken.ui('Signage "{id}"\'s {child} "{sub_id}" does not exist.')
@@ -30,6 +34,19 @@ TRANS_INVALID_NUMBERS_WIDTH = TransToken.untranslated(
     'Signage legend number texture width must be divisible by ten!'
 )
 TRANS_NO_OVERLAY = TransToken.untranslated('No Signage style overlay defined.')
+
+EDITOR_SHAPES = [
+    'box',
+    'cross',
+    'dot',
+    'moon',
+    'slash',
+    'triangle',
+    'sine',
+    'star',
+    'circle',
+    'wavy',
+]
 
 
 def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | None:
@@ -56,7 +73,18 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | Non
     return data
 
 
-@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA, StepResource.RES_SPECIAL])
+def load_conn_icon(fsys: FileSystem, shape: str) -> Image.Image | None:
+    """Load the antline signage textures."""
+    try:
+        file = fsys[f'materials/models/props_map_editor/signage_shape_{shape}.vtf']
+    except FileNotFoundError:
+        return None
+    with file.open_bin() as f:
+        vtf = VTF.read(f)
+        return vtf.get().to_PIL()
+
+
+@STEPS.add_step(prereq=[StepResource.VPK_WRITTEN], results=[StepResource.VCONF_DATA, StepResource.RES_SPECIAL])
 async def step_signage(exp_data: ExportData) -> None:
     """Export the selected signage to the config, and produce the legend."""
     # Timer value -> sign ID.
@@ -77,9 +105,9 @@ async def step_signage(exp_data: ExportData) -> None:
         except KeyError:
             errors.append(AppError(TRANS_MISSING_SELECTED.format(id=sign_id)))
             continue
-        prop_block = Keyvalues(str(tim_id), [])
+        kv_block = Keyvalues(str(tim_id), [])
 
-        sty_sign = serialise(sign, prop_block, exp_data.selected_style)
+        sty_sign = serialise(sign, kv_block, exp_data.selected_style)
 
         for sub_name, sub_id in [
             ('primary', sign.prim_id),
@@ -98,10 +126,10 @@ async def step_signage(exp_data: ExportData) -> None:
                     sub_block = Keyvalues(sub_name, [])
                     serialise(sub_sign, sub_block, exp_data.selected_style)
                     if sub_block:
-                        prop_block.append(sub_block)
+                        kv_block.append(sub_block)
 
-        if prop_block:
-            conf.append(prop_block)
+        if kv_block:
+            conf.append(kv_block)
 
         # Valid timer number, store to be placed on the texture.
         if tim_id.isdigit() and sty_sign is not None:
@@ -110,14 +138,31 @@ async def step_signage(exp_data: ExportData) -> None:
     if errors:
         raise ExceptionGroup('Signage Export', errors)
 
+    fsys = exp_data.game.get_filesystem()
+
+    async with trio.open_nursery() as nursery:
+        ant_icons = {
+            ind + 3: ResultCapture.start_soon(
+                nursery, trio.to_thread.run_sync,
+                load_conn_icon, fsys, shape,
+            )
+            for ind, shape in enumerate(EDITOR_SHAPES)
+        }
+
     exp_data.vbsp_conf.append(conf)
     sign_path = Path(exp_data.game.abs_path(SIGN_LOC))
+    sign_ant_path = Path(exp_data.game.abs_path(SIGN_ANT_LOC))
 
-    exp_data.resources.add(sign_path)
-    await trio.to_thread.run_sync(
-        make_legend,
-        exp_data, sign_path, sel_icons,
-    )
+    exp_data.resources |= {sign_path, sign_ant_path}
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(
+            trio.to_thread.run_sync, make_legend,
+            exp_data, sign_path, sel_icons,
+        )
+        nursery.start_soon(
+            trio.to_thread.run_sync, make_legend,
+            exp_data, sign_ant_path, ant_icons,
+        )
 
 
 def iter_cells() -> Iterator[tuple[int, int, int]]:
@@ -132,11 +177,12 @@ def iter_cells() -> Iterator[tuple[int, int, int]]:
 def make_legend(
     exp: ExportData,
     sign_path: Path,
-    icons: dict[int, ImgHandle],
+    icons: dict[int, ImgHandle | ResultCapture[Image.Image | None]],
 ) -> None:
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
+    ico: Image.Image | None = None
     blank_img: Image.Image | None = None
     num_sheet: Image.Image | None = None
     num_step = num_x = num_y = 0
@@ -167,11 +213,15 @@ def make_legend(
 
     for num, x, y in iter_cells():
         try:
-            ico = icons[num].get_pil().resize(
-                (CELL_SIZE, CELL_SIZE),
-                Image.Resampling.LANCZOS,
-            ).convert('RGB')
+            handle = icons[num]
         except KeyError:
+            ico = None
+        else:
+            if isinstance(handle, ImgHandle):
+                ico = handle.get_pil()
+            else:
+                ico = handle.result()
+        if ico is None:
             if blank_img is None:
                 # Blank this section.
                 legend.paste(
@@ -180,6 +230,10 @@ def make_legend(
                 )
                 continue
             ico = blank_img
+        ico = ico.resize(
+            (CELL_SIZE, CELL_SIZE),
+            Image.Resampling.LANCZOS,
+        ).convert('RGB')
         legend.paste(ico, (x, y))
         if num_sheet is not None and ico is not blank_img:
             tens, ones = divmod(num, 10)

@@ -7,7 +7,7 @@ from enum import Enum, auto
 from pathlib import PurePath
 import os
 
-from srctools import Keyvalues
+from srctools import Keyvalues, VPK
 import attrs
 import srctools.logger
 import trio
@@ -98,6 +98,8 @@ class ExportData(packages.PackErrorInfo):
     resources: set[PurePath] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
+    # The style VPK file.
+    vpk: VPK | None = None
 
     def selected[T](self, key: ExportKey[T]) -> T:
         """Fetch the value for this key."""

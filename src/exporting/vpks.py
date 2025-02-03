@@ -283,5 +283,6 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
         with trio.CancelScope(shield=True, deadline=math.inf):
             await vpk_filename.unlink()
         raise
+    exp_data.vpk = vpk_file
 
     LOGGER.info('Written {} files to VPK!', len(vpk_file))
