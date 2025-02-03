@@ -148,7 +148,10 @@ def make_legend(
         else:
             overlay = legend_info.overlay.get_pil()
             if legend_info.blank is not None:
-                blank_img = legend_info.blank.get_pil()
+                blank_img = legend_info.blank.get_pil().resize(
+                    (CELL_SIZE, CELL_SIZE),
+                    Image.Resampling.LANCZOS,
+                )
             if legend_info.background is not None:
                 legend.paste(legend_info.background.get_pil(), (0, 0))
             if legend_info.numbers is not None:
