@@ -15,6 +15,7 @@ import attrs
 from typing_extensions import Literal, assert_never
 
 from precomp import brushLoc, options, packing, conditions, connections
+from precomp.collisions import Collisions, CollideType
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst, resolve_filter
 import user_errors
@@ -73,6 +74,10 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 # loaded in the base-entity machinery.
 # It's somewhat buggy though, so we use the SetModel method if possible.
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
+
+# In coop, the viewmodel grabbing behaviour allows you to pull cubes through anything
+# if you can pick them up. So optionally add a VScript to deny USE if grating is in the way.
+COOP_CUBE_VSCRIPT = 'bee2/coop_block_grate_grab'
 
 
 class CubeEntType(Enum):
@@ -1627,6 +1632,7 @@ def make_cube(
     in_dropper: bool,
     bounce_in_map: bool,
     speed_in_map: bool,
+    prevent_grate_use: bool,
 ) -> tuple[bool, Entity]:
     """Place a cube on the specified floor location.
 
@@ -1688,6 +1694,10 @@ def make_cube(
     else:
         ent['rendercolor'] = rendercolor = str(cube_type.base_tint)
 
+    vscripts = []
+    if prevent_grate_use:
+        vscripts.append(COOP_CUBE_VSCRIPT)
+
     if pair.superpos is not None and pair.is_superpos_ghost:
         # Superposition ghost cubes are regular physics props, most of this functionality doesn't
         # apply.
@@ -1698,7 +1708,8 @@ def make_cube(
         # Set response contexts for detection via `filter_activator_context`.
         ent['responsecontext'] = 'nofizzle:1,superpos_ghost:1'
         ent['spawnflags'] = 1048576 | 256  # Can always pick up, generate output on USE.
-        ent['vscripts'] = 'BEE2/superpos_ghost.nut'
+        vscripts.append('BEE2/superpos_ghost.nut')
+        ent['vscripts'] = ' '.join(vscripts)
         ent['thinkfunction'] = 'Think'
         # The VScript needs to know the color, so it can reset after painting.
         ent['vscript_init_code'] = f"ghost_color <- `{rendercolor}`; ghost_alpha <- {ghost_alpha}"
@@ -1814,7 +1825,6 @@ def make_cube(
                 spawn_paint = CubePaintType.CLEAR
 
     has_addon_inst = False
-    vscripts = []
     for addon in pair.addons:
         if addon.inst:
             has_addon_inst = True
@@ -1919,14 +1929,25 @@ def make_cube(
 
 
 @conditions.MetaCond.GenerateCubes.register
-def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
+def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None:
     """Generates cube instances.
 
     After this point, all the addon instances, cube entities, droppers etc have been
     generated.
     """
+    if not PAIRS:
+        return  # No cubes to do anything with.
+
     bounce_in_map = info.has_attr('bouncegel')
     speed_in_map = info.has_attr('speedgel')
+
+    prevent_grate_use = (
+        info.is_coop and info.has_attr('grating') and
+        options.get_itemconf(('VALVE_TEST_ELEM', 'BlockCoopGrateUse'), False)
+    )
+    if prevent_grate_use:
+        LOGGER.info('Marking grating collision type to be exported to VScript for cube +USE blocking.')
+        coll.vscript_flags |= CollideType.GRATING
 
     # point_template for spawning dropperless cubes.
     # We can fit 16 in each, start with the count = 16 so
@@ -2005,7 +2026,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             assert pair.drop_type is not None, pair
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.spawn_offset @ Angle.from_str(pair.dropper['angles'])
-            has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map)
+            has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map, prevent_grate_use)
             cubes.append(drop_cube)
 
             # We can't refer to the dropped cube directly because of the template name
@@ -2156,7 +2177,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
             pos += Vec(z=DROPPERLESS_OFFSET) @ Angle.from_str(pair.cube['angles'])
-            has_addon, cube = make_cube(vmf, pair, pos, False, bounce_in_map, speed_in_map)
+            has_addon, cube = make_cube(vmf, pair, pos, False, bounce_in_map, speed_in_map, prevent_grate_use)
             cubes.append(cube)
             cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'box')
 
