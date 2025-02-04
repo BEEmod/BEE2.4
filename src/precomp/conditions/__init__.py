@@ -177,8 +177,8 @@ RES_EXHAUSTED = object()
 class MetaCond(Enum):
     """Priority values for meta conditions."""
     FaithPlate = Decimal(-900)
-    LinkCubes = Decimal(-750)
-    LinkedItems = Decimal(-300)
+    LinkCubes = Decimal(-750)  # Modifies connections
+    LinkedItems = Decimal(-300)  # Modifies connections
     MonCameraLink = Decimal(-275)
     ScaffoldLinkOld = Decimal('-250.0001')
     Connections = Decimal(-250)
@@ -191,11 +191,11 @@ class MetaCond(Enum):
     AntiFizzBump = Decimal(200)
     PlayerModel = Decimal(400)
     Vactubes = Decimal(400)
-    PlayerPortalGun = Decimal(500)
     Fizzler = Decimal(500)
     Screenshot = Decimal(750)
-    GenerateCubes = Decimal(750)
-    RemoveBlankInst = Decimal(1000)
+    GenerateCubes = Decimal(750)  # Can set needs-portal-man.
+    PlayerPortalGun = Decimal(800)
+    RemoveBlankInst = Decimal(1000)  # After anything generating instances.
 
     def register[Call: Callable[..., object]](self, func: Call) -> Call:
         """Register a meta-condition."""
