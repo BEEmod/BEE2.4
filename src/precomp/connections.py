@@ -1408,8 +1408,15 @@ def add_item_indicators(
             (item.output_act(), 0.0, style.check_cmd),
             (item.output_deact(), 0.0, style.cross_cmd),
         ]
-    if pan_filename and item.ind_panels:
-        conditions.ALL_INST.add(pan_filename.casefold())
+    if pan_filename:
+        if item.ind_panels:
+            conditions.ALL_INST.add(pan_filename.casefold())
+    else:
+        # No sign filename, remove the panels.
+        has_sign = False
+        for pan in item.ind_panels:
+            pan.remove()
+        item.ind_panels.clear()
 
     if timer_delay is not None:
         panel_fixup['$time'] = format_float(timer_delay)

@@ -150,14 +150,14 @@ class IndicatorStyle:
     wall: AntType
     floor: AntType
 
-    # Instance to use for checkmark signs.
+    # Instance to use for checkmark signs, or blank if they should not be used.
     check_inst: str
     check_switching: PanelSwitchingStyle
     # Sign inputs to swap the two versions.
     check_cmd: Sequence[Output]
     cross_cmd: Sequence[Output]
 
-    # Instance to use for timer signs.
+    # Instance to use for timer signs, or blank if they should not be used.
     timer_inst: str
     timer_switching: PanelSwitchingStyle
     # Outputs to use for the advanced version to swap skins, and to control the indicator.
