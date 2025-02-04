@@ -1948,6 +1948,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
     if prevent_grate_use:
         LOGGER.info('Marking grating collision type to be exported to VScript for cube +USE blocking.')
         coll.vscript_flags |= CollideType.GRATING
+        info.set_attr('needsportalman')
 
     # point_template for spawning dropperless cubes.
     # We can fit 16 in each, start with the count = 16 so

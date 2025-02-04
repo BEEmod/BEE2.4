@@ -466,9 +466,11 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     force_portal_man = has_btn_onoff or info.has_attr('needsportalman')
 
     LOGGER.info(
-        'Blue: {}, Orange: {!s}',
+        'Blue: {}, Orange: {}, On/Off: {}, Portal Manager: {}',
         'Y' if blue_portal else 'N',
         'Y' if oran_portal else 'N',
+        'Y' if has_btn_onoff else 'N',
+        'Y' if force_portal_man else 'N',
     )
 
     if blue_portal and oran_portal:
