@@ -1403,7 +1403,9 @@ def retexture_template(
         if instance is None or not targetname:
             raise ValueError(
                 f'"{template.id}": Barrier setters can only create barriers if '
-                f'a named instance is associated with this template import!'
+                f'a named instance is associated with this template import! '
+                f'Check to see if the instance has a name. '
+                f'Instance: {repr(instance["file"]) if instance is not None else "None"}'
             )
 
         try:
