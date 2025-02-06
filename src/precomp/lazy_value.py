@@ -10,8 +10,10 @@ import operator
 from srctools.vmf import Entity, Output
 from srctools import conv_int, conv_float, conv_bool, Vec, Angle, Matrix
 
-__all__ = ['LazyValue']
+import utils
 
+
+__all__ = ['LazyValue']
 MutTypes = (Vec, Angle, Matrix, Entity, Output)
 
 
@@ -102,8 +104,24 @@ class LazyValue[U](abc.ABC):
         return self.map(Matrix.from_angstr, 'Matrix')
 
     def casefold(self: LazyValue[str]) -> LazyValue[str]:
-        """Call str.casefold()."""
+        """Call str.casefold(). TODO Replace with object IDs?"""
         return self.map(str.casefold, 'str.casefold')
+
+    def as_obj_id(self, kind: str) -> LazyValue[utils.ObjectID]:
+        """Call utils.obj_id()."""
+        return self.map(lambda val: utils.obj_id(val, kind), 'obj_id')
+
+    def as_obj_id_optional(self, kind: str) -> LazyValue[utils.ObjectID | utils.BlankID]:
+        """Call utils.obj_id_optional()."""
+        return self.map(lambda val: utils.obj_id_optional(val, kind), 'obj_id?')
+
+    def as_special_id(self, kind: str) -> LazyValue[utils.SpecialID]:
+        """Call utils.special_id()."""
+        return self.map(lambda val: utils.special_id(val, kind), 'special_id')
+
+    def as_special_id_optional(self, kind: str) -> LazyValue[utils.SpecialID | utils.BlankID]:
+        """Call utils.special_id_optional()."""
+        return self.map(lambda val: utils.special_id_optional(val, kind), 'special_id?')
 
     def __invert__(self: LazyValue[bool]) -> LazyValue[bool]:
         """Invert a boolean."""
