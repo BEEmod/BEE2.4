@@ -21,6 +21,7 @@ from srctools.dmx import Element
 import srctools.logger
 
 from . import tiling, texturing, options, rand, connections, collisions, barriers
+from .lazy_value import LazyValue
 from .texturing import MaterialConf, Portalable, GenCat, TileSize
 from .tiling import TileType
 from plane import PlaneKey
@@ -37,6 +38,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='template')
 # _SCALE_TEMP is converted from Template. The frozenset is the visgroups.
 _TEMPLATES: dict[str, UnparsedTemplate | Template] = {}
 _SCALE_TEMP: dict[tuple[str, frozenset[str]], ScalingTemplate] = {}
+_DUMMY_VMF = VMF()
 
 
 @attrs.define
@@ -176,8 +178,8 @@ class CollisionDef(TemplateEntity):
 @attrs.define
 class BarrierSetter(PlanarTemplateEntity):
     """Alter the glass/grating barrier present in a particlar sub-voxel."""
-    # The ID to use. Blank = remove.
-    id: utils.ObjectID | utils.BlankID
+    # The ID to use, blank = remove.
+    id: LazyValue[utils.ObjectID | utils.BlankID]
     force: bool  # Overwrite an existing barrier if true. Always overwrites if removing.
 
 
@@ -366,8 +368,7 @@ class Template:
         )
         self.tile_setters = list(tile_setters)
         self.voxel_setters = list(voxel_setters)
-        # Ensure those that clear barriers occur first.
-        self.barrier_setters = sorted(barrier_setters, key=lambda setter: setter.id != "")
+        self.barrier_setters = list(barrier_setters)
         self.barrier_clearers = list(barrier_clearers)
         self.collisions = list(coll)
 
@@ -730,7 +731,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             offset=Vec.from_str(ent['origin']),
             normal=Matrix.from_angstr(ent['angles']).up(),
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
-            id=utils.obj_id_optional(ent['barrierid'], 'Barrier Type'),
+            id=LazyValue.parse(ent['barrierid']).as_obj_id_optional('Barrier Type'),
             force=srctools.conv_bool(ent['force']),
         ))
 
@@ -1099,6 +1100,8 @@ def retexture_template(
     # multiple templates in the same block get the same texture, so they
     # can clip into each other without looking bad.
     rand_prefix = f'TEMPLATE_{(origin // 128).x}_{(origin // 128).y}_{(origin // 128).z}:'
+    # All lookups will fail if no instance was provided.
+    fixup_inst = Entity(_DUMMY_VMF) if instance is None else instance
 
     # Reprocess the replace_tex passed in, converting values.
     evalled_replace_tex: dict[str, list[str]] = {}
@@ -1376,10 +1379,15 @@ def retexture_template(
         else:
             type_to_barrier[existing.type] = existing
 
-    for barrier_setter in template.barrier_setters:
-        if not barrier_setter.is_applicable(template_data.visgroups):
-            continue
+    # Resolve IDs, ensure those that clear barriers occur first.
+    barrier_setters = [
+        (setter.id(fixup_inst), setter)
+        for setter in template.barrier_setters
+        if setter.is_applicable(template_data.visgroups)
+    ]
+    barrier_setters.sort(key=lambda tup: tup[0] != "")
 
+    for barrier_id, barrier_setter in barrier_setters:
         setter_pos = round(barrier_setter.offset @ template_data.orient + template_data.origin + sense_offset, 6)
         setter_plane = PlaneKey(barrier_setter.normal @ template_data.orient, setter_pos)
         local = setter_plane.world_to_plane(setter_pos)
@@ -1392,7 +1400,7 @@ def retexture_template(
                 origin=setter_pos,
             )
 
-        if barrier_setter.id == "":
+        if barrier_id == "":
             # Always replace if we're removing it
             del barrier_grid[uv]
             continue
@@ -1409,7 +1417,7 @@ def retexture_template(
             )
 
         try:
-            new_barrier_type = barriers.BARRIER_TYPES[barrier_setter.id]
+            new_barrier_type = barriers.BARRIER_TYPES[barrier_id]
         except KeyError:
             raise ValueError(
                 f'"{template.id}": Barrier setter is set to invalid ID "{barrier_setter.id}"!\n'
