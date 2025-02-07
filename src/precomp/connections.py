@@ -134,7 +134,7 @@ class ShapeSignage:
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
-        'inst', 'config', '_kv_setters',
+        'inst', 'config', '_kv_setters', 'ind_state_relays',
         'ind_panels',
         'antlines', 'shape_signs',
         'ind_style',
@@ -142,6 +142,7 @@ class Item:
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
     ]
+    ind_state_relays: dict[str, Entity] | None
 
     def __init__(
         self,
@@ -152,7 +153,6 @@ class Item:
         panels: Iterable[Entity] = (),
         antlines: Iterable[Antline] = (),
         shape_signs: Iterable[ShapeSignage] = (),
-        ant_toggle_var: str = '',
     ) -> None:
         self.inst = inst
         self.config = item_type
@@ -181,6 +181,8 @@ class Item:
         # This eliminates needing io_proxies.
         # The key is the name of the local ent.
         self._kv_setters: dict[str, Entity] = {}
+        # For custom antlines, the state comp_relays.
+        self.ind_state_relays = None
 
         assert self.name, 'Blank name!'
 
@@ -354,7 +356,7 @@ class Item:
         times: int = -1,
         inst_in: str | None = None,
     ) -> None:
-        """Add an output to this item.
+        """Add an output to this item. Should only be used here during generation.
 
         For convenience, if the output is None this does nothing.
         """
@@ -391,6 +393,36 @@ class Item:
             times=times,
             inst_in=inst_in,
         ))
+
+    def get_ind_state_relay(self, relay_name: str) -> Entity:
+        """Fetch or create the indicator state comp_relay with the given name."""
+        relay_name = relay_name.casefold()
+        if self.ind_state_relays is None:
+            self.ind_state_relays = {}
+
+        try:
+            return self.ind_state_relays[relay_name]
+        except KeyError:
+            pass
+        pos = self.inst['origin']
+        vmf = self.inst.map
+        # Do it this way so that if the style changes we keep all the relays.
+        for state in self.ind_style.states:
+            state_name = state.name.casefold()
+            if state_name not in self.ind_state_relays:
+                self.ind_state_relays[state_name] = vmf.create_ent(
+                    'comp_relay',
+                    targetname=conditions.local_name(self.inst, state.name),
+                    origin=pos,
+                )
+        try:
+            return self.ind_state_relays[relay_name]
+        except KeyError:
+            # Should not happen.
+            raise LookupError(
+                f'Invalid antline mode relay "{relay_name}". '
+                f'Valid: {sorted(self.ind_state_relays)}'
+            ) from None
 
 
 class Connection:
