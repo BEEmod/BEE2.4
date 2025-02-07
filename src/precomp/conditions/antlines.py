@@ -581,6 +581,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 beam['LightningStart'] = NAME_SPR(base_name, indexes[node_a])
                 beam['LightningEnd'] = NAME_SPR(base_name, indexes[node_b])
                 beam['spawnflags'] = conf_beam_flags
+                if initial_state.beam_colour:
+                    beam['rendercolor'] = initial_state.glow_colour
 
         if group.type is NodeType.LASER and cable_conf:
             build_cables(

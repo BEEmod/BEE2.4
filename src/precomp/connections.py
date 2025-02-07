@@ -1366,6 +1366,7 @@ def add_item_indicators(
 
     # Special case - the item wants full control over its antlines.
     if has_ant and style.toggle_var:
+        # Deprecated method, give the item full control.
         item.inst.fixup[style.toggle_var] = ant_name
         # We don't have antlines to control.
         has_ant = False
@@ -1450,7 +1451,7 @@ def add_item_indicators(
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
-        if independent_timer:
+        if independent_timer or style.states:
             # We need to not tie antline control to the timer.
             needs_toggle = has_ant
             inst_type = PanelSwitchingStyle.CUSTOM
@@ -1466,7 +1467,7 @@ def add_item_indicators(
             pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name
         # Ensure only one gets the indicator name.
         elif first_inst and inst_type is PanelSwitchingStyle.INTERNAL:
-            pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else ' '
+            pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else '-'
             first_inst = False
         else:
             # VBSP and/or Hammer seems to get confused with totally empty
@@ -1510,16 +1511,23 @@ def add_item_indicators(
             targetname='toggle_' + item.name,
             target=ant_name,
         )
-        # Don't use the configurable inputs - if they want that, use custAntline.
-        item.add_io_command(
-            item.output_deact(),
-            toggle,
-            'SetTextureIndex',
-            '0',
-        )
-        item.add_io_command(
-            item.output_act(),
-            toggle,
-            'SetTextureIndex',
-            '1',
-        )
+        if style.states:
+            for state in style.states:
+                item.get_ind_state_relay(state.name).add_out(Output(
+                    'OnTrigger', toggle,
+                    'SetTextureIndex', state.frame
+                ))
+        else:
+            # Default behaviour.
+            item.add_io_command(
+                item.output_deact(),
+                toggle,
+                'SetTextureIndex',
+                '0',
+            )
+            item.add_io_command(
+                item.output_act(),
+                toggle,
+                'SetTextureIndex',
+                '1',
+            )
