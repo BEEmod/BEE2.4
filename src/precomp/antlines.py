@@ -205,8 +205,10 @@ class IndicatorStyle:
     # A list of states that are available for this antline set. Each is generated as a comp_relay,
     # overriding the default on/off behaviour.
     states: Sequence[State]
-    # If not blank, override the antlaser model and initial skin.
-    antlaser_model: tuple[str, int]
+    # If states are defined, the initial one.
+    initial_state: State | None
+    # If not blank, override the antlaser model
+    antlaser_model: str
 
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
@@ -265,12 +267,18 @@ class IndicatorStyle:
             State.parse(mode_kv)
             for mode_kv in kv.find_children('states')
         ]
-        antlaser_model_name = kv['antlaser_model', '']
-        if '#' in antlaser_model_name:
-            antlaser_model_name, skin_str = antlaser_model_name.rsplit('#', 1)
-            antlaser_model = antlaser_model_name, conv_int(skin_str)
+        initial_state: State | None
+        if states:
+            initial_state_name = kv['initial_state'].casefold()
+            for state in states:
+                if state.name.casefold() == initial_state_name:
+                    initial_state = state
+                    break
+            else:
+                raise ValueError(f'Initial state "{initial_state_name}" does not exist!')
         else:
-            antlaser_model = antlaser_model_name, 0
+            initial_state = None
+        antlaser_model = kv['antlaser_model', '']
 
         check_kv = kv.find_block('check', or_blank=True)
         if bool(check_kv):
@@ -307,6 +315,7 @@ class IndicatorStyle:
                 floor=floor or parent.floor,
                 toggle_var=toggle_var,
                 states=states,
+                initial_state=initial_state,
                 antlaser_model=antlaser_model,
             )
             if check is not None:
@@ -356,7 +365,8 @@ class IndicatorStyle:
             timer_oran_cmd=(),
             toggle_var='',
             states=(),
-            antlaser_model=('', 0),
+            initial_state=None,
+            antlaser_model='',
         )
 
     def has_advanced_timer(self) -> bool:
