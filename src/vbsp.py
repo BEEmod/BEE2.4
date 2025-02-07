@@ -169,6 +169,9 @@ async def load_settings() -> tuple[
         'the main antline configuration',
         antlines.IndicatorStyle.from_legacy(id_to_item),
     )
+    if indicators.toggle_var:
+        LOGGER.warning('A custom toggle var is nonsensical on the default antline definition. Removing.')
+        indicators = attrs.evolve(indicators, toggle_var='')
 
     # Parse packlist data.
     packing.parse_packlists(res_packlist.result())

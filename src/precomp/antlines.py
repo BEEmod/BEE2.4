@@ -168,6 +168,10 @@ class IndicatorStyle:
     timer_basic_start_cmd: Sequence[Output]
     timer_basic_stop_cmd: Sequence[Output]
 
+    # If set, the item has special antlines. This is a fixup var,
+    # which gets the antline name filled in for us.
+    toggle_var: str
+
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
         """Parse the style from a configuration block.
@@ -214,6 +218,8 @@ class IndicatorStyle:
         check_switching = PanelSwitchingStyle.CUSTOM
         timer_switching = PanelSwitchingStyle.CUSTOM
 
+        toggle_var = kv['toggle_var', '']
+
         check_kv = kv.find_block('check', or_blank=True)
         if bool(check_kv):
             check_inst = check_kv['inst']
@@ -247,6 +253,7 @@ class IndicatorStyle:
                 parent,
                 wall=wall or parent.wall,
                 floor=floor or parent.floor,
+                toggle_var=toggle_var,
             )
             if check is not None:
                 check_inst, check_cmd, cross_cmd = check
@@ -293,6 +300,7 @@ class IndicatorStyle:
             timer_adv_cmds=EmptyMapping,
             timer_blue_cmd=(),
             timer_oran_cmd=(),
+            toggle_var='',
         )
 
     def has_advanced_timer(self) -> bool:

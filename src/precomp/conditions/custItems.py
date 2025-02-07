@@ -28,7 +28,6 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     make_style = antlines.IndicatorStyle.parser(res, 'custAntline block')
 
     remove_signs = res.bool('remove_signs')
-    toggle_var = res['toggle_var', '']
 
     def change_antlines(inst: Entity) -> None:
         """Change the antlines of an item."""
@@ -39,7 +38,4 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
             for sign in item.ind_panels:
                 sign.remove()
             item.ind_panels.clear()
-
-        if toggle_var:
-            item.ant_toggle_var = toggle_var
     return change_antlines

@@ -141,7 +141,6 @@ class Item:
         'inputs', 'outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
-        'ant_toggle_var',
     ]
 
     def __init__(
@@ -165,10 +164,6 @@ class Item:
 
         # And the style to use for the antlines.
         self.ind_style = ind_style
-
-        # If set, the item has special antlines. This is a fixup var,
-        # which gets the antline name filled in for us.
-        self.ant_toggle_var = ant_toggle_var
 
         # From this item
         self.outputs: set[Connection] = set()
@@ -258,7 +253,6 @@ class Item:
         copy.shape_signs = []
 
         copy.ind_style = self.ind_style
-        copy.ant_toggle_var = self.ant_toggle_var
 
         copy.outputs = set()
         copy.inputs = set()
@@ -1339,11 +1333,11 @@ def add_item_indicators(
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, item.ind_style)
+        ant.export(item.inst.map, style)
 
     # Special case - the item wants full control over its antlines.
-    if has_ant and item.ant_toggle_var:
-        item.inst.fixup[item.ant_toggle_var] = ant_name
+    if has_ant and style.toggle_var:
+        item.inst.fixup[style.toggle_var] = ant_name
         # We don't have antlines to control.
         has_ant = False
 
