@@ -407,33 +407,19 @@ class Item:
 
     def get_ind_state_relay(self, relay_name: str) -> Entity:
         """Fetch or create the indicator state comp_relay with the given name."""
-        relay_name = relay_name.casefold()
         if self.ind_state_relays is None:
             self.ind_state_relays = {}
 
+        key = relay_name.casefold()
         try:
-            return self.ind_state_relays[relay_name]
+            return self.ind_state_relays[key]
         except KeyError:
-            pass
-        pos = self.inst['origin']
-        vmf = self.inst.map
-        # Do it this way so that if the style changes we keep all the relays.
-        for state in self.ind_style.states:
-            state_name = state.name.casefold()
-            if state_name not in self.ind_state_relays:
-                self.ind_state_relays[state_name] = vmf.create_ent(
-                    'comp_relay',
-                    targetname=conditions.local_name(self.inst, state.name),
-                    origin=pos,
-                )
-        try:
-            return self.ind_state_relays[relay_name]
-        except KeyError:
-            # Should not happen.
-            raise LookupError(
-                f'Invalid antline mode relay "{relay_name}". '
-                f'Valid: {sorted(self.ind_state_relays)}'
-            ) from None
+            self.ind_state_relays[key] = relay =  self.inst.map.create_ent(
+                'comp_relay',
+                targetname=conditions.local_name(self.inst, relay_name),
+                origin=self.inst['origin'],
+            )
+            return relay
 
 
 class Connection:

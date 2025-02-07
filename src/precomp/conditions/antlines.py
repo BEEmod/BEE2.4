@@ -218,10 +218,11 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 
     # State configurations used when no custom ones are defined.
     # Initial state (off) must be first!
-    default_states = [attrs.evolve(
-            antlines.State.parse(res.find_block('off_state')),
-            name='off_rl',
-        ), attrs.evolve(
+    default_off_state = attrs.evolve(
+        antlines.State.parse(res.find_block('off_state')),
+        name='off_rl',
+    )
+    default_states = [default_off_state, attrs.evolve(
             antlines.State.parse(res.find_block('on_state')),
             name='on_rl',
         )
@@ -336,6 +337,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             [group.item.ind_style] = inp_styles
 
         states = group.item.ind_style.states or default_states
+        initial_state = group.item.ind_style.initial_state
 
         # These trigger the output when we activate.
         out_enable = [Output('', '', 'FireUser2')]
@@ -345,10 +347,17 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             out_enable.append(Output('', 'on_rl', 'Trigger'))
             out_disable.append(Output('', 'off_rl', 'Trigger'))
             inp_items = {group.item}
+            initial_state = default_off_state
         else:
             inp_items = {
                 conn.from_item for conn in group.item.inputs
             }
+            assert initial_state is not None, "No initial state defined but states defined??"
+            # Single item with custom antlines, transfer it there so that handles them.
+            # Sorta a hack, but we only change indicators if the input is also common.
+            if len(inp_items) == 1:
+                [inp_item] = inp_items
+                group.item.transfer_antlines(inp_item)
 
         group.item.enable_cmd = tuple(out_enable)
         group.item.disable_cmd = tuple(out_disable)
@@ -382,7 +391,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     for out in state_out:
                         relay.add_out(out.copy())
 
-            model_name, model_skin = group.item.ind_style.antlaser_model
+            model_name = group.item.ind_style.antlaser_model
             if model_name:
                 vmf.create_ent(
                     'comp_kv_setter',
@@ -392,13 +401,11 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     kv_name='model',
                     kv_value_global=model_name,
                 )
-            else:
-                # First state is the initial state.
-                model_skin = states[0].antlaser_skin
             skinset_str = ' '.join(sorted(skinset))
             for node in group.nodes:
+                # Skinset must be second, otherwise skin will substitute first.
+                node.inst.fixup['$skin'] = initial_state.antlaser_skin
                 node.inst.fixup['$skinset'] = skinset_str
-                node.inst.fixup['$skin'] = model_skin
 
         # For corners, states are applied during regular connection generation.
 
@@ -533,6 +540,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     sprite = vmf.create_ent('env_sprite')
                     for kv in glow_conf:
                         sprite[kv.name] = node.inst.fixup.substitute(kv.value)
+                    if initial_state.glow_colour:
+                        sprite['rendercolor'] = initial_state.glow_colour
 
                     sprite['origin'] = sprite_pos
                     sprite['targetname'] = NAME_SPR(base_name, i)
@@ -550,6 +559,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     beam = vmf.create_ent('env_beam')
                     for kv in beam_conf:
                         beam[kv.name] = node.inst.fixup.substitute(kv.value)
+                    if initial_state.beam_colour:
+                        beam['rendercolor'] = initial_state.glow_colour
 
                     beam['origin'] = beam['targetpoint'] = beam_pos
                     beam['targetname'] = NAME_BEAM_LOW(base_name, i)
