@@ -8,7 +8,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
+from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, conv_int, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
 import utils
@@ -143,6 +143,35 @@ class AntType:
         )
 
 
+@attrs.frozen(eq=False)
+class State:
+    """A specific state to set a custom indicator to.
+
+    This decouples the item from setting skins, allowing it to work with antlasers as well as overlays.
+    """
+    name: str  # Name of relay to create.
+
+    frame: int  # Antline texture frame.
+    beam_colour: str  # Colour for beam, if present.
+    spr_colour: str  # Colour for sprite, if present.
+    antlaser_skin: int  # Model skin.
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> 'State':
+        """Parse from keyvalues."""
+        frame = kv.int('tex_frame')
+        beam_colour = kv['antlaser_beam_colour', kv['beam_color', '255 255 255']]
+        spr_colour = kv['antlaser_sprite_colour', kv['sprite_color', beam_colour]]
+        skin = kv.int('antlaser_skin')
+        return cls(
+            name=kv.name,
+            frame=frame,
+            beam_colour=beam_colour,
+            spr_colour=spr_colour,
+            antlaser_skin=skin,
+        )
+
+
 @final
 @attrs.frozen(eq=False, kw_only=True)
 class IndicatorStyle:
@@ -170,7 +199,13 @@ class IndicatorStyle:
 
     # If set, the item has special antlines. This is a fixup var,
     # which gets the antline name filled in for us.
+    # Deprecated, use the modes instead.
     toggle_var: str
+    # A list of states that are available for this antline set. Each is generated as a comp_relay,
+    # overriding the default on/off behaviour.
+    states: Sequence[State]
+    # If not blank, override the antlaser model and initial skin.
+    antlaser_model: tuple[str, int]
 
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
@@ -219,6 +254,22 @@ class IndicatorStyle:
         timer_switching = PanelSwitchingStyle.CUSTOM
 
         toggle_var = kv['toggle_var', '']
+        if toggle_var:
+            LOGGER.warning(
+                'Antline toggle var "{}" for {} is deprecated, prefer state definitions '
+                'to allow compatibility with antlasers.',
+                toggle_var, desc,
+            )
+        states = [
+            State.parse(mode_kv)
+            for mode_kv in kv.find_children('states')
+        ]
+        antlaser_model_name = kv['antlaser_model', '']
+        if '#' in antlaser_model_name:
+            antlaser_model_name, skin_str = antlaser_model_name.rsplit('#', 1)
+            antlaser_model = antlaser_model_name, conv_int(skin_str)
+        else:
+            antlaser_model = antlaser_model_name, 0
 
         check_kv = kv.find_block('check', or_blank=True)
         if bool(check_kv):
@@ -254,6 +305,8 @@ class IndicatorStyle:
                 wall=wall or parent.wall,
                 floor=floor or parent.floor,
                 toggle_var=toggle_var,
+                states=states,
+                antlaser_model=antlaser_model,
             )
             if check is not None:
                 check_inst, check_cmd, cross_cmd = check
@@ -301,6 +354,8 @@ class IndicatorStyle:
             timer_blue_cmd=(),
             timer_oran_cmd=(),
             toggle_var='',
+            states=(),
+            antlaser_model=('', 0),
         )
 
     def has_advanced_timer(self) -> bool:
