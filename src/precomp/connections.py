@@ -85,6 +85,10 @@ SIGN_ORDER_LOOKUP: dict[consts.Signage | str, int] = {
     enumerate(SIGN_ORDER)
 }
 
+# The generated item for antlasers, which we want to treat as an antline even though it's
+# a non-logic item.
+ID_ANTLASER = utils.special_id('<ANTLASER>')
+
 
 class ShapeSignage:
     """Represents a pair of signage shapes."""
@@ -320,7 +324,7 @@ class Item:
         self.ind_panels.clear()
         self.shape_signs.clear()
 
-    def walk_nonlogic_outputs(self) -> Iterator[tuple[Sequence[Item], Connection]]:
+    def walk_nonlogic_outputs(self, ignore_antlaser: bool) -> Iterator[tuple[Sequence[Item], Connection]]:
         """Iterate over all items this outputs to, passing through logic item connections.
 
         This yields the connection to the final item, plus any logic gates in-between.
@@ -338,7 +342,14 @@ class Item:
                     for item in path
                 ])
             dest = conn.to_item
-            if dest.is_logic and len(dest.inputs) == 1:
+            if len(dest.inputs) != 1:
+                # Must include.
+                yield path, conn
+                continue
+
+            if dest.is_logic or (
+                ignore_antlaser and dest.config.id == ID_ANTLASER
+            ):
                 # Collapsable, search through this.
                 subpath = [*path, dest]
                 for subitem in dest.outputs:

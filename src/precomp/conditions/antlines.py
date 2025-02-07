@@ -17,7 +17,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
 # Antlasers have their own visuals, so they need an item to stay.
 CONFIG_ANTLASER = connections.Config(
-    '<ANTLASER>',
+    connections.ID_ANTLASER,
     input_type=connections.InputType.OR,
     output_act=(None, 'OnUser2'),
     output_deact=(None, 'OnUser1'),

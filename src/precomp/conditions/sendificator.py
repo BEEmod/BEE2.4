@@ -52,10 +52,12 @@ def res_sendificator(vmf: VMF, inst: Entity) -> None:
         delay=0.01,
     ), )
 
-    for ind, (logic, conn) in enumerate(list(sendtor.walk_nonlogic_outputs()), start=1):
+    outputs = list(sendtor.walk_nonlogic_outputs(ignore_antlaser=True))
+    for ind, (logic, conn) in enumerate(outputs, start=1):
         las_item = conn.to_item
         for gate in logic:
-            connections.collapse_item(gate)
+            if gate.is_logic:
+                connections.collapse_item(gate)
         conn.remove()
         try:
             targ_offset, targ_normal = SENDTOR_TARGETS[las_item.name]
