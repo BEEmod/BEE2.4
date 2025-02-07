@@ -86,8 +86,6 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
         targ_item = conn.to_item
         conn.remove()
         try:
-            if targ_item.config.id != 'ITEM_BARRIER':
-                raise KeyError
             gls_barrier = barriers.BARRIERS_BY_NAME.pop(targ_item.name)
         except KeyError as exc:
             raise user_errors.UserError(
