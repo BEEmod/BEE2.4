@@ -1396,8 +1396,11 @@ def retexture_template(
 
         if template_data.debug_marker is not None:
             template_data.debug_marker(
-                'bee2_template_barrier_voxel_clear',
+                'bee2_template_barriersetter',
                 origin=setter_pos,
+                angles=Matrix.from_basis(z=setter_plane.normal),
+                id=barrier_id,
+                force=barrier_setter.force,
             )
 
         if barrier_id == "":
