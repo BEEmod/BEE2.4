@@ -153,23 +153,24 @@ class State:
 
     frame: int  # Antline texture frame.
     beam_colour: str  # Colour for beam, if present.
-    spr_colour: str  # Colour for sprite, if present.
+    glow_colour: str  # Colour for glow sprite, if present.
     antlaser_skin: int  # Model skin.
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> 'State':
         """Parse from keyvalues."""
         frame = kv.int('tex_frame')
-        beam_colour = kv['antlaser_beam_colour', kv['beam_color', '255 255 255']]
-        spr_colour = kv['antlaser_sprite_colour', kv['sprite_color', beam_colour]]
+        beam_colour = kv['antlaser_beam_colour', kv['antlaser_beam_color', '255 255 255']]
+        glow_colour = kv['antlaser_glow_colour', kv['antlaser_glow_color', beam_colour]]
         skin = kv.int('antlaser_skin')
         return cls(
             name=kv.name,
             frame=frame,
             beam_colour=beam_colour,
-            spr_colour=spr_colour,
+            glow_colour=glow_colour,
             antlaser_skin=skin,
         )
+
 
 
 @final
