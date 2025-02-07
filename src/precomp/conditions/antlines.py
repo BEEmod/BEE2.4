@@ -1,6 +1,9 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
+from typing import Literal
+
 from collections.abc import Callable
 from enum import Enum
+
 import attrs
 
 from precomp import instanceLocs, connections, conditions, antlines
@@ -25,10 +28,14 @@ CONFIG_ANTLINE = connections.Config(
     input_type=connections.InputType.OR_LOGIC,
 )
 
-NAME_SPR: Callable[[str, int], str] = '{}-fx_sp_{}'.format
+# Preconfigured format strings for all the names we generate. Centralises the naming format.
+NAME_SPR: Callable[[str, int | Literal['*']], str] = '{}-fx_sp_{}'.format
 NAME_BEAM_LOW: Callable[[str, int], str] = '{}-fx_b_low_{}'.format
 NAME_BEAM_CONN: Callable[[str, int], str] = '{}-fx_b_conn_{}'.format
+NAME_ALL_FX: Callable[[str], str] = '{}-fx_*'.format
+NAME_ALL_BEAM: Callable[[str], str] = '{}-fx_b_*'.format
 NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
+NAME_MODEL: Callable[[str], str] = '{}-mdl'.format
 
 
 # The corner offset in the model for each timer delay value. This starts at delay=3.
@@ -168,6 +175,16 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     """The condition to generate AntLasers and Antline Corners.
 
     This is executed once to modify all instances.
+    Parameters are all for antlasers, the corner follows the style definition:
+    * GlowKeys: Keyvalues for a glow env_sprite generated at each node. If absent, none are added.
+    * GlowHeight: Distance above the floor to generate the glow sprite, if present.
+    * BeamKeys: Keyvalues for the env_beams generated to connect nodes. If absent, none are added.
+    * LasStart: Distance above the floor to position each beam, if present.
+    * CableKeys: Keyvalues for the move_ropes generated to connect nodes. If absent, none are added.
+    * RopePos: Instance-local offset for each rope.
+    * on_state, off_state: Antline states (except for tex_frame), used to specify the default behaviours.
+
+    In the instance, the emitter model must be named `mdl`, and have `$skin`/`$skinset` fixups.
     """
     conf_inst_corner = instanceLocs.resolve_filter('<item_bee2_antline_corner>', silent=True)
     conf_inst_laser = instanceLocs.resolve_filter(res['instance'])
@@ -199,12 +216,16 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     else:
         conf_beam_flags = 0
 
-    conf_outputs = [
-        Output.parse(kv)
-        for kv in res
-        if kv.name in ('onenabled', 'ondisabled')
+    # State configurations used when no custom ones are defined.
+    # Initial state (off) must be first!
+    default_states = [attrs.evolve(
+            antlines.State.parse(res.find_block('off_state')),
+            name='off_rl',
+        ), attrs.evolve(
+            antlines.State.parse(res.find_block('on_state')),
+            name='on_rl',
+        )
     ]
-
     # Find all the markers.
     nodes: dict[str, Node] = {}
 
@@ -310,20 +331,76 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         # Choose a random item name to use for our group.
         base_name = group.nodes[0].item.name
 
-        out_enable = [Output('', '', 'FireUser2')]
-        out_disable = [Output('', '', 'FireUser1')]
-        if group.type is NodeType.LASER:
-            for output in conf_outputs:
-                if output.output.casefold() == 'onenabled':
-                    out_enable.append(output.copy())
-                else:
-                    out_disable.append(output.copy())
-
-        group.item.enable_cmd = tuple(out_enable)
-        group.item.disable_cmd = tuple(out_disable)
         inp_styles = {conn.from_item.ind_style for conn in group.item.inputs}
         if len(inp_styles) == 1:  # Common style, switch to that.
             [group.item.ind_style] = inp_styles
+
+        states = group.item.ind_style.states or default_states
+
+        # These trigger the output when we activate.
+        out_enable = [Output('', '', 'FireUser2')]
+        out_disable = [Output('', '', 'FireUser1')]
+        if states is default_states:
+            # Add in outputs to trigger default states.
+            out_enable.append(Output('', 'on_rl', 'Trigger'))
+            out_disable.append(Output('', 'off_rl', 'Trigger'))
+            inp_items = {group.item}
+        else:
+            inp_items = {
+                conn.from_item for conn in group.item.inputs
+            }
+
+        group.item.enable_cmd = tuple(out_enable)
+        group.item.disable_cmd = tuple(out_disable)
+
+        if group.type is NodeType.LASER:
+            skinset = set()
+            for state in states:
+                state_out = [
+                    Output('OnTrigger', NAME_MODEL(base_name), 'Skin', state.antlaser_skin),
+                ]
+                skinset.add(str(state.antlaser_skin))
+                # We have both and they're set to the same value, can fire all at once.
+                if beam_conf and glow_conf and state.beam_colour == state.glow_colour:
+                    state_out.append(Output(
+                        'OnTrigger', NAME_ALL_FX(base_name),
+                        'Color', state.beam_colour,
+                    ))
+                else:
+                    if beam_conf:
+                        state_out.append(Output(
+                            'OnTrigger', NAME_ALL_BEAM(base_name),
+                            'Color', state.beam_colour,
+                        ))
+                    if glow_conf:
+                        state_out.append(Output(
+                            'OnTrigger', NAME_SPR(base_name, '*'),
+                            'Color', state.beam_colour,
+                        ))
+                for item in inp_items:
+                    relay = item.get_ind_state_relay(state.name)
+                    for out in state_out:
+                        relay.add_out(out.copy())
+
+            model_name, model_skin = group.item.ind_style.antlaser_model
+            if model_name:
+                vmf.create_ent(
+                    'comp_kv_setter',
+                    origin=group.nodes[0].inst['origin'],
+                    target=NAME_MODEL(base_name),
+                    mode='kv',
+                    kv_name='model',
+                    kv_value_global=model_name,
+                )
+            else:
+                # First state is the initial state.
+                model_skin = states[0].antlaser_skin
+            skinset_str = ' '.join(sorted(skinset))
+            for node in group.nodes:
+                node.inst.fixup['$skinset'] = skinset_str
+                node.inst.fixup['$skin'] = model_skin
+
+        # For corners, states are applied during regular connection generation.
 
         # Node -> index for targetnames.
         indexes: dict[Node, int] = {}
