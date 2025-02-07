@@ -125,7 +125,7 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
             return conditions.instvar_comp(inst, val_a, None, val_b)
         case [var]:
             # Single name, treat as boolean.
-            return conv_bool(inst.fixup.substitute(var))
+            return conv_bool(inst.fixup.substitute(var, allow_invert=True))
         case err:  # Only 1 - 3 values are possible.
             raise AssertionError(err)
 

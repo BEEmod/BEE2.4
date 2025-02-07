@@ -570,7 +570,7 @@ class CondCall[CallResultT]:
         return self.func.__doc__
 
     @__doc__.setter
-    def __doc__(self, value: str) -> None:
+    def __doc__(self, value: str | None) -> None:
         self.func.__doc__ = value
 
     def __call__(
@@ -860,8 +860,8 @@ def check_test(
         name = name[1:]
     else:
         desired_result = True
-    if name.startswith('$'):
-        # Not a test, a fixup check.
+    if name.startswith(('$', '!$')):
+        # Not a test function, a fixup check.
         if test.has_children():
             LOGGER.warning('Test "{}" may not have a block!', name)
             return False
@@ -1096,8 +1096,8 @@ def instvar_comp(inst: Entity, val_a: str, op: str | None, val_b: str) -> bool:
         val_a = '$' + val_a
 
     comp_func = INSTVAR_COMP.get(op, INSTVAR_COMP_DEFAULT)
-    val_a = inst.fixup.substitute(val_a, default='')
-    val_b = inst.fixup.substitute(val_b, default='')
+    val_a = inst.fixup.substitute(val_a, default='', allow_invert=True)
+    val_b = inst.fixup.substitute(val_b, default='', allow_invert=True)
     try:
         # Convert to numbers if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
