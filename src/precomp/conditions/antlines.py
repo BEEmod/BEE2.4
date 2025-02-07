@@ -174,7 +174,6 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')
-    conf_toggle_targ = res['toggleTarg', '']
 
     beam_conf = res.find_key('BeamKeys', or_blank=True)
     glow_conf = res.find_key('GlowKeys', or_blank=True)
@@ -325,12 +324,6 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         inp_styles = {conn.from_item.ind_style for conn in group.item.inputs}
         if len(inp_styles) == 1:  # Common style, switch to that.
             [group.item.ind_style] = inp_styles
-
-        if group.type is NodeType.LASER and conf_toggle_targ:
-            # Make the group info_target into a texturetoggle.
-            toggle = group.item.inst
-            toggle['classname'] = 'env_texturetoggle'
-            toggle['target'] = conditions.local_name(group.nodes[0].inst, conf_toggle_targ)
 
         # Node -> index for targetnames.
         indexes: dict[Node, int] = {}
