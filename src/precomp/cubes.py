@@ -6,13 +6,12 @@ from contextlib import suppress
 from weakref import WeakKeyDictionary
 
 from enum import Enum
-from typing import NamedTuple, MutableMapping
+from typing import NamedTuple, MutableMapping,  Literal, assert_never
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle
 import srctools.logger
 import attrs
-from typing_extensions import Literal, assert_never
 
 from precomp import brushLoc, options, packing, conditions, connections
 from precomp.collisions import Collisions, CollideType
@@ -154,6 +153,9 @@ class AddonFixups(Enum):
     DROPPER = 'dropper'
     CUBE = 'cube'
     LINKED = 'linked'
+    TINT = 'tint'
+    IS_COLOURED = 'is_coloured'
+    SUPERPOS = 'superpos'
 
 
 class ModelSwapMeth(Enum):
@@ -313,7 +315,11 @@ class CubeAddon:
             found = True
             for prop in parent:
                 if prop.value.startswith('<') and prop.value.endswith('>'):
-                    src = AddonFixups(prop.value[1:-1].casefold())
+                    val = prop.value[1:-1].casefold()
+                    if val == 'is_colored':
+                        src = AddonFixups.IS_COLOURED
+                    else:
+                        src = AddonFixups(prop.value[1:-1].casefold())
                 else:
                     src = prop.value
                 fixups.append((prop.real_name, src))
@@ -1842,14 +1848,23 @@ def make_cube(
             )
             if addon.fixups is not None:
                 for fixup_var, fixup_src in addon.fixups:
-                    if fixup_src is AddonFixups.CUBE:
-                        inst.fixup[fixup_var] = not in_dropper
-                    elif fixup_src is AddonFixups.DROPPER:
-                        inst.fixup[fixup_var] = in_dropper
-                    elif fixup_src is AddonFixups.LINKED:
-                        inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
-                    else:
-                        inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_src, allow_invert=True)
+                    match fixup_src:
+                        case AddonFixups.CUBE:
+                            inst.fixup[fixup_var] = not in_dropper
+                        case AddonFixups.DROPPER:
+                            inst.fixup[fixup_var] = in_dropper
+                        case AddonFixups.LINKED:
+                            inst.fixup[fixup_var] = pair.dropper is not None and pair.cube is not None
+                        case AddonFixups.IS_COLOURED:
+                            inst.fixup[fixup_var] = pair.tint is not None
+                        case AddonFixups.TINT:
+                            inst.fixup[fixup_var] = pair.tint or pair.cube_type.base_tint
+                        case AddonFixups.SUPERPOS:
+                            inst.fixup[fixup_var] = pair.superpos is not None
+                        case str() as fixup_val:
+                            inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_val, allow_invert=True)
+                        case never:
+                            assert_never(never)
             else:
                 inst.fixup.update(pair.cube_fixup)
         packing.pack_list(vmf, addon.pack)
