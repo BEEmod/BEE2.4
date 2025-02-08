@@ -107,19 +107,19 @@ class LazyValue[U](abc.ABC):
         """Call str.casefold(). TODO Replace with object IDs?"""
         return self.map(str.casefold, 'str.casefold')
 
-    def as_obj_id(self, kind: str) -> LazyValue[utils.ObjectID]:
+    def as_obj_id(self: LazyValue[str], kind: str) -> LazyValue[utils.ObjectID]:
         """Call utils.obj_id()."""
         return self.map(lambda val: utils.obj_id(val, kind), 'obj_id')
 
-    def as_obj_id_optional(self, kind: str) -> LazyValue[utils.ObjectID | utils.BlankID]:
+    def as_obj_id_optional(self: LazyValue[str], kind: str) -> LazyValue[utils.ObjectID | utils.BlankID]:
         """Call utils.obj_id_optional()."""
         return self.map(lambda val: utils.obj_id_optional(val, kind), 'obj_id?')
 
-    def as_special_id(self, kind: str) -> LazyValue[utils.SpecialID]:
+    def as_special_id(self: LazyValue[str], kind: str) -> LazyValue[utils.SpecialID]:
         """Call utils.special_id()."""
         return self.map(lambda val: utils.special_id(val, kind), 'special_id')
 
-    def as_special_id_optional(self, kind: str) -> LazyValue[utils.SpecialID | utils.BlankID]:
+    def as_special_id_optional(self: LazyValue[str], kind: str) -> LazyValue[utils.SpecialID | utils.BlankID]:
         """Call utils.special_id_optional()."""
         return self.map(lambda val: utils.special_id_optional(val, kind), 'special_id?')
 

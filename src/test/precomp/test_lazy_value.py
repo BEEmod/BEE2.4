@@ -106,11 +106,11 @@ def test_map_id_optional(func: Callable[[LazyValue[str], str], LazyValue[Any]]) 
     assert isinstance(inst_val, UnaryMapValue)
     assert inst_val(ent) == ''
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"IDs may not be blank."):
         LazyValue.parse('').as_obj_id('No blanks')
 
     inst_val = LazyValue.parse('$empty').as_obj_id('Deferred raise')
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"IDs may not be blank."):
         inst_val(ent)
 
 
@@ -131,7 +131,7 @@ def test_map_special_ids(func: Callable[[LazyValue[str], str], LazyValue[Any]]) 
     assert isinstance(inst_val, UnaryMapValue)
     assert inst_val(ent) == '<INHERIT>'
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"IDs may not start/end with brackets."):
         LazyValue.parse('<NONE>').as_obj_id('Invalid')
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"IDs may not start/end with brackets."):
         LazyValue.parse('<NONE>').as_obj_id_optional('Invalid')
