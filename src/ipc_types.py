@@ -1,5 +1,5 @@
 """Defines types for the messages that can be passed to loadscreen/bg_daemon."""
-from typing_extensions import Literal, NewType
+from typing import Literal, NewType
 
 import attrs
 

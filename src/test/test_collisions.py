@@ -1,6 +1,6 @@
 """Test the collisions module."""
 from __future__ import annotations
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 from pathlib import Path
 import math
 
@@ -11,7 +11,7 @@ import pytest
 from collisions import BBox, CollideType, NonBBoxError, Volume
 
 
-tuple3 = Tuple[int, int, int]
+type Tuple3 = tuple[int, int, int]
 
 
 def assert_bbox(
@@ -168,7 +168,7 @@ def test_bbox_hash() -> None:
     assert hash(bb) != hash(BBox(40, 60, 80, 120, 450, 732, contents=CollideType.PHYSICS, tags={'tag1', 'tag3'}))
 
 
-def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> Vec:
+def reorder(coord: Tuple3, order: str, x: int, y: int, z: int) -> Vec:
     """Reorder the coords by these axes."""
     assoc = dict(zip('xyz', coord, strict=True))
     return Vec(x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]])
@@ -183,12 +183,12 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tuple3] | None]]:
+def get_intersect_testcases() -> Iterable[tuple[Tuple3, Tuple3, tuple[Tuple3, Tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '..', 'bbox_samples.vmf').resolve().open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
-    def process(brush: Solid) -> tuple[tuple3, tuple3]:
+    def process(brush: Solid) -> tuple[Tuple3, Tuple3]:
         """Extract the bounding box from the brush."""
         bb_min, bb_max = brush.get_bbox()
         for vec in [bb_min, bb_max]:
@@ -225,9 +225,9 @@ def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tu
 @pytest.mark.parametrize('y', [-128, 0, 129])
 @pytest.mark.parametrize('z', [-128, 0, 129])
 def test_bbox_intersection(
-    mins: tuple3, maxs: tuple3,
+    mins: Tuple3, maxs: Tuple3,
     x: int, y: int, z: int,
-    success: tuple[tuple3, tuple3] | None, axes: str,
+    success: tuple[Tuple3, Tuple3] | None, axes: str,
 ) -> None:
     """Test intersection founction for bounding boxes.
 
@@ -338,7 +338,7 @@ def test_bbox_parse_block() -> None:
     ('bottom', ( 80, 10,  40), (150, 220, 40)),  # -Z
     ('top',    ( 80, 10,  70), (150, 220, 70)),  # +Z
 ], ids=['-x', '+x', '-y', '+y', '-z', '+z'])
-def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
+def test_bbox_parse_plane(axis: str, mins: Tuple3, maxes: Tuple3) -> None:
     """Test parsing planar bboxes from a VMF.
 
     With 5 skip sides, the brush is flattened into the remaining plane.

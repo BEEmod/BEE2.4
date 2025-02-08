@@ -172,7 +172,7 @@ class SoundBrowser(SoundBrowserBase):
         chosen = self.wid_type.GetClientData(self.wid_type.GetSelection())
         self.mode.value = chosen
 
-    def _evt_filter_changed(self, event: wx.Event):
+    def _evt_filter_changed(self, event: wx.Event) -> None:
         self.filter.value = self.wid_text_filter.Value
 
     def _evt_resize_soundlist(self, event: wx.SizeEvent) -> None:

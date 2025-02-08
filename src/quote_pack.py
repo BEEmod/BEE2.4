@@ -57,6 +57,7 @@ class LineCriteria(enum.Enum):
         else:
             assert_never(self)
 
+
 # Criteria the player model can set.
 PLAYER_CRITERIA = [
     LineCriteria.CHELL,
@@ -66,6 +67,7 @@ PLAYER_CRITERIA = [
     LineCriteria.HUMAN,
     LineCriteria.ROBOT,
 ]
+
 
 @utils.freeze_enum_props
 class Response(enum.Enum):

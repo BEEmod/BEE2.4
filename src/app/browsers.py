@@ -92,8 +92,10 @@ class Browser(ABC):
         """Successfully select a value."""
         self.result.trigger(value)
 
+    @abc.abstractmethod
     async def _reload(self, packset: PackagesSet, game: Game) -> None:
         """Reload data for a new game or packages."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _ui_show_window(self) -> None:
@@ -115,6 +117,7 @@ class AllowedSounds(enum.Flag):
     # Not necessary, but makes sure type checkers know there's other members possible.
     ALL = SOUNDSCRIPT | RAW_SOUND | CHOREO
 
+
 SOUND_TYPES = [
     (AllowedSounds.SOUNDSCRIPT, TransToken.ui("Soundscript")),
     (AllowedSounds.RAW_SOUND, TransToken.ui("Raw Sounds")),
@@ -130,6 +133,7 @@ def parse_soundscript(file: File) -> dict[str, Sound]:
     with file.open_str(encoding='cp1252') as f:
         kv = Keyvalues.parse(f, file.path, allow_escapes=False)
     return Sound.parse(kv)
+
 
 type SoundSeq = Sequence[Sound | str | choreo.Entry]
 
@@ -171,6 +175,7 @@ class SoundBrowserBase(Browser, ABC):
             ):
                 await trio.sleep(0.1)
                 filter_text = self.filter.value.casefold()
+                result: SoundSeq
                 match self.mode.value:
                     case AllowedSounds.SOUNDSCRIPT:
                         result = [
@@ -270,7 +275,7 @@ class SoundBrowserBase(Browser, ABC):
                 LOGGER.debug('Parsing {}...', file.path)
                 nursery.start_soon(parse_script, file, pos)
         # Merge everything together.
-        soundscripts = {}
+        soundscripts: dict[str, Sound] = {}
         for sounds in parsed:
             soundscripts.update(sounds)
         self._soundscripts.extend(soundscripts.values())

@@ -8,7 +8,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, conv_int, logger
+from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
 import utils
@@ -157,7 +157,7 @@ class State:
     antlaser_skin: int  # Model skin.
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> 'State':
+    def parse(cls, kv: Keyvalues) -> State:
         """Parse from keyvalues."""
         frame = kv.int('tex_frame')
         beam_colour = kv['antlaser_beam_colour', kv['antlaser_beam_color', '255 255 255']]
@@ -170,7 +170,6 @@ class State:
             glow_colour=glow_colour,
             antlaser_skin=skin,
         )
-
 
 
 @final

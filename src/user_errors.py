@@ -174,7 +174,7 @@ class UserError(BaseException):
         )
 
     def __str__(self) -> str:
-        return f'Error message: {self.info.message}'
+        return f'Error message: {self.info.message!r}'
 
 
 # Define a translation token for every error message that can be produced. The app will translate

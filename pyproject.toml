@@ -83,6 +83,7 @@ extend-ignore = [
 	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
 	"PLC1901",  # Allow comparison to empty string etc.
 	"PLW0108",  # Need lambdas for deliberate late binding sometimes.
+	"PLW1641",  # Explicitly setting __hash__ = None is problematic for type checkers
 
 	# Flake8-pyi:
 	"PYI041",  # Use int | float

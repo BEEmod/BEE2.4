@@ -1128,6 +1128,7 @@ async def parse_package(
 
     desc: list[str] = []
     # If this package is unzipped, show warnings about extra values directly to the user.
+    pack_warn: Callable[[TransToken], None]
     if DEV_MODE.value or pack.is_dev():
         pack_warn = errors.add
     else:
