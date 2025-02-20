@@ -158,27 +158,13 @@ def done_callback(result: Outcome[None]) -> None:
 
 def start_main(init: Callable[[trio.Nursery], Awaitable[object]] = init_app) -> None:
     """Starts the Wx and Trio loops."""
-    def run_callback(event: wx.IdleEvent) -> None:
-        """Called to execute the callback."""
-        while queue:
-            queue.popleft()()
-
-    def run_sync_soon_threadsafe(func: Callable[[], Any]) -> None:
-        """Run the specified func in the next loop, from other threads."""
-        queue.append(func)
-        wx.WakeUpIdle()
-
-    queue: collections.deque[Callable[[], Any]] = collections.deque()
-
     LOGGER.debug('Starting Trio loop.')
     trio.lowlevel.start_guest_run(
         app_main, init,
-        run_sync_soon_threadsafe=run_sync_soon_threadsafe,
+        run_sync_soon_threadsafe=wx.CallAfter,
         done_callback=done_callback,
         instruments=[_TRACER] if _TRACER is not None else [],
         strict_exception_groups=True,
     )
-    APP.Bind(wx.EVT_IDLE, run_callback)
-    wx.WakeUpIdle()
     MAIN_WINDOW.Show()
     APP.MainLoop()

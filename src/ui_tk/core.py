@@ -168,6 +168,8 @@ def start_main(init: Callable[[trio.Nursery], Awaitable[object]] = init_app) -> 
 
     See https://github.com/richardsheridan/trio-guest/.
     """
+    # Empirically, Trio will only ever schedule one callback, so the queue is unnecessary.
+    # But better to have it in case it ever does need to.
     def tk_func() -> None:
         """Called to execute the callback."""
         queue.popleft()()
