@@ -497,7 +497,7 @@ async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
         LOGGER.warning('No game selected to restore from?')
         return
 
-    def extract_file(zipfile: ZipFile, src_path: str, dest_path: str) -> None:
+    def extract_file(zipfile: AnyZip, src_path: str, dest_path: str) -> None:
         """Write the file in the background."""
         with zip_open_bin(zipfile, src_path) as src, open(dest_path, 'wb') as dest:
             shutil.copyfileobj(src, dest)
@@ -516,8 +516,8 @@ async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
                 ):
                     continue
             if scr_path in zip_names(back_zip):
-                nursery.start_soon(trio.to_thread.run_sync, extract_file, scr_path, abs_scr)
-            nursery.start_soon(trio.to_thread.run_sync, extract_file, map_path, abs_map)
+                nursery.start_soon(trio.to_thread.run_sync, extract_file, back_zip, scr_path, abs_scr)
+            nursery.start_soon(trio.to_thread.run_sync, extract_file, back_zip, map_path, abs_map)
 
             new_item = p2c.copy()
             new_item.zip_file = FakeZip(game_dir)
