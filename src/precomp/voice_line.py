@@ -106,7 +106,12 @@ def encode_coop_responses(vmf: VMF, pos: Vec, voice: QuoteInfo, info: corridor.I
 
 @conditions.make_result('QuoteEvent', valid_before=conditions.MetaCond.VoiceLine)
 def res_quote_event(res: Keyvalues) -> object:
-    """Enable a quote event. The given file is the default instance."""
+    """Enable a quote event.
+
+    Options:
+    * `id`: The quote event ID to enable.
+    * `file`: If no quote event is present with the specified ID, this instance is placed instead.
+    """
     QUOTE_EVENTS[res['id'].casefold()] = res['file']
 
     return conditions.RES_EXHAUSTED
@@ -410,19 +415,21 @@ def add_voice(
     # QuoteEvents allows specifying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
     # in certain styles, but uses the default if not set.
-    ind = 1
-    for event in voice.events.values():
-        # We ignore the config if no result was executed.
-        if event.id in QUOTE_EVENTS:
+    for ind, (event_id, filename) in enumerate(QUOTE_EVENTS.items(), start=1):
+        try:
+            event = voice.events[event_id.casefold()]
+        except KeyError:
+            pass  # No override, use default from condition.
+        else:
             # Instances from the voiceline config are in this subfolder,
             # but not the default item - that's set from the conditions.
-            conditions.add_inst(
-                vmf,
-                targetname=f'voice_event_{ind}',
-                file=INST_PREFIX + event.file,
-                origin=quote_loc,
-            )
-            ind += 1
+            filename = INST_PREFIX + event.file
+        conditions.add_inst(
+            vmf,
+            targetname=f'voice_event_{ind}',
+            file=filename,
+            origin=quote_loc,
+        )
 
     # Determine the flags that enable/disable specific lines based on which
     # players are used. Silently ignore if this isn't found, the player-model-setter
