@@ -12,6 +12,11 @@ from transtoken import TransToken, TransTokenSource
 import utils
 
 
+__all__ = [
+    'TRANS_NO_NAME', 'MIDCHAMBER_ID', 'PLAYER_CRITERIA', 'RESPONSE_NAMES',
+    'LineCriteria', 'Response', 'QuoteEvent', 'Choreo',
+    'Line', 'Group', 'Quote', 'QuoteInfo', 'Monitor',
+]
 LOGGER = logger.get_logger(__name__)
 TRANS_QUOTE = TransToken.untranslated('"{line}"')
 TRANS_QUOTE_ACT = TransToken.untranslated(': "{line}"')
@@ -146,6 +151,31 @@ class Choreo:
     name: str
 
 
+
+def parse_output(kv: Keyvalues) -> Output:
+    return Output(
+        'OnCompletion',
+        kv['target'],
+        kv['input'],
+        kv['parm', ''],
+        kv.float('delay'),
+        only_once=kv.bool('only_once'),
+        times=kv.int('times', -1),
+    )
+
+def parse_transcript(pak_id: utils.ObjectID, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, TransToken]]:
+    for child in kvs:
+        if ':' in child.value:
+            name, trans = child.value.split(':', 1)
+            yield name.rstrip(), TRANS_QUOTE_ACT.format(
+                line=TransToken.parse(pak_id, trans.lstrip())
+            )
+        else:
+            yield '', TRANS_QUOTE.format(
+                line=TransToken.parse(pak_id, child.value)
+            )
+
+
 @attrs.frozen(kw_only=True)
 class Line:
     """A single group of lines that can be played."""
@@ -192,7 +222,7 @@ class Line:
                 raise ValueError('Quote Pack has no ID or name defined for a line!') from None
 
         disp_name = TransToken.parse(pak_id, kv['name', ''])
-        transcript = list(cls._parse_transcript(pak_id, kv.find_all('trans')))
+        transcript = list(parse_transcript(pak_id, kv.find_all('trans')))
         only_once = kv.bool('onlyonce')
         atomic = kv.bool('atomic')
         caption_name = kv['cc_emit', '']
@@ -205,24 +235,36 @@ class Line:
         instances = [inst for child in kv.find_all('file') for inst in child.as_array()]
         scenes = []
 
-        # Scenes and the dependent commands are order dependent.
+        # Scenes and the (deprecated) dependent commands are order dependent.
         cur_choreo_name = ''
         end_commands: list[Output] = []
         for child in kv:
             # Several alternate names in different configs and sections.
             if child.name in ['choreo_name', 'quote_name', 'target']:
+                if cur_choreo_name:
+                    raise ValueError(
+                        f'Duplicate choreo name override '
+                        f'"{cur_choreo_name}" and "{child.value}"!'
+                    )
+                LOGGER.warning('Choreo name overrides should be set inside the choreo block!')
                 cur_choreo_name = child.value
             elif child.name == 'endcommand':
-                end_commands.append(Output(
-                    'OnCompletion',
-                    child['target'],
-                    child['input'],
-                    child['parm', ''],
-                    child.float('delay'),
-                    only_once=child.bool('only_once'),
-                    times=child.int('times', -1),
-                ))
+                LOGGER.warning('Choreo end commands should be set inside the choreo block!')
+                end_commands.append(parse_output(child))
             elif child.name == 'choreo':
+                scenes = []
+                for choreo_kv in child:
+                    if choreo_kv.name == 'name':
+                        cls._warn_if_vcd(choreo_kv.value, 'name override')
+                        if cur_choreo_name:
+                            raise ValueError(
+                                f'Duplicate choreo name override '
+                                f'"{cur_choreo_name}" and "{choreo_kv.value}"!'
+                            )
+                        cur_choreo_name = choreo_kv.value
+                    elif choreo_kv.name == 'endcommand' and choreo_kv.has_children():
+                        end_commands.append(parse_output(choreo_kv))
+
                 if require_quote_name and not cur_choreo_name:
                     LOGGER.warning('Quote Pack has no quote name for midchamber line!')
                 scenes.append(Choreo(
@@ -254,17 +296,18 @@ class Line:
         )
 
     @classmethod
-    def _parse_transcript(cls, pak_id: utils.ObjectID, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, TransToken]]:
-        for child in kvs:
-            if ':' in child.value:
-                name, trans = child.value.split(':', 1)
-                yield name.rstrip(), TRANS_QUOTE_ACT.format(
-                    line=TransToken.parse(pak_id, trans.lstrip())
-                )
-            else:
-                yield '', TRANS_QUOTE.format(
-                    line=TransToken.parse(pak_id, child.value)
-                )
+    def _warn_if_vcd(cls, value: str, desc: str) -> None:
+        """Check to see if this value might be a VCD path.
+
+        The choreo block in lines used to treat all values as VCDs, so check
+        to see if a user happened to use our option keys as the KV name.
+        """
+        if value.casefold().endswith('.vcd') and ('/' in value or '\\' in value):
+            LOGGER.warning(
+                'Choreo line {} "{}" may be a VCD, '
+                'change key to "scene" if so.',
+                desc, value,
+            )
 
     def iter_trans_tokens(self, path: str) -> Iterator[TransTokenSource]:
         """Yield all translatable tokens for this line."""
