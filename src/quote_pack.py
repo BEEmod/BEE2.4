@@ -158,7 +158,7 @@ class Line:
     atomic: bool
 
     caption_name: str
-    bullseyes: list[str]
+    bullseyes: set[str]
     instances: list[str]
     sounds: list[str]
     scenes: list[Choreo]
@@ -183,10 +183,14 @@ class Line:
             quote_id = kv['id']
         except LookupError:
             quote_id = kv['name', '']
-            LOGGER.warning(
-                'Quote Pack has no specific ID for "{}"!',
-                quote_id,
-            )
+            if quote_id:
+                LOGGER.warning(
+                    'Quote Pack has no ID defined for line "{}"!',
+                    quote_id,
+                )
+            else:
+                raise ValueError('Quote Pack has no ID or name defined for a line!') from None
+
         disp_name = TransToken.parse(pak_id, kv['name', ''])
         transcript = list(cls._parse_transcript(pak_id, kv.find_all('trans')))
         only_once = kv.bool('onlyonce')
@@ -196,9 +200,9 @@ class Line:
             child.value.casefold()
             for child in kv.find_all('setstylevar')
         }
-        sounds = [child.value for child in kv.find_all('snd')]
-        bullseyes = [child.value for child in kv.find_all('bullseye')]
-        instances = [child.value for child in kv.find_all('file')]
+        sounds = [snd for child in kv.find_all('snd') for snd in child.as_array()]
+        bullseyes = {bullseye for child in kv.find_all('bullseye') for bullseye in child.as_array()}
+        instances = [inst for child in kv.find_all('file') for inst in child.as_array()]
         scenes = []
 
         # Scenes and the dependent commands are order dependent.
