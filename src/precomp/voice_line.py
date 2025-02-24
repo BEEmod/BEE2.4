@@ -511,10 +511,10 @@ def add_voice(
             add_line(
                 vmf,
                 rng.choice(chosen),
-                group.choreo_name,
-                group.choreo_loc or quote_loc,
+                group.ent_name,
+                group.loc_override if group.loc_override is not None else quote_loc,
                 style_vars,
-                group.choreo_use_dings and voice.use_dings,
+                group.use_dings_override if group.use_dings_override is not None else voice.use_dings,
             )
 
     if allow_mid_voices:

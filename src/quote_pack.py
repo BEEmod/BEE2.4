@@ -314,17 +314,17 @@ class Group:
     id: str
     name: TransToken
     desc: TransToken
-    choreo_name: str
-    choreo_loc: Vec | None
-    choreo_use_dings: bool
+    ent_name: str
+    loc_override: Vec | None
+    use_dings_override: bool | None
 
     quotes: list[Quote]
 
     @classmethod
     def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues) -> Self:
         """Parse from the keyvalues data."""
-        choreo_name = kv['Choreo_Name', '@choreo']
-        use_dings = kv.bool('use_dings', True)
+        ent_name = kv['Choreo_Name', '@choreo']
+        use_dings = kv.bool('use_dings', None)
 
         name_raw = kv['name']
         try:
@@ -350,9 +350,9 @@ class Group:
             id=group_id,
             name=name,
             desc=desc,
-            choreo_name=choreo_name,
-            choreo_use_dings=use_dings,
-            choreo_loc=choreo_loc,
+            ent_name=ent_name,
+            use_dings_override=use_dings,
+            loc_override=choreo_loc,
             quotes=quotes,
         )
 
