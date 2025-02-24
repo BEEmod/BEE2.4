@@ -89,7 +89,7 @@ def encode_coop_responses(vmf: VMF, pos: Vec, voice: QuoteInfo, info: corridor.I
         ent = vmf.create_ent(
             'bee2_coop_response',
             origin=pos,
-            type=response.name,
+            type=response.name.casefold(),
         )
 
         index = 1

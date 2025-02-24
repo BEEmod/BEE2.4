@@ -10,7 +10,7 @@ def generate_coop_responses(ctx: Context) -> None:
     """If the entities are present, add the coop response script."""
     responses: dict[str, list[str]] = {}
     for response in ctx.vmf.by_class['bee2_coop_response']:
-        responses[response['type']] = [
+        responses[response['type'].casefold()] = [
             value for key, value in response.items()
             if key.startswith('choreo')
         ]
