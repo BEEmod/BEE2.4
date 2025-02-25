@@ -1547,17 +1547,18 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
                         or brush_type.textures[TexGroup.TRIGGER]
                         or brush_type.textures[TexGroup.CENTER]
                     )
-                    if brush_type.singular:
-                        goo_brush_ent = brush_ent  # Can continue appending
-                    else:
-                        # Need a separate one. Don't bother with the mat-mod, this should be invisible.
-                        # We must use the same origin to prevent leaks.
-                        goo_brush_ent = brush_type.generate_ent(vmf, fizz, (seg_min + seg_max) / 2)
-                        if goo_brush_ent['classname'] == 'trigger_portal_cleanser':
-                            goo_brush_ent['visible'] = '0'
-                            goo_brush_ent['usescanline'] = '0'
                     normal = fizz.normal()
                     for start, end in goo_runs:
+                        if brush_type.singular:
+                            goo_brush_ent = brush_ent  # Can continue appending.
+                        else:
+                            # Need a separate one. Don't bother with the mat-mod, this should be invisible.
+                            goo_brush_ent = brush_type.generate_ent(
+                                vmf, fizz, (start + end) / 2 - (0, 0, 104),
+                            )
+                            if goo_brush_ent['classname'] == 'trigger_portal_cleanser':
+                                goo_brush_ent['visible'] = '0'
+                                goo_brush_ent['usescanline'] = '0'
                         goo_brush_ent.solids.append(vmf.make_prism(
                             start - (brush_type.thickness / 2) * normal - 64 * fizz.up_axis,
                             end + (brush_type.thickness / 2) * normal - 144 * fizz.up_axis,
