@@ -1184,6 +1184,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             filterclass='prop_paint_bomb',
         )
 
+    barrier_input_points = []
     wall_goo_extend = options.get_itemconf('VALVE_TEST_ELEM:ExtendGooBarrier', False)
 
     debug_skin: dict[utils.ObjectID | utils.BlankID, int] = {
@@ -1210,6 +1211,19 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     vmf, coll, barrier, plane_slice,
                     False, min_u, min_v, max_u, max_v,
                 )
+                # Additionally, check to see if any vanilla glass/grating items still have
+                # inputs defined. That's  invalid right now (custom barrier items would have been
+                # stripped, and it's reserved for sliding barriers).
+                if (
+                    sub_barrier.item is not None
+                    and sub_barrier.item.inputs
+                    and sub_barrier.type.id in [GLASS_ID, GRATE_ID]
+                ):
+                    barrier_input_points += [
+                        plane_slice.plane_to_world(32 * u + 16, 32 * v + 16)
+                        for u in range(min_u, max_u + 1)
+                        for v in range(min_v, max_v + 1)
+                    ]
 
             add_glass_floorbeams(vmf, barrier, plane_slice, group_plane)
 
@@ -1290,6 +1304,13 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     vmf, coll, barrier, plane_slice,
                     True, min_u, min_v, max_u, max_v,
                 )
+
+    if barrier_input_points:
+        # Raise an error showing every offending barrier.
+        raise user_errors.UserError(
+            user_errors.TOK_BARRIER_RESERVED_INPUT,
+            points=barrier_input_points,
+        )
 
     for hole_plane in HOLES.values():
         for hole in hole_plane.values():

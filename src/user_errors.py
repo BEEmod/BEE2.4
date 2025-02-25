@@ -356,6 +356,11 @@ TOK_BARRIER_HOLE_DISALLOWED = TransToken.ui(
     'which does not allow holes.'
 )
 
+TOK_BARRIER_RESERVED_INPUT = TransToken.ui(
+    'The highlighted barrier items have inputs connected, but this is currently permitted only to '
+    'transform them into custom barrier types.'
+)
+
 TOK_CHAINING_MULTI_INPUT = TransToken.ui(
     'A chain of items has multiple inputs to a single item. The chain should form a single '
     'path, not have branches.'
