@@ -308,7 +308,6 @@ class BarrierType:
     error_disp: user_errors.Kind | None = None
     surfaces: Sequence[Brush | Collide] = ()
     floorbeam: FloorbeamConf | None = None
-    coll_thick: float = 4.0
     # If set, the brushes for this item can be combined with others of the same type.
     mergeable: bool = False
     # Hole variants valid for this kind of barrier.
@@ -365,7 +364,6 @@ class BarrierType:
             surfaces=surfaces,
             floorbeam=floorbeam,
             hole_variants=hole_variants,
-            coll_thick=kv.float('coll_thick', 4.0),
             mergeable=kv.bool('mergeable'),
             frame_world_brush=kv.bool('frame_world_brush'),
         )
@@ -1398,12 +1396,18 @@ def place_lighting_origin(
         name = conditions.local_name(barrier.item.inst, 'lighting')
     else:
         name = 'lighting'
+    # Calculate average centre-point for surfaces.
+    inset = sum(
+        (segment.offset + segment.thickness / 2)
+        for segment in barrier.type.surfaces
+        # Guard against /0 error, just use 0.
+    ) / min(1, len(barrier.type.surfaces))
     ent = vmf.create_ent(
         'info_lighting',
         origin=plane.plane_to_world(
             best_u * 32 + 16.0,
             best_v * 32 + 16.0,
-            barrier.type.coll_thick / 2,
+            inset,
         ),
         targetname=name,
     )
