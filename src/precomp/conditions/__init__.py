@@ -483,7 +483,10 @@ def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object
     It's a closure over the function, to allow reference to the function more directly.
     This also means it can be reused for other funcs with the same order.
     """
-    func = eval(f'lambda func: lambda {inputs}: func({outputs})')
+    func = eval(compile(
+        f'lambda func: lambda {inputs}: func({outputs})',
+        '<condition reorderer>', 'eval',
+    ))
     assert isinstance(func, types.FunctionType)
     return func
 
