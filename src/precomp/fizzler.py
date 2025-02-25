@@ -1,11 +1,13 @@
 """Implements fizzler/laserfield generation and customisation."""
 from __future__ import annotations
+
 from typing import Self, final, assert_never
 
 from collections.abc import Callable, Iterator, Sequence
 from collections import defaultdict
 from enum import Enum
 import itertools
+import math
 
 import attrs
 import srctools.vmf
@@ -14,13 +16,8 @@ from srctools import FrozenVec, Keyvalues, NoKeyError, Vec, Matrix, Angle, logge
 
 import utils
 from precomp import (
-    instance_traits, tiling, instanceLocs,
-    texturing,
-    connections,
-    options,
-    packing,
-    template_brush,
-    conditions, rand,
+    instance_traits, tiling, instanceLocs, texturing, connections,
+    options, packing, template_brush, brushLoc, conditions, rand,
 )
 import consts
 import user_errors
@@ -59,6 +56,8 @@ class TexGroup(Enum):
     FITTED = 'fitted'  # If set, use this for all - scaled like laserfields do.
     # If set, it's an invisible trigger/clip - just apply this to all sides.
     TRIGGER = 'trigger'
+    # If set, overrides material used for the invisible 1/4 section to the top of goo.
+    GOO = 'goo'
 
     # Special case - for Tag fizzlers, when it's on for that side.
     TAG_ON_LEFT = 'tag_left'
@@ -158,6 +157,7 @@ def read_configs(conf: Keyvalues) -> None:
             local_keys={},
             outputs=[],
             singular=True,
+            goo_extend=True,
         ))
 
 
@@ -654,6 +654,7 @@ class FizzlerBrush:
         side_color: Vec | None = None,
         singular: bool = False,
         set_axis_var: bool = False,
+        goo_extend: bool = False,
         mat_mod_name: str | None = None,
         mat_mod_var: str | None = None,
     ) -> None:
@@ -671,6 +672,9 @@ class FizzlerBrush:
 
         # If set, stretch the center to the brush size.
         self.stretch_center = stretch_center
+
+        # If set, this is allowed to extend into the goo underneath the fizzler.
+        self.goo_extend = goo_extend
 
         # If set, store a 'axis' variable in VScript to the plane.
         self.set_axis_var = set_axis_var
@@ -692,6 +696,9 @@ class FizzlerBrush:
         self.textures: dict[TexGroup, str | None] = {}
         for group in TexGroup:
             self.textures[group] = textures.get(group, None)
+
+        if self.textures[TexGroup.GOO]:
+            self.goo_extend = True
 
     @classmethod
     def parse(cls, conf: Keyvalues, fizz_id: utils.ObjectID) -> FizzlerBrush:
@@ -740,6 +747,7 @@ class FizzlerBrush:
             stretch_center=conf.bool('stretch_center', True),
             side_color=side_color,
             singular=conf.bool('singular'),
+            goo_extend=conf.bool('goo_extend'),
             mat_mod_name=conf['mat_mod_name', None],
             mat_mod_var=conf['mat_mod_var', None],
             set_axis_var=conf.bool('set_axis_var'),
@@ -1002,6 +1010,36 @@ class FizzlerBrush:
         side.uaxis.offset %= tex_size
         side.vaxis.offset %= tex_size
 
+    def generate_ent(self, vmf: VMF, fizz: Fizzler, center: Vec) -> Entity:
+        """Create an entity for this brush type."""
+        brush_ent = vmf.create_ent(classname='func_brush')
+        for key_name, key_value in self.keys.items():
+            brush_ent[key_name] = fizz.base_inst.fixup.substitute(key_value, allow_invert=True)
+        for key_name, key_value in self.local_keys.items():
+            brush_ent[key_name] = conditions.local_name(
+                fizz.base_inst,
+                fizz.base_inst.fixup.substitute(key_value, allow_invert=True),
+            )
+        brush_ent['targetname'] = conditions.local_name(
+            fizz.base_inst, self.name,
+        )
+        # Set this to the center, to make sure it's not going to leak.
+        brush_ent['origin'] = center
+        # For fizzlers flat on the floor/ceiling, scanlines look
+        # useless. Turn them off.
+        if 'usescanline' in brush_ent and fizz.normal().z:
+            brush_ent['UseScanline'] = 0
+        if self.set_axis_var:
+            brush_ent['vscript_init_code'] = f'axis <- `{fizz.normal().axis()}`;'
+        for out in self.outputs:
+            new_out = out.copy()
+            new_out.target = conditions.local_name(
+                fizz.base_inst,
+                new_out.target,
+            )
+            brush_ent.add_out(new_out)
+        return brush_ent
+
 
 def make_model_namer(fizz_type: FizzlerType, fizz_name: str) -> Callable[[int], str]:
     """Define a function which applies the model naming."""
@@ -1220,6 +1258,7 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
     """
     has_fizz_border = 'fizz_border' in texturing.SPECIAL
     conf_tile_blacken = options.get_itemconf(('VALVE_FIZZLER', 'BlackenTiles'), False)
+    conf_goo_extend = options.get_itemconf(('VALVE_TEST_ELEM', 'ExtendGooBarrier'), False)
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -1237,6 +1276,9 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
             and fizz.base_inst.fixup.bool('$start_enabled', True)
         )
         tile_blacken = conf_tile_blacken and fizz.fizz_type.blocks_portals
+        goo_extend = conf_goo_extend and fizz.up_axis.z > 0.9 and any(
+            brush.goo_extend for brush in fizz.fizz_type.brushes
+        )
 
         pack_list = (
             fizz.fizz_type.pack_lists_static
@@ -1374,6 +1416,28 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
             min_inst.fixup.update(fizz.base_inst.fixup)
             instance_traits.get(min_inst).update(fizz_traits)
 
+            goo_runs = []
+            if goo_extend:
+                # Find runs of goo below the emitters.
+                vox_common = seg_min - Vec.dot(forward, seg_min)
+                vox_min = vox_common + forward * (math.floor(Vec.dot(forward, seg_min) / 128) * 128 + 64)
+                vox_max = vox_common + forward * (math.ceil(Vec.dot(forward, seg_max) / 128) * 128 - 64)
+                cur_goo_start: Vec | None = None
+                cur_goo_end: Vec | None = None
+                for pos in Vec.iter_line(vox_min, vox_max, 128):
+                    voxel = brushLoc.POS.lookup_world(pos - (0, 0, 128))
+                    if voxel.is_goo and voxel.is_top:
+                        cur_goo_end = seg_max if pos == vox_max else pos + 64 * forward
+                        if cur_goo_start is None:
+                            # Start a run
+                            cur_goo_start = seg_min if pos == vox_min else pos - 64 * forward
+                    else:
+                        if cur_goo_start is not None and cur_goo_end is not None:
+                            goo_runs.append((cur_goo_start, cur_goo_end))
+                        cur_goo_start = cur_goo_end = None
+                if cur_goo_start is not None and cur_goo_end is not None:
+                    goo_runs.append((cur_goo_start, cur_goo_end))
+
             if has_fizz_border or tile_blacken:
                 # noinspection PyProtectedMember
                 fizz._edit_border_tiles(vmf, seg_min, seg_max, has_fizz_border, tile_blacken)
@@ -1449,42 +1513,11 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
 
                 # Non-singular or not generated yet - make the entity.
                 if brush_ent is None:
-                    brush_ent = vmf.create_ent(classname='func_brush')
-
-                    for key_name, key_value in brush_type.keys.items():
-                        brush_ent[key_name] = fizz.base_inst.fixup.substitute(key_value, allow_invert=True)
-
-                    for key_name, key_value in brush_type.local_keys.items():
-                        brush_ent[key_name] = conditions.local_name(
-                            fizz.base_inst,
-                            fizz.base_inst.fixup.substitute(key_value, allow_invert=True),
-                        )
-
-                    brush_ent['targetname'] = conditions.local_name(
-                        fizz.base_inst, brush_type.name,
-                    )
-                    # Set this to the center, to make sure it's not going to leak.
-                    brush_ent['origin'] = (seg_min + seg_max)/2
-
-                    # For fizzlers flat on the floor/ceiling, scanlines look
-                    # useless. Turn them off.
-                    if 'usescanline' in brush_ent and fizz.normal().z:
-                        brush_ent['UseScanline'] = 0
+                    brush_ent = brush_type.generate_ent(vmf, fizz, (seg_min + seg_max)/2)
 
                     if brush_ent['classname'] == 'trigger_hurt':
                         trigger_hurt_name = brush_ent['targetname']
                         trigger_hurt_start_disabled = brush_ent['startdisabled']
-
-                    if brush_type.set_axis_var:
-                        brush_ent['vscript_init_code'] = f'axis <- `{fizz.normal().axis()}`;'
-
-                    for out in brush_type.outputs:
-                        new_out = out.copy()
-                        new_out.target = conditions.local_name(
-                            fizz.base_inst,
-                            new_out.target,
-                        )
-                        brush_ent.add_out(new_out)
 
                     if brush_type.singular:
                         # Record for the next iteration.
@@ -1503,14 +1536,33 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
 
                 # Generate the brushes and texture them.
                 brush_ent.solids.extend(
-                    brush_type.generate(
-                        vmf,
-                        fizz,
-                        seg_min,
-                        seg_max,
-                        used_tex_func,
-                    )
+                    brush_type.generate(vmf, fizz, seg_min, seg_max, used_tex_func)
                 )
+
+                if brush_type.goo_extend and goo_runs:
+                    # Extend this into the goo below. 96 would be the surface, but extend further to prevent
+                    # dipping cubes into goo.
+                    mat = (
+                        brush_type.textures[TexGroup.GOO]
+                        or brush_type.textures[TexGroup.TRIGGER]
+                        or brush_type.textures[TexGroup.CENTER]
+                    )
+                    if brush_type.singular:
+                        goo_brush_ent = brush_ent  # Can continue appending
+                    else:
+                        # Need a separate one. Don't bother with the mat-mod, this should be invisible.
+                        # We must use the same origin to prevent leaks.
+                        goo_brush_ent = brush_type.generate_ent(vmf, fizz, (seg_min + seg_max) / 2)
+                        if goo_brush_ent['classname'] == 'trigger_portal_cleanser':
+                            goo_brush_ent['visible'] = '0'
+                            goo_brush_ent['usescanline'] = '0'
+                    normal = fizz.normal()
+                    for start, end in goo_runs:
+                        goo_brush_ent.solids.append(vmf.make_prism(
+                            start - (brush_type.thickness / 2) * normal - 64 * fizz.up_axis,
+                            end + (brush_type.thickness / 2) * normal - 144 * fizz.up_axis,
+                            mat,
+                        ).solid)
 
         # We have a trigger_hurt in this fizzler, potentially generate
         # the flinching logic.
