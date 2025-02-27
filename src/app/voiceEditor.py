@@ -7,11 +7,9 @@ from tkinter.font import nametofont as tk_nametofont
 import tkinter as tk
 from collections.abc import Iterable
 from configparser import SectionProxy
-from decimal import Decimal
 from enum import Enum
 import functools
 
-from srctools import Keyvalues
 import attrs
 import srctools.logger
 
@@ -159,15 +157,6 @@ def init_widgets() -> None:
     # original size.
     trans_frame.update_idletasks()
     pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
-
-
-def quote_sort_func(quote: Keyvalues) -> Decimal:
-    """The quotes will be sorted by their priority value."""
-    # Use Decimal so any number of decimal points can be used.
-    try:
-        return Decimal(quote['priority', '0'])
-    except ArithmeticError:
-        return Decimal('0')
 
 
 def show_trans(transcript: list[tuple[str, TransToken]], e: tk.Event) -> None:
