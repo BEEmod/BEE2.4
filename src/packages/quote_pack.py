@@ -3,7 +3,7 @@ from typing import Final
 
 from collections.abc import Iterator
 
-from srctools import Angle, Keyvalues, NoKeyError, logger
+from srctools import Keyvalues, NoKeyError, logger
 import srctools
 
 from packages import (
@@ -62,14 +62,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
         except NoKeyError:
             monitor = None
         else:
-            monitor = Monitor(
-                studio=monitor_data['studio'],
-                studio_actor=monitor_data['studio_actor', ''],
-                interrupt=monitor_data.float('interrupt_chance', 0),
-                cam_loc=monitor_data.vec('Cam_loc'),
-                cam_angle=Angle(monitor_data.vec('cam_angles')),
-                turret_hate=monitor_data.bool('TurretShoot'),
-            )
+            monitor = Monitor.parse(monitor_data)
 
         # Parse immediately.
         config = await (await get_config(

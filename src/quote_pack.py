@@ -418,6 +418,17 @@ class Monitor:
     interrupt: float
     cam_angle: Angle
 
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> 'Monitor':
+        return cls(
+            studio=kv['studio'],
+            studio_actor=kv['studio_actor', ''],
+            interrupt=kv.float('interrupt_chance', 0),
+            cam_loc=kv.vec('Cam_loc'),
+            cam_angle=Angle(kv.vec('cam_angles')),
+            turret_hate=kv.bool('TurretShoot'),
+        )
+
 
 @attrs.define(kw_only=True)
 class QuoteInfo:
