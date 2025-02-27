@@ -137,7 +137,8 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
             lines = responses.setdefault(resp, [])
             with logger.context(repr(resp)):
                 for line_kv in resp_kv:
-                    lines.append(Line.parse(data.pak_id, line_kv, False))
+                    if line_kv.name.startswith('line'):
+                        lines.append(Line.parse(data.pak_id, line_kv, False))
 
         return cls(
             data.id,
