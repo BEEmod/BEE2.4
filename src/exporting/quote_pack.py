@@ -57,8 +57,9 @@ async def step_quote_pack(exp_data: ExportData) -> None:
     except KeyError:
         raise AppError(TRANS_OBJ_NOT_FOUND.format(object="Voice", id=sel_id)) from None
 
-    exp_data.vbsp_conf += voice.config
-    await write_data(exp_data.game, voice.data)
+    data, config = await voice.parse_conf()
+    exp_data.vbsp_conf += config
+    await write_data(exp_data.game, data)
 
     # Copy the config files for this voice line...
     for prefix, pretty in [

@@ -429,14 +429,17 @@ async def init_option(
     sugg_btn.bind('<Enter>', suggested_style_mousein)
     sugg_btn.bind('<Leave>', suggested_style_mouseout)
 
-    def configure_voice() -> None:
-        """Open the voiceEditor window to configure a Quote Pack."""
+    async def configure_voice() -> None:
+        """Open the voiceEditor window to configure a Quote Pack.
+
+        TODO: Push parsing into editor code, make not async.
+        """
         try:
             chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value)
         except KeyError:
-            pass
-        else:
-            voiceEditor.show(tk_img, chosen_voice)
+            return
+        info, _ = await chosen_voice.parse_conf()
+        voiceEditor.show(tk_img, chosen_voice, info)
     for ind, name in enumerate([
             TransToken.ui("Style: "),
             None,
@@ -454,7 +457,7 @@ async def init_option(
     voice_frame.columnconfigure(1, weight=1)
     btn_conf_voice = ttk.Button(
         voice_frame,
-        command=configure_voice,
+        command=lambda: core_nursery.start_soon(configure_voice),
         width=8,
     )
     btn_conf_voice.grid(row=0, column=0, sticky='NS')

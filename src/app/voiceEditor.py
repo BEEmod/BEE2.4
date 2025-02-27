@@ -18,7 +18,7 @@ import srctools.logger
 from app import img
 from BEE2_config import ConfigFile
 from packages import QuotePack
-from quote_pack import Line, LineCriteria
+from quote_pack import Line, LineCriteria, QuoteInfo
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.img import TKImages
@@ -235,7 +235,7 @@ def add_tabs(tk_img: TKImages) -> None:
         notebook.select(current_tab)
 
 
-def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
+def show(tk_img: TKImages, quote_pack: QuotePack, info: QuoteInfo) -> None:
     """Display the editing window."""
     global voice_item, config, config_mid, config_resp
     if voice_item is not None:
@@ -269,7 +269,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
 
     TABS.clear()
 
-    for group in quote_pack.data.groups.values():
+    for group in info.groups.values():
         make_tab(
             tk_img,
             TabTypes.NORM,
@@ -282,7 +282,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             )
         )
 
-    if quote_pack.data.midchamber:
+    if info.midchamber:
         make_tab(
             tk_img,
             TabTypes.MIDCHAMBER,
@@ -291,11 +291,11 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             config=config_mid,
             contents=(
                 (quote.name, ID_MIDCHAMBER, quote.lines)
-                for quote in sorted(quote_pack.data.midchamber, key=lambda quote: quote.name.token)
+                for quote in sorted(info.midchamber, key=lambda quote: quote.name.token)
             )
         )
 
-    if any(quote_pack.data.responses.values()):
+    if any(info.responses.values()):
         make_tab(
             tk_img,
             TabTypes.RESPONSE,
@@ -304,7 +304,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             config=config_resp,
             contents=(
                 (resp.title, resp.name.lower(), lines)
-                for resp, lines in quote_pack.data.responses.items()
+                for resp, lines in info.responses.items()
             )
         )
 

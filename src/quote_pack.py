@@ -233,7 +233,7 @@ class Line:
         sounds = [snd for child in kv.find_all('snd') for snd in child.as_array()]
         bullseyes = {bullseye for child in kv.find_all('bullseye') for bullseye in child.as_array()}
         instances = [inst for child in kv.find_all('file') for inst in child.as_array()]
-        scenes = []
+        scenes: list[Choreo] = []
 
         # Scenes and the (deprecated) dependent commands are order dependent.
         cur_choreo_name = ''
@@ -392,6 +392,16 @@ class Group:
                 Quote.parse(pak_id, child, False)
                 for child in kv.find_all('Quote')
             ]
+
+        used_ids = set()
+        for quote in quotes:
+            for line in quote.lines:
+                if line.id in used_ids:
+                    LOGGER.warning(
+                        'Quote Pack has duplicate line ID "{}" in group "{}"!',
+                        line.id, group_id
+                    )
+                used_ids.add(line.id)
 
         return cls(
             id=group_id,
