@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Final, Protocol, Self, override
-from collections.abc import Iterable, Iterator
+from collections.abc import AsyncIterator, Iterable, Iterator
 from contextlib import AbstractContextManager, aclosing
 import itertools
 
@@ -370,11 +370,12 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         )
 
     @override
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield translation tokens for this config group."""
         source = f'configgroup/{self.id}'
         yield self.name, f'{source}.name'
-        yield from self.desc.iter_tokens(f'{source}.desc')
+        for tok in self.desc.iter_tokens(f'{source}.desc'):
+            yield tok
         for widget in itertools.chain(self.widgets, self.multi_widgets):
             yield widget.name, f'{source}/{widget.id}.name'
             yield widget.tooltip, f'{source}/{widget.id}.tooltip'

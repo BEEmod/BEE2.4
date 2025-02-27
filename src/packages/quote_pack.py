@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Final
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
 from srctools import Keyvalues, NoKeyError, logger
 import srctools
@@ -224,19 +224,23 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
                         )
                     used.add(line.id)
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield all translation tokens in this voice pack."""
-        yield from self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
+        async for tok in self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}'):
+            yield tok
         for group in self.data.groups.values():
             yield group.name, f'voiceline/{self.id}/{group.id}.name'
             yield group.desc, f'voiceline/{self.id}/{group.id}.desc'
             for quote in group.quotes:
-                yield from quote.iter_trans_tokens(f'voiceline/{self.id}/{group.id}')
+                for tok in quote.iter_trans_tokens(f'voiceline/{self.id}/{group.id}'):
+                    yield tok
         for resp, lines in self.data.responses.items():
             for line in lines:
-                yield from line.iter_trans_tokens(f'voiceline/{self.id}/responses')
+                for tok in line.iter_trans_tokens(f'voiceline/{self.id}/responses'):
+                    yield tok
         for quote in self.data.midchamber:
-            yield from quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}')
+            for tok in quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}'):
+                yield tok
 
     @classmethod
     def get_selector_attrs(cls, packset: PackagesSet, voice_id: utils.SpecialID) -> AttrMap:

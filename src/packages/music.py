@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final, Iterator, Mapping
 
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 
 from srctools import conv_float
 import srctools.logger
@@ -174,9 +174,9 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
     def __repr__(self) -> str:
         return f'<Music {self.id}>'
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield all translation tokens used by this music."""
-        yield from self.selitem_data.iter_trans_tokens('music/' + self.id)
+        return self.selitem_data.iter_trans_tokens('music/' + self.id)
 
     def has_channel(self, packset: PackagesSet, channel: MusicChannel) -> bool:
         """Check if this track or its children has a channel."""

@@ -2,6 +2,7 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
+from collections.abc import AsyncIterator
 from typing import Final, Iterator
 
 from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
@@ -59,7 +60,7 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
     def __repr__(self) -> str:
         return f'<Elevator {self.id}>'
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield translation tokens present in the elevator."""
         return self.selitem_data.iter_trans_tokens('elevators/' + self.id)
 

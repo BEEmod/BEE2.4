@@ -9,7 +9,7 @@ Those are only relevant for default styles or explicit inheritance.
 from __future__ import annotations
 from typing import Final, Self, override
 
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Iterator, Mapping, Sequence
 from enum import Enum
 from pathlib import PurePosixPath as FSPath
 import copy
@@ -714,12 +714,14 @@ class Item(PakObject, needs_foreground=True):
         return f'<Item:{self.id}>'
 
     @override
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield all translation tokens in this item."""
-        yield from self.glob_desc.iter_tokens(f'items/{self.id}.desc')
+        for tok in self.glob_desc.iter_tokens(f'items/{self.id}.desc'):
+            yield tok
         for version in self.versions.values():
             for style_id, variant in version.styles.items():
-                yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
+                for tok in variant.iter_trans_tokens(f'items/{self.id}/{style_id}'):
+                    yield tok
 
     @classmethod
     @override

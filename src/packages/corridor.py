@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Final
 
 from collections import defaultdict
-from collections.abc import Sequence, Iterator, Mapping
+from collections.abc import AsyncIterator, Sequence, Iterator, Mapping
 import itertools
 
 from srctools import Keyvalues, logger
@@ -444,13 +444,14 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             )
                         dup_check.add(folded)
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Iterate over translation tokens in the corridor."""
         for (mode, direction, orient), corridors in self.corridors.items():
             source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'
             for corr in corridors:
                 yield corr.name, f'{source}.name'
-                yield from corr.desc.iter_tokens(f'{source}.desc')
+                for tok in corr.desc.iter_tokens(f'{source}.desc'):
+                    yield tok
 
     def defaults(self, mode: GameMode, direction: Direction, attach: Attachment) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""

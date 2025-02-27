@@ -6,7 +6,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, NewType, NoReturn, ClassVar, Self, cast, overload
 
-from collections.abc import Awaitable, Callable, Collection, Iterable, Iterator, Mapping
+from collections.abc import (
+    AsyncIterator, Awaitable, Callable, Collection, Iterable, Iterator,
+    Mapping,
+)
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -354,12 +357,13 @@ class SelitemData:
             packages=self.packages | other.packages,
         )
 
-    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self, source: str) -> AsyncIterator[TransTokenSource]:
         """Yield the tokens in this data."""
         yield self.name, f'{source}.long_name'
         yield self.short_name, f'{source}.short_name'
         yield self.group, f'{source}.group'
-        yield from self.desc.iter_tokens(f'{source}.desc')
+        for tok in self.desc.iter_tokens(f'{source}.desc'):
+            yield tok
 
 
 TRANS_NONE_NAME = TransToken.ui("<None>")
@@ -554,12 +558,13 @@ class PakObject:
         """
         pass
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yields translation tokens in this object.
 
         This is used to regenerate package translation files.
         """
-        return iter(())
+        if False:
+            yield None  # noqa
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
@@ -1571,7 +1576,7 @@ class Style(SelPakObject, needs_foreground=True):
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Iterate over translation tokens in the style."""
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 

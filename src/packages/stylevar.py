@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final
 
-from collections.abc import Iterator, Mapping
+from collections.abc import AsyncIterator, Iterator, Mapping
 
 from packages import ExportKey, PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
@@ -96,7 +96,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             f'styles={self.styles}>'
         )
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    async def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield translation tokens used by this stylevar."""
         yield self.name, self.id + '.name'
         yield self.desc, self.id + '.desc'

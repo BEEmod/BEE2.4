@@ -532,7 +532,7 @@ async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[Tr
     for obj_type in packset.objects:
         LOGGER.debug('Checking object type {}', obj_type.__name__)
         for obj in packset.all_obj(obj_type):
-            for tup in obj.iter_trans_tokens():
+            async for tup in obj.iter_trans_tokens():
                 await trio.lowlevel.checkpoint()
                 yield tup
     await trio.lowlevel.checkpoint()

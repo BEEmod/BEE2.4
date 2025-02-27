@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Final
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 from srctools import Keyvalues
 
@@ -73,7 +73,7 @@ class Skybox(
         self.config = lazy_conf.concat(self.config, override.config)
         self.fog_opts += override.fog_opts.copy()
 
-    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+    def iter_trans_tokens(self) -> AsyncIterator[TransTokenSource]:
         """Yield translation tokens used by this skybox."""
         return self.selitem_data.iter_trans_tokens('skyboxes/' + self.id)
 
