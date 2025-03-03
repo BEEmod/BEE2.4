@@ -14,7 +14,7 @@ from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT
-from .tk_tools import center_onscreen, center_win, set_window_icon
+from .tk_tools import center_onscreen, center_win, set_window_icon, wait_eventloop
 from .wid_transtoken import set_text
 
 
@@ -258,7 +258,6 @@ class CustomMessagebox:
         win.wm_protocol('WM_DELETE_WINDOW', self.event_func(None))
         win.title(str(title))
         win.transient(parent)
-        win.grab_set()
         win.columnconfigure(0, weight=1)
         win.columnconfigure(1, weight=1)
         win.columnconfigure(2, weight=1)
@@ -372,9 +371,18 @@ class TkDialogs(Dialogs):
             if self.parent is TK_ROOT:
                 # Force to be centered and visible - the root might be hidden if doing an early add-game.
                 TK_ROOT.deiconify()
+                force_show = True
+                await wait_eventloop()
             center_onscreen(box.win)
-            await box.event.wait()
-            box.win.destroy()
+            try:
+                box.win.grab_set()
+                await box.event.wait()
+            finally:  # If held, the app can't quit.
+                box.win.grab_release()
+                box.win.destroy()
+            if force_show:
+                TK_ROOT.withdraw()
+                await wait_eventloop()
             return cancel if box.result is None else box.result
 
     @override
