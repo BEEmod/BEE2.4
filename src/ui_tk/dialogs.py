@@ -284,11 +284,6 @@ class CustomMessagebox:
 
 class TkDialogs(Dialogs):
     """The class allows passing through a parent window."""
-    INFO = Icon.INFO
-    WARNING = Icon.WARNING
-    QUESTION = Icon.QUESTION
-    ERROR = Icon.ERROR
-
     def __init__(self, parent: tk.Toplevel | tk.Tk) -> None:
         """Create with the specified parent."""
         self.parent = parent
