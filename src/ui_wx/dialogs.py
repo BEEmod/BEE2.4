@@ -1,5 +1,5 @@
 """A consistent interface for dialog boxes."""
-from typing import Literal, override
+from typing import overload, override
 
 from collections.abc import Callable
 
@@ -16,14 +16,25 @@ from . import MAIN_WINDOW
 
 __all__ = ['Dialogs', 'WxDialogs', 'DIALOG']
 
-
+@overload
+def _messagebox(
+    style: int, parent: wx.TopLevelWindow,
+    message: TransToken, title: TransToken,
+    icon: Icon,
+) -> wx.MessageDialog: ...
+@overload
+def _messagebox(
+    style: int, parent: wx.TopLevelWindow,
+    message: TransToken, title: TransToken,
+    icon: Icon, detail: str,
+) -> wx.RichMessageDialog: ...
 def _messagebox(
     style: int,
     parent: wx.TopLevelWindow,
     message: TransToken,
     title: TransToken,
     icon: Icon,
-    detail: str,
+    detail: str = '',
 ) -> wx.RichMessageDialog | wx.MessageDialog:
     """Common logic for message dialogs"""
     match icon:
@@ -163,11 +174,6 @@ async def text_entry_window(
 
 class WxDialogs(Dialogs):
     """The class allows passing through a parent window."""
-    INFO = Icon.INFO
-    WARNING = Icon.WARNING
-    QUESTION = Icon.QUESTION
-    ERROR = Icon.ERROR
-
     def __init__(self, parent: wx.TopLevelWindow) -> None:
         """Create with the specified parent."""
         self.parent = parent
@@ -201,8 +207,8 @@ class WxDialogs(Dialogs):
                 return True
             case wx.ID_CANCEL:
                 return False
-            case res:
-                raise ValueError(res)
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def ask_yes_no(
@@ -220,8 +226,8 @@ class WxDialogs(Dialogs):
                 return True
             case wx.ID_NO:
                 return False
-            case error:
-                raise ValueError(error)
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def ask_yes_no_cancel(
@@ -241,8 +247,8 @@ class WxDialogs(Dialogs):
                 return False
             case wx.ID_CANCEL:
                 return None
-            case error:
-                raise ValueError(error)
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     async def ask_custom(
         self,
@@ -268,6 +274,7 @@ class WxDialogs(Dialogs):
             raise ValueError("Button 3 is missing but set as cancel button?")
         # Now move the cancel button to the end to line up.
         buttons.append(buttons.pop(cancel))
+        await trio.lowlevel.checkpoint()
 
         # TODO: Stock IDs, if ever used with eligible tokens.
         box = _messagebox(
@@ -276,25 +283,26 @@ class WxDialogs(Dialogs):
             message=message,
             title=title,
             icon=icon,
-            detail='',
         )
         match buttons:
-            case [(first, _), (second, _), (third, _)]:
+            case [(first, first_val), (second, sec_val), (third, last_val)]:
                 changed = box.SetYesNoCancelLabels(str(first), str(second), str(third))
-            case [(first, _), (second, _)]:
+            case [(first, first_val), (second, sec_val)]:
                 changed = box.SetOKCancelLabels(str(first), str(second))
+                last_val = sec_val
             case _:
                 raise AssertionError(buttons)
         if not changed:
             # Use wx.GenericMessageDialog?
             raise NotImplementedError("No custom buttons for this platform?")
+        await trio.lowlevel.checkpoint()
         match box.ShowModal():
             case wx.ID_YES | wx.ID_OK:
-                return buttons[0][1]
+                return first_val
             case wx.ID_NO:
-                return buttons[1][1]
+                return sec_val
             case wx.ID_CANCEL:
-                return buttons[-1][1]
+                return last_val
             case btn_id:
                 raise ValueError(f"Unknown button ID: {btn_id}")
 
