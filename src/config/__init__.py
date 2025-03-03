@@ -61,7 +61,7 @@ TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
     'The palette "{name}" has unknown config versions for the following sections:'
 )
 TRANS_MISMATCH_CONF_MESSAGE = TransToken.ui(
-    'The primary config has unknon versions for the following sections:'
+    'The primary config has unknown versions for the following sections:'
 )
 TRANS_MISMATCH_PAL_SKIP_PROMPT = TransToken.ui(
     'Either discard this data to load the rest of the palette, skip it tempoarily, '
@@ -82,9 +82,12 @@ def build_version_mismatch_prompt(
     pal_name: str | None,
 ) -> TransToken:
     """Build the text to describe a version mismatch."""
-    section = TransToken.untranslated('- {name}')
+    section_ver = TransToken.untranslated('- {name}: {found} > {max}')
+    section_unknown = TransToken.untranslated('- {name}')
     sections = [
-        section.format(name=info.name if isinstance(info, ConfInfo) else info)
+        section_ver.format(name=info.name, found=version, max=info.version) if
+        isinstance(info, ConfInfo)
+        else section_unknown.format(name=info)
         for info, version in sections
     ]
     if pal_name is not None:

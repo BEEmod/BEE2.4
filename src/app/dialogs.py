@@ -1,11 +1,15 @@
 """API for dialog boxes."""
-from typing import ClassVar, Literal
+import sys
+from typing import ClassVar, Literal, assert_never
 
 from collections.abc import Callable
 from enum import Enum
 import abc
 
+import trio.lowlevel
+
 from transtoken import AppError, TransToken
+import config
 
 
 type Btn3 = Literal[0, 1, 2]
@@ -130,6 +134,23 @@ class Dialogs(abc.ABC):
         The filter should be a description, plus an extension like `.txt`.
         """
         raise NotImplementedError
+
+
+async def check_future_config(dialogs: Dialogs) -> None:
+    """Check to see if the main config has unknown sections, and prompt the user if that happens."""
+    extra = config.APP.extra_sections
+    if not extra:
+        await trio.lowlevel.checkpoint()
+        return
+    message = config.build_version_mismatch_prompt(extra, False, None)
+    if await dialogs.ask_custom(
+        message,
+        TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
+        cancel=0,
+    ) == 0:
+        # Don't overwrite the config.
+        config.DISABLE_WRITE = True
+        sys.exit()
 
 
 async def test_generic_msg(dialog: Dialogs) -> None:
