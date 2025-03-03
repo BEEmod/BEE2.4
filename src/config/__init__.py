@@ -30,6 +30,8 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
 # Name and version to use for DMX files.
 DMX_NAME = 'BEEConfig'
 DMX_VERSION = 1
+# For tests or other reasons, allow globally disabling saving.
+DISABLE_WRITE: bool = False
 
 
 @attrs.define
@@ -278,8 +280,8 @@ class Config:
 @attrs.define(eq=False)
 class ConfigSpec:
     """A config spec represents the set of data types in a particlar config file."""
-    _name_to_type: dict[str, type[Data]] = attrs.Factory(dict)
-    _registered: set[type[Data]] = attrs.Factory(set)
+    _name_to_type: dict[str, type[Data]] = attrs.field(init=False, factory=dict)
+    _registered: set[type[Data]] = attrs.field(init=False, factory=set)
 
     # After the relevant UI is initialised, this is set to a channel which
     # applies the data to the UI. This way we know it can be done safely now.
@@ -288,9 +290,11 @@ class ConfigSpec:
     _apply_channel: dict[
         tuple[type[Data], str],
         list[trio.MemorySendChannel[Data]],
-    ] = attrs.field(factory=dict, repr=False)
+    ] = attrs.field(init=False, factory=dict, repr=False)
 
-    _current: Config = attrs.Factory(lambda: Config({}))
+    _current: Config = attrs.field(init=False, factory=lambda: Config({}))
+    # When parsing, stash any too-new section names here, for later printing.
+    extra_sections: VersionMismatchList = attrs.field(init=False, factory=list)
 
     def datatype_for_name(self, name: str) -> type[Data]:
         """Lookup the data type for a specific name."""
@@ -740,7 +744,10 @@ class ConfigSpec:
         return root
 
     def read_file(self, filename: Path) -> None:
-        """Read and apply the settings from disk."""
+        """Read and apply the settings from disk.
+
+        After calling, `extra_sections` needs to be checked to display the appropriate message.
+        """
         try:
             file = filename.open(encoding='utf8')
         except FileNotFoundError:
@@ -750,18 +757,21 @@ class ConfigSpec:
                 kv = Keyvalues.parse(file)
         except KeyValError:
             LOGGER.warning('Cannot parse {}!', filename.name, exc_info=True)
-            # Try and move to a backup name, if not don't worry about it.
-            try:
-                filename.replace(filename.with_suffix('.err.vdf'))
-            except OSError:
-                pass
+            backup_conf(filename, ".err")
             return
 
-        self._current, _ = self.parse_kv1(kv)
+        self._current, upgraded, self.extra_sections = self.parse_kv1(kv)
+        if self.extra_sections:
+            LOGGER.warning('Config {} has unknown sections: {}', filename.name, self.extra_sections)
+            backup_conf(filename, ".bak")
+        if upgraded:
+            LOGGER.info('Upgraded config {}', filename.name)
+            if not self.extra_sections:  # Only do once if this somehow occurs.
+                backup_conf(filename, ".bak")
 
     def write_file(self, filename: Path) -> None:
         """Write the settings to disk."""
-        if self._current.is_blank():
+        if self._current.is_blank() or DISABLE_WRITE:
             # We don't have any data saved, abort!
             # This could happen while parsing, for example.
             return
