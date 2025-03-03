@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import IO, TypeGuard, Literal, Final, assert_never, cast
 
 from collections.abc import Sequence
+from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 import os
 import shutil
@@ -523,6 +524,7 @@ async def load_palettes(dialogs: Dialogs) -> list[Palette]:
                 else:
                     if needs_upgrade:
                         LOGGER.info('Resaving older palette file {}', pal.filename)
+                        config.backup_conf(Path(path), ".bak")
                         pal.save(ignore_readonly=True)
                     palettes.append(pal)
                 continue

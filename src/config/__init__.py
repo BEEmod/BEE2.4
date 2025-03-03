@@ -5,10 +5,10 @@ They can then fetch the current state and store new state.
 """
 from __future__ import annotations
 
-import sys
-from typing import ClassVar, Literal, Protocol, Self, assert_never, cast, override
+from typing import ClassVar, Self, cast, override
 from collections.abc import Generator, ItemsView, Iterator, KeysView, Mapping
 from pathlib import Path
+import datetime
 import abc
 import contextlib
 import os
@@ -54,7 +54,6 @@ class ConfInfo[DataT: 'Data']:
 
 # List of mismatched sections produced when parsing.
 type VersionMismatchList = list[tuple[ConfInfo | str, int]]
-type VersionMismatchResult = Literal['skip', 'discard', 'quit']
 TRANS_MISMATCH_TITLE = TransToken.ui('Version Mismatch')
 TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
     'The palette "{name}" has unknown config versions for the following sections:'
@@ -73,20 +72,6 @@ TRANS_MISMATCH_PAL_PROMPT = TransToken.ui(
 TRANS_MISMATCH_CONF_PROMPT = TransToken.ui(
     'Continue (discarding these sections), or quit and leave it unchanged?'
 )
-
-
-class VersionMismatchPrompt(Protocol):
-    """Interface for a specialised dialog which asks users to continue if new/unknown sections are found.
-
-    This should display the description, list of unknown sections, then error.
-    """
-    async def __call__(
-        self,
-        message: TransToken,
-        prompt: TransToken,
-        sections: list[str],
-        can_skip: bool,
-    ) -> VersionMismatchResult: ...
 
 
 def build_version_mismatch_prompt(
@@ -108,6 +93,30 @@ def build_version_mismatch_prompt(
         prompt = TRANS_MISMATCH_CONF_PROMPT
         assert not can_skip, "Primary config can't be skipped?"
     return TransToken.untranslated('\n').join([msg, *sections, prompt])
+
+
+def backup_conf(path: Path, suffix: str) -> None:
+    """Backup the current version of a file, before upgrading or discarding data.
+
+    This is synchronous so we can do it when loading the main config, before the event loop.
+    """
+    folder = path.parent
+    date = datetime.date.today().strftime('%d_%b_%y')
+    ext = path.suffix + suffix
+    name = f'{path.stem}_{date.lower()}'
+    try:
+        dest = (folder / f'{name}{ext}').open('xb')
+    except FileExistsError:
+        i = 1
+        while True:
+            try:
+                dest = (folder / f'{name}_{i}{ext}').open('xb')
+                break
+            except FileExistsError:
+                i += 1
+    with dest, path.open('rb') as src:
+        dest.write(src.read())
+        LOGGER.info('Backup created: {}', dest.name)
 
 
 class Data(abc.ABC):
