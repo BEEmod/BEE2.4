@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import IO, TypeGuard, Literal, Final, assert_never, cast
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from uuid import UUID, uuid4, uuid5
 import os
 import shutil
@@ -495,10 +495,11 @@ class Palette:
         )
 
 
-def load_palettes() -> Iterator[Palette]:
+async def load_palettes(dialogs: Dialogs) -> list[Palette]:
     """Scan and read in all palettes. Legacy files will be converted in the process."""
+    palettes = []
     for name, items in DEFAULT_PALETTES.items():
-        yield Palette.builtin(name, items)
+        palettes.append(Palette.builtin(name, items))
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
@@ -512,7 +513,7 @@ def load_palettes() -> Iterator[Palette]:
                     with srctools.logger.context(name):
                         with open(path, encoding='utf8') as f:
                             kv = Keyvalues.parse(f, path)
-                        pal, needs_upgrade = Palette.parse(kv, path)
+                        pal, needs_upgrade = await Palette.parse(kv, path, dialogs)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
@@ -523,7 +524,7 @@ def load_palettes() -> Iterator[Palette]:
                     if needs_upgrade:
                         LOGGER.info('Resaving older palette file {}', pal.filename)
                         pal.save(ignore_readonly=True)
-                    yield pal
+                    palettes.append(pal)
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
@@ -544,7 +545,7 @@ def load_palettes() -> Iterator[Palette]:
         else:
             # Legacy parsing of BEE2.2 files...
             try:
-                yield parse_legacy(pos_file, prop_file, name)
+                palettes.append(parse_legacy(pos_file, prop_file, name))
             except ValueError as exc:
                 LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
                 continue
@@ -564,6 +565,7 @@ def load_palettes() -> Iterator[Palette]:
             pal.readonly = True
             pal.save()
             shutil.rmtree(path)
+    return palettes
 
 
 def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
@@ -590,9 +592,3 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                 else:
                     raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)
-
-
-if __name__ == '__main__':
-    results = load_palettes()
-    for palette in results:
-        print(palette)

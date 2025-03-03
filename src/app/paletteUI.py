@@ -70,6 +70,7 @@ class PaletteUI:
     def __init__(
         self, f: ttk.Frame, menu: tk.Menu, item_picker: ItemPickerBase,
         *,
+        palettes: list[Palette],
         tk_img: TKImages,
         dialog_menu: Dialogs,
         dialog_window: Dialogs,
@@ -77,7 +78,7 @@ class PaletteUI:
         """Initialises the palette pane."""
         self.palettes: dict[UUID, Palette] = {
             pal.uuid: pal
-            for pal in paletteLoader.load_palettes()
+            for pal in palettes
         }
         prev_state = config.APP.get_cur_conf(PaletteState)
         self.selected_uuid = prev_state.selected

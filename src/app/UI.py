@@ -13,7 +13,7 @@ import trio
 import trio_util
 
 import exporting
-from app import lifecycle, quit_app
+from app import lifecycle, paletteLoader, quit_app
 from app.SubPane import CONF_EXPORT_OPTS, CONF_PALETTE
 from async_util import EdgeTrigger, run_as_task
 from BEE2_config import GEN_OPTS
@@ -665,6 +665,7 @@ async def init_windows(
     await trio.lowlevel.checkpoint()
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu, item_picker,
+        palettes=await paletteLoader.load_palettes(DIALOG),
         tk_img=tk_img,
         dialog_menu=TkDialogs(TK_ROOT),
         dialog_window=TkDialogs(windows['pal'].win),
