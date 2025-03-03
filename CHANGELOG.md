@@ -11,6 +11,8 @@
   relevant files for debugging the error.
 * Flip Panels will now have correct lighting in all positions.
 * Dynamic Angled Panels set to start deployed will be lit for that position.
+* Palettes and configs will now prompt if future versions of the files are found.
+  These will also be backed up if chosen to be loaded.
 
 ### Bugfixes:
 * The case where no voicelines are set is once again handled correctly.
