@@ -1,18 +1,22 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, TypeGuard, Literal, Final, cast
 
-from collections.abc import Iterator, Sequence
+from typing import IO, TypeGuard, Literal, Final, assert_never, cast
+
+from collections.abc import Sequence
+from pathlib import Path
 from uuid import UUID, uuid4, uuid5
 import os
 import shutil
 import zipfile
 import random
 import io
+import sys
 
 from srctools import Keyvalues, NoKeyError, KeyValError
 import srctools.logger
 
+from app.dialogs import Dialogs, TRANS_BTN_QUIT, TRANS_BTN_SKIP, TRANS_BTN_DISCARD
 from transtoken import TransToken
 from consts import DefaultItems
 import config
@@ -236,7 +240,7 @@ def validate_y(y: int) -> TypeGuard[VertInd]:
 
 class FutureVersionError(Exception):
     """Raised if a palette is from a future version."""
-    def __init__(self, version: int) -> None:
+    def __init__(self, version: str) -> None:
         super().__init__(f'Unknown version {version}!')
         self.version = version
 
@@ -300,7 +304,12 @@ class Palette:
         return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, kv: Keyvalues, path: str) -> tuple[Palette, bool]:
+    async def parse(
+        cls,
+        kv: Keyvalues,
+        path: str,
+        dialogs: Dialogs,
+    ) -> tuple[Palette, bool]:
         """Parse a palette from a file.
 
         The returned boolean indicates if it should be resaved.
@@ -308,6 +317,7 @@ class Palette:
         needs_upgrade = False
         version = kv.int('version', 1)
         name = kv['Name', '??']
+        readonly = kv.bool('readonly')
 
         items: ItemPos = {}
 
@@ -339,7 +349,7 @@ class Palette:
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
         else:
-            raise FutureVersionError(version)
+            raise FutureVersionError(str(version))
 
         if version != CUR_VERSION:
             needs_upgrade = True
@@ -361,7 +371,26 @@ class Palette:
         except NoKeyError:
             settings = None
         else:
-            settings, upgraded_settings = config.PALETTE.parse_kv1(settings_conf)
+            settings, upgraded_settings, unknown = config.PALETTE.parse_kv1(settings_conf)
+            if unknown:
+                message = config.build_version_mismatch_prompt(
+                    unknown, can_skip=not readonly, pal_name=name,
+                )
+                match await dialogs.ask_custom(
+                    message,
+                    TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
+                    None if readonly else TRANS_BTN_SKIP,
+                    cancel=0,
+                ):
+                    case 0:
+                        sys.exit()
+                    case 1:
+                        pass  # Continue
+                    case 2:
+                        raise FutureVersionError('<configs>')
+                    case never:
+                        assert_never(never)
+
             if upgraded_settings:
                 needs_upgrade = True
 
@@ -370,7 +399,7 @@ class Palette:
             items,
             trans_name=trans_name,
             group=kv['group', ''],
-            readonly=kv.bool('readonly'),
+            readonly=readonly,
             filename=os.path.basename(path),
             uuid=uuid,
             settings=settings,
@@ -467,10 +496,11 @@ class Palette:
         )
 
 
-def load_palettes() -> Iterator[Palette]:
+async def load_palettes(dialogs: Dialogs) -> list[Palette]:
     """Scan and read in all palettes. Legacy files will be converted in the process."""
+    palettes = []
     for name, items in DEFAULT_PALETTES.items():
-        yield Palette.builtin(name, items)
+        palettes.append(Palette.builtin(name, items))
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
@@ -484,7 +514,7 @@ def load_palettes() -> Iterator[Palette]:
                     with srctools.logger.context(name):
                         with open(path, encoding='utf8') as f:
                             kv = Keyvalues.parse(f, path)
-                        pal, needs_upgrade = Palette.parse(kv, path)
+                        pal, needs_upgrade = await Palette.parse(kv, path, dialogs)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
@@ -494,8 +524,9 @@ def load_palettes() -> Iterator[Palette]:
                 else:
                     if needs_upgrade:
                         LOGGER.info('Resaving older palette file {}', pal.filename)
+                        config.backup_conf(Path(path), ".bak")
                         pal.save(ignore_readonly=True)
-                    yield pal
+                    palettes.append(pal)
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
@@ -516,7 +547,7 @@ def load_palettes() -> Iterator[Palette]:
         else:
             # Legacy parsing of BEE2.2 files...
             try:
-                yield parse_legacy(pos_file, prop_file, name)
+                palettes.append(parse_legacy(pos_file, prop_file, name))
             except ValueError as exc:
                 LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
                 continue
@@ -536,6 +567,7 @@ def load_palettes() -> Iterator[Palette]:
             pal.readonly = True
             pal.save()
             shutil.rmtree(path)
+    return palettes
 
 
 def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
@@ -562,9 +594,3 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                 else:
                     raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)
-
-
-if __name__ == '__main__':
-    results = load_palettes()
-    for palette in results:
-        print(palette)

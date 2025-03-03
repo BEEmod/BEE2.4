@@ -3,7 +3,7 @@
 Call add_tooltip with a widget to add all the events automatically.
 """
 from __future__ import annotations
-from typing import Callable
+from collections.abc import Callable
 
 import tkinter as tk
 import warnings

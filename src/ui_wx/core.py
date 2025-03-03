@@ -11,6 +11,7 @@ import wx
 import async_util
 import exporting
 from app import CompilerPane, localisation, sound, img, gameMan, UI, logWindow, lifecycle
+from app.dialogs import check_future_config
 from config.windows import WindowState
 from trio_debug import Tracer
 from ui_wx.dialogs import DIALOG
@@ -131,9 +132,10 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
         app._APP_NURSERY = nursery
         # Start some core tasks.
         await nursery.start(display_errors)
-
         # Check very early before bad things happen.
         await gameMan.check_app_in_game(DIALOG)
+        # Prompt if config is too new.
+        await check_future_config(DIALOG)
 
         nursery.start_soon(wid_transtoken.update_task)
         # await nursery.start(loadScreen.startup)

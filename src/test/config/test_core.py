@@ -139,6 +139,7 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     """Test parsing Keyvalues1 data, and upgrading old versions."""
     spec = config.ConfigSpec()
     spec.register(DataSingle)
+    spec.register(DefaultableData)
 
     kv = Keyvalues.root(
         Keyvalues('version', '1'),
@@ -146,10 +147,15 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
             Keyvalues('_version', '1'),
             Keyvalues('value', value),
             Keyvalues('is_bee', bool_as_int(triple == 'b')),
+        ]),
+        Keyvalues('UnknownSeg', [
+            Keyvalues('_version', '48'),
+            Keyvalues('custom', 'arg'),
         ])
     )
-    conf, upgraded = spec.parse_kv1(kv)
+    conf, upgraded, unknown = spec.parse_kv1(kv)
     assert upgraded
+    assert unknown == [('unknownseg', 48)]
     assert conf == config.Config({DataSingle: {'': DataSingle(value, triple)}})
 
     kv = Keyvalues.root(
@@ -158,10 +164,14 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
             Keyvalues('_version', '2'),
             Keyvalues('value', value),
             Keyvalues('triple', triple),
+        ]),
+        Keyvalues('HasDefault', [
+            Keyvalues('_version', '290'),
         ])
     )
-    conf, upgraded = spec.parse_kv1(kv)
+    conf, upgraded, unknown = spec.parse_kv1(kv)
     assert not upgraded
+    assert unknown == [(DefaultableData.get_conf_info(), 290)]
     assert conf == config.Config({DataSingle: {'': DataSingle(value, triple)}})
 
 

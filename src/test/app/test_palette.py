@@ -1,11 +1,14 @@
 """Test palette saving and loading."""
 from __future__ import annotations
 
+from unittest.mock import create_autospec
+
 from pytest_regressions.data_regression import DataRegressionFixture
 from srctools import Keyvalues
 import pytest
 
-from app.paletteLoader import Palette, DEFAULT_PALETTES, GROUP_BUILTIN
+from app.dialogs import Dialogs
+from app.paletteLoader import DEFAULT_PALETTES, GROUP_BUILTIN, Palette
 from transtoken import TransToken
 
 
@@ -110,7 +113,7 @@ def check_palette(pal: Palette) -> None:
 
 
 @pytest.mark.parametrize('set_version', [False, True], ids=['blank', 'v1'])
-def test_palette_load_v1(set_version: bool) -> None:
+async def test_palette_load_v1(set_version: bool) -> None:
     """Test loading version 1 of the palette format."""
     kv = Keyvalues('Palette', [
         Keyvalues('Name', 'Test Palette'),
@@ -160,15 +163,18 @@ def test_palette_load_v1(set_version: bool) -> None:
     if set_version:
         kv['version'] = '1'
 
-    pal, upgrade = Palette.parse(kv, 'test_file.vdf')
+    dialogs = create_autospec(Dialogs, instance=True)
+
+    pal, upgrade = await Palette.parse(kv, 'test_file.vdf', dialogs)
     assert upgrade is True
     check_palette(pal)
     assert pal.group == ''
     assert not pal.readonly
     assert pal.settings is None
+    dialogs.ask_custom.assert_not_called()
 
 
-def test_palette_load_v2() -> None:
+async def test_palette_load_v2() -> None:
     """Test loading version 2 of the palette format."""
     kv = Keyvalues('Palette', [
         Keyvalues('Version', '2'),
@@ -176,16 +182,20 @@ def test_palette_load_v2() -> None:
         Keyvalues('UUID', 'c510aee8759e4b61871d233806b5e73a'),
         Keyvalues('Items', pos_block).copy(),
     ])
-    pal, upgrade = Palette.parse(kv, 'test_file.vdf')
+
+    dialogs = create_autospec(Dialogs, instance=True)
+
+    pal, upgrade = await Palette.parse(kv, 'test_file.vdf', dialogs)
     assert upgrade is True
     check_palette(pal)
     assert pal.group == ''
     assert not pal.readonly
     assert pal.settings is None
+    dialogs.ask_custom.assert_not_called()
 
 
-def test_palette_load_v3() -> None:
-    """Test loading version 2 of the palette format."""
+async def test_palette_load_v3() -> None:
+    """Test loading version 3 of the palette format."""
     kv = Keyvalues('Palette', [
         Keyvalues('Version', '3'),
         Keyvalues('Name', 'Test Palette'),
@@ -196,12 +206,15 @@ def test_palette_load_v3() -> None:
             Keyvalues('ITEM_INVALID_OLD_BLOCK', '3'),
         ])
     ])
-    pal, upgrade = Palette.parse(kv, 'test_file.vdf')
+    dialogs = create_autospec(Dialogs, instance=True)
+
+    pal, upgrade = await Palette.parse(kv, 'test_file.vdf', dialogs)
     assert upgrade is False
     check_palette(pal)
     assert pal.group == ''
     assert not pal.readonly
     assert pal.settings is None
+    dialogs.ask_custom.assert_not_called()
 
 
 @pytest.mark.parametrize('pal_id', [

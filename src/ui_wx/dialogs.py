@@ -1,12 +1,12 @@
 """A consistent interface for dialog boxes."""
-from typing import override
+from typing import overload, override
 
 from collections.abc import Callable
 
 import trio
 import wx
 
-from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
+from app.dialogs import DEFAULT_TITLE, Btn3, Dialogs, Icon, validate_non_empty
 from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 from ui_wx.wid_transtoken import set_text, set_win_title
@@ -16,15 +16,26 @@ from . import MAIN_WINDOW
 
 __all__ = ['Dialogs', 'WxDialogs', 'DIALOG']
 
-
-async def _messagebox(
+@overload
+def _messagebox(
+    style: int, parent: wx.TopLevelWindow,
+    message: TransToken, title: TransToken,
+    icon: Icon,
+) -> wx.MessageDialog: ...
+@overload
+def _messagebox(
+    style: int, parent: wx.TopLevelWindow,
+    message: TransToken, title: TransToken,
+    icon: Icon, detail: str,
+) -> wx.RichMessageDialog: ...
+def _messagebox(
     style: int,
     parent: wx.TopLevelWindow,
     message: TransToken,
     title: TransToken,
     icon: Icon,
-    detail: str,
-) -> int:
+    detail: str = '',
+) -> wx.RichMessageDialog | wx.MessageDialog:
     """Common logic for message dialogs"""
     match icon:
         case Icon.INFO:
@@ -36,14 +47,12 @@ async def _messagebox(
         case Icon.ERROR:
             style |= wx.ICON_ERROR
     style |= wx.CENTRE
-    box: wx.RichMessageDialog | wx.MessageDialog
     if detail:
         box = wx.RichMessageDialog(parent, str(message), str(title), style)
         box.ShowDetailedText(detail)
+        return box
     else:
-        box = wx.MessageDialog(parent, str(message), str(title), style)
-    await trio.lowlevel.checkpoint()
-    return box.ShowModal()
+        return wx.MessageDialog(parent, str(message), str(title), style)
 
 
 class TextValidator(wx.Validator):
@@ -165,11 +174,6 @@ async def text_entry_window(
 
 class WxDialogs(Dialogs):
     """The class allows passing through a parent window."""
-    INFO = Icon.INFO
-    WARNING = Icon.WARNING
-    QUESTION = Icon.QUESTION
-    ERROR = Icon.ERROR
-
     def __init__(self, parent: wx.TopLevelWindow) -> None:
         """Create with the specified parent."""
         self.parent = parent
@@ -183,7 +187,9 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> None:
         """Show a message box with some information."""
-        await _messagebox(wx.OK | wx.ICON_INFORMATION, self.parent, message, title, icon, detail)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.OK | wx.ICON_INFORMATION, self.parent, message, title, icon, detail)
+        box.ShowModal()
 
     @override
     async def ask_ok_cancel(
@@ -194,13 +200,15 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
-        res = await _messagebox(wx.OK | wx.CANCEL, self.parent, message, title, icon, detail)
-        if res == wx.ID_OK:
-            return True
-        elif res == wx.ID_CANCEL:
-            return False
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.OK | wx.CANCEL, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_OK:
+                return True
+            case wx.ID_CANCEL:
+                return False
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def ask_yes_no(
@@ -211,13 +219,15 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
-        res = await _messagebox(wx.YES_NO, self.parent, message, title, icon, detail)
-        if res == wx.ID_YES:
-            return True
-        elif res == wx.ID_NO:
-            return False
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.YES_NO, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_YES:
+                return True
+            case wx.ID_NO:
+                return False
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def ask_yes_no_cancel(
@@ -228,15 +238,73 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
-        res = await _messagebox(wx.YES_NO | wx.CANCEL, self.parent, message, title, icon, detail)
-        if res == wx.ID_YES:
-            return True
-        elif res == wx.ID_NO:
-            return False
-        elif res == wx.ID_CANCEL:
-            return None
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.YES_NO | wx.CANCEL, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_YES:
+                return True
+            case wx.ID_NO:
+                return False
+            case wx.ID_CANCEL:
+                return None
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
+
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        cancel: Btn3,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Btn3:
+        """Show a message box with custom buttons."""
+        buttons: list[tuple[TransToken, Btn3]] = [
+            (button_1, 0),
+            (button_2, 1),
+        ]
+        has_three = False
+        if button_3 is not None:
+            has_three = True
+            buttons.append((button_3, 2))
+        elif cancel == 2:
+            raise ValueError("Button 3 is missing but set as cancel button?")
+        # Now move the cancel button to the end to line up.
+        buttons.append(buttons.pop(cancel))
+        await trio.lowlevel.checkpoint()
+
+        # TODO: Stock IDs, if ever used with eligible tokens.
+        box = _messagebox(
+            style=wx.CANCEL | (wx.YES_NO if has_three else wx.OK),
+            parent=self.parent,
+            message=message,
+            title=title,
+            icon=icon,
+        )
+        match buttons:
+            case [(first, first_val), (second, sec_val), (third, last_val)]:
+                changed = box.SetYesNoCancelLabels(str(first), str(second), str(third))
+            case [(first, first_val), (second, sec_val)]:
+                changed = box.SetOKCancelLabels(str(first), str(second))
+                last_val = sec_val
+            case _:
+                raise AssertionError(buttons)
+        if not changed:
+            # Use wx.GenericMessageDialog?
+            raise NotImplementedError("No custom buttons for this platform?")
+        await trio.lowlevel.checkpoint()
+        match box.ShowModal():
+            case wx.ID_YES | wx.ID_OK:
+                return first_val
+            case wx.ID_NO:
+                return sec_val
+            case wx.ID_CANCEL:
+                return last_val
+            case btn_id:
+                raise ValueError(f"Unknown button ID: {btn_id}")
 
     @override
     async def prompt(

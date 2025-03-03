@@ -1,13 +1,23 @@
 """API for dialog boxes."""
-from typing import ClassVar, Literal, Protocol
+import sys
+from typing import ClassVar, Literal, assert_never
 
 from collections.abc import Callable
 from enum import Enum
+import abc
+
+import trio.lowlevel
 
 from transtoken import AppError, TransToken
+import config
 
 
+type Btn3 = Literal[0, 1, 2]
 DEFAULT_TITLE = TransToken.ui('BEEmod')
+# Here to allow reuse, and for WX to use builtin if possible.
+TRANS_BTN_SKIP = TransToken.ui('Skip')
+TRANS_BTN_DISCARD = TransToken.ui('Discard')
+TRANS_BTN_QUIT = TransToken.ui('Quit')
 
 
 class Icon(Enum):
@@ -28,7 +38,7 @@ def validate_non_empty(value: str) -> str:
     return value
 
 
-class Dialogs(Protocol):
+class Dialogs(abc.ABC):
     """Interface exposed by ui_*.dialogs.
 
     This is passed in to processing code, allowing it to do some basic UI interaction.
@@ -36,8 +46,10 @@ class Dialogs(Protocol):
     """
     INFO: ClassVar[Literal[Icon.INFO]]
     ERROR: ClassVar[Literal[Icon.ERROR]]
+    QUESTION: ClassVar[Literal[Icon.QUESTION]]
     WARNING: ClassVar[Literal[Icon.WARNING]]
 
+    @abc.abstractmethod
     async def show_info(
         self,
         message: TransToken,
@@ -49,6 +61,7 @@ class Dialogs(Protocol):
 
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_ok_cancel(
         self,
         message: TransToken,
@@ -59,6 +72,7 @@ class Dialogs(Protocol):
         """Show a message box with "OK" and "Cancel" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_yes_no(
         self,
         message: TransToken,
@@ -69,6 +83,7 @@ class Dialogs(Protocol):
         """Show a message box with "Yes" and "No" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_yes_no_cancel(
         self,
         message: TransToken,
@@ -79,6 +94,25 @@ class Dialogs(Protocol):
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        cancel: Btn3,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Btn3:
+        """Show a message box with 2 or 3 custom buttons.
+
+        The button passed to cancel will be returned if the X is pressed.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     async def prompt(
         self,
         message: TransToken,
@@ -87,7 +121,9 @@ class Dialogs(Protocol):
         validator: Callable[[str], str] = validate_non_empty,
     ) -> str | None:
         """Ask the user to enter a string."""
+        raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_open_filename(
         self,
         title: TransToken = DEFAULT_TITLE,
@@ -97,10 +133,29 @@ class Dialogs(Protocol):
 
         The filter should be a description, plus an extension like `.txt`.
         """
+        raise NotImplementedError
+
+
+async def check_future_config(dialogs: Dialogs) -> None:
+    """Check to see if the main config has unknown sections, and prompt the user if that happens."""
+    extra = config.APP.extra_sections
+    if not extra:
+        await trio.lowlevel.checkpoint()
+        return
+    message = config.build_version_mismatch_prompt(extra, False, None)
+    if await dialogs.ask_custom(
+        message,
+        TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
+        cancel=0,
+    ) == 0:
+        # Don't overwrite the config.
+        config.DISABLE_WRITE = True
+        sys.exit()
 
 
 async def test_generic_msg(dialog: Dialogs) -> None:
     """Test the dialog implementation for messageboxes."""
+    import pytest
     # No need to translate tests.
     tt = TransToken.untranslated
 
@@ -120,6 +175,25 @@ async def test_generic_msg(dialog: Dialogs) -> None:
     assert await dialog.ask_yes_no_cancel(tt("Press no")) is False
     assert await dialog.ask_yes_no_cancel(tt("Press cancel")) is None
     assert await dialog.ask_yes_no_cancel(tt("Press X")) is None
+
+    left = tt("Left")
+    mid = tt("Center")
+    right = tt("Right")
+
+    with pytest.raises(ValueError):
+        await dialog.ask_custom(tt("Invalid cancellation"), left, right, cancel=2)
+
+    assert await dialog.ask_custom(tt("Press Left for info"), left, right, icon=Icon.INFO, cancel=0) == 0
+    assert await dialog.ask_custom(tt("Press Right for question"), left, right, icon=Icon.QUESTION, cancel=1) == 1
+    assert await dialog.ask_custom(tt("Press X for warning"), left, right, icon=Icon.WARNING, cancel=0) == 0
+    assert await dialog.ask_custom(tt("Press X for error"), left, right, icon=Icon.ERROR, cancel=1) == 1
+
+    cancel: Literal[0, 1, 2]
+    for cancel in (0, 1, 2):
+        assert await dialog.ask_custom(tt("Press Left for info"), left, mid, right, icon=Icon.INFO, cancel=cancel) == 0
+        assert await dialog.ask_custom(tt("Press Center for question"), left, mid, right, icon=Icon.QUESTION, cancel=cancel) == 1
+        assert await dialog.ask_custom(tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING, cancel=cancel) == 2
+        assert await dialog.ask_custom(tt("Press X for error"), left, mid, right, icon=Icon.ERROR, cancel=cancel) == cancel
 
 
 async def test_generic_prompt(dialog: Dialogs) -> None:

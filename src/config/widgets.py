@@ -42,7 +42,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     def parse_legacy(cls, config: Keyvalues) -> dict[str, Self]:
         """Parse from the old legacy config."""
         data = {}
-        for group in config:
+        for group in config.find_children('itemvar'):
             if not group.has_children():
                 LOGGER.warning('Illegal leaf keyvalue "{}" in ItemVar conf', group.name)
             for widget in group:

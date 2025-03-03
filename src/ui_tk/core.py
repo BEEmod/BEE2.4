@@ -12,6 +12,7 @@ import trio
 from app import (
     UI, CompilerPane, gameMan, img, lifecycle, localisation, logWindow, sound,
 )
+from app.dialogs import check_future_config
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 from config.windows import WindowState
@@ -141,6 +142,8 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
 
         # Check very early before bad things happen.
         await gameMan.check_app_in_game(DIALOG)
+        # Prompt if config is too new.
+        await check_future_config(DIALOG)
 
         await nursery.start(loadScreen.startup)
         nursery.start_soon(wid_transtoken.update_task)

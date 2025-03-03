@@ -1,6 +1,6 @@
 """A consistent interface for dialog boxes."""
 from __future__ import annotations
-from typing import override
+from typing import Literal, override
 
 from tkinter import commondialog, filedialog, simpledialog, ttk
 from tkinter.font import Font
@@ -9,12 +9,12 @@ from collections.abc import Callable
 
 import trio
 
-from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
+from app.dialogs import Btn3, DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
 from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT
-from .tk_tools import center_onscreen, center_win, set_window_icon
+from .tk_tools import center_onscreen, center_win, set_window_icon, wait_eventloop
 from .wid_transtoken import set_text
 
 
@@ -242,13 +242,47 @@ class QueryValidator(tk.Toplevel):
         return self.result
 
 
+class CustomMessagebox:
+    """Implements a custom messagebox with 2 or 3 buttons."""
+    result: Btn3 | None
+    def __init__(
+        self,
+        parent: tk.Toplevel | tk.Tk,
+        title: TransToken, message: TransToken,
+        lbl_1: TransToken, lbl_2: TransToken, lbl_3: TransToken | None,
+    ) -> None:
+        self.result = None
+        self.event = trio.Event()
+
+        self.win = win = tk.Toplevel(parent)
+        win.wm_protocol('WM_DELETE_WINDOW', self.event_func(None))
+        win.title(str(title))
+        win.transient(parent)
+        win.columnconfigure(0, weight=1)
+        win.columnconfigure(1, weight=1)
+        win.columnconfigure(2, weight=1)
+
+        label = ttk.Label(win, text=str(message))
+        label.grid(row=0, column=0, columnspan=3, sticky='ew', padx=8, pady=(8, 4))
+        btn_1 = ttk.Button(win, text=str(lbl_1), command=self.event_func(0))
+        btn_1.grid(row=1, column=0, padx=4, pady=(4, 8))
+        btn_2 = ttk.Button(win, text=str(lbl_2), command=self.event_func(1))
+        btn_2.grid(row=1, column=1, padx=4, pady=(4, 8))
+        if lbl_3 is not None:
+            btn_3 = ttk.Button(win, text=str(lbl_3), command=self.event_func(2))
+            btn_3.grid(row=1, column=2, padx=4, pady=(4, 8))
+
+    def event_func(self, result: Btn3 | None) -> Callable[[], None]:
+        """Make a handler for each button."""
+        def func() -> None:
+            """The handler."""
+            self.result = result
+            self.event.set()
+        return func
+
+
 class TkDialogs(Dialogs):
     """The class allows passing through a parent window."""
-    INFO = Icon.INFO
-    WARNING = Icon.WARNING
-    QUESTION = Icon.QUESTION
-    ERROR = Icon.ERROR
-
     def __init__(self, parent: tk.Toplevel | tk.Tk) -> None:
         """Create with the specified parent."""
         self.parent = parent
@@ -316,6 +350,40 @@ class TkDialogs(Dialogs):
             return None
         else:
             raise ValueError(res)
+
+    @override
+    async def ask_custom(
+        self,
+        message: TransToken,
+        button_1: TransToken,
+        button_2: TransToken,
+        button_3: TransToken | None = None,
+        *,
+        cancel: Btn3,
+        title: TransToken = DEFAULT_TITLE,
+        icon: Icon = Icon.QUESTION,
+    ) -> Btn3:
+        # Icon ignored, can't use.
+        if button_3 is None and cancel == 2:
+            raise ValueError("Button 3 is missing but set as cancel button?")
+        with suppress_screens():
+            box = CustomMessagebox(self.parent, title, message, button_1, button_2, button_3)
+            if self.parent is TK_ROOT:
+                # Force to be centered and visible - the root might be hidden if doing an early add-game.
+                TK_ROOT.deiconify()
+                force_show = True
+                await wait_eventloop()
+            center_onscreen(box.win)
+            try:
+                box.win.grab_set()
+                await box.event.wait()
+            finally:  # If held, the app can't quit.
+                box.win.grab_release()
+                box.win.destroy()
+            if force_show:
+                TK_ROOT.withdraw()
+                await wait_eventloop()
+            return cancel if box.result is None else box.result
 
     @override
     async def prompt(
