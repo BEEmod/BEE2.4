@@ -1,8 +1,9 @@
 """API for dialog boxes."""
-from typing import ClassVar, Literal, Protocol
+from typing import ClassVar, Literal
 
 from collections.abc import Callable
 from enum import Enum
+import abc
 
 from transtoken import AppError, TransToken
 
@@ -33,7 +34,7 @@ def validate_non_empty(value: str) -> str:
     return value
 
 
-class Dialogs(Protocol):
+class Dialogs(abc.ABC):
     """Interface exposed by ui_*.dialogs.
 
     This is passed in to processing code, allowing it to do some basic UI interaction.
@@ -41,8 +42,10 @@ class Dialogs(Protocol):
     """
     INFO: ClassVar[Literal[Icon.INFO]]
     ERROR: ClassVar[Literal[Icon.ERROR]]
+    QUESTION: ClassVar[Literal[Icon.QUESTION]]
     WARNING: ClassVar[Literal[Icon.WARNING]]
 
+    @abc.abstractmethod
     async def show_info(
         self,
         message: TransToken,
@@ -54,6 +57,7 @@ class Dialogs(Protocol):
 
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_ok_cancel(
         self,
         message: TransToken,
@@ -64,6 +68,7 @@ class Dialogs(Protocol):
         """Show a message box with "OK" and "Cancel" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_yes_no(
         self,
         message: TransToken,
@@ -74,6 +79,7 @@ class Dialogs(Protocol):
         """Show a message box with "Yes" and "No" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_yes_no_cancel(
         self,
         message: TransToken,
@@ -84,6 +90,7 @@ class Dialogs(Protocol):
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_custom(
         self,
         message: TransToken,
@@ -101,6 +108,7 @@ class Dialogs(Protocol):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def prompt(
         self,
         message: TransToken,
@@ -109,7 +117,9 @@ class Dialogs(Protocol):
         validator: Callable[[str], str] = validate_non_empty,
     ) -> str | None:
         """Ask the user to enter a string."""
+        raise NotImplementedError
 
+    @abc.abstractmethod
     async def ask_open_filename(
         self,
         title: TransToken = DEFAULT_TITLE,
@@ -119,6 +129,7 @@ class Dialogs(Protocol):
 
         The filter should be a description, plus an extension like `.txt`.
         """
+        raise NotImplementedError
 
 
 async def test_generic_msg(dialog: Dialogs) -> None:
