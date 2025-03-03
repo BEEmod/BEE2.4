@@ -107,9 +107,9 @@ async def load_settings() -> tuple[
         """Load our main DMX config."""
         with open(filename, 'rb') as f:
             dmx, fmt_name, fmt_ver = Element.parse(f)
-        conf, _ = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
+        conf, upgrade, extra = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
         # We're never changing the file, no point upgrading it. The app will do so next
-        # export anyway.
+        # export anyway. The parse function has already logged, so we can ignore those.
         return conf
 
     try:
