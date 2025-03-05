@@ -47,13 +47,13 @@ TIMER_BLOCK = Keyvalues('timervalue', [
 
 def test_parse_legacy() -> None:
     """Test parsing the older config version."""
-    kv = Keyvalues('ItemVar', [
+    kv = Keyvalues.root(Keyvalues('ItemVar', [
         Keyvalues('VALVE_TEST_ELEM', [
             Keyvalues('LaserCollision', '1'),
             Keyvalues('FunnelSpeed', '250'),
         ]),
         Keyvalues('BEE_NEUROTOXIN', [TIMER_BLOCK.copy()]),
-    ])
+    ]))
     res = WidgetConfig.parse_legacy(kv)
     assert res == {
         'VALVE_TEST_ELEM:LaserCollision': WidgetConfig('1'),

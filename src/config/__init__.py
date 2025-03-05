@@ -157,7 +157,10 @@ class Data(abc.ABC):
 
     @classmethod
     def parse_legacy(cls, conf: Keyvalues, /) -> dict[str, Self]:
-        """Parse from the old legacy config. The user has to handle the uses_id style."""
+        """Parse from the old legacy config.
+
+        This is parsed the entire config, the user is in charge of parsing each ID individually.
+        """
         return {}
 
     @classmethod
