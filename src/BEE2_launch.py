@@ -42,11 +42,13 @@ import utils
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
-        log_name = app_name = sys.argv[1].lower()
-    elif 'python' not in sys.argv[0].casefold():
-        log_name = app_name = Path(sys.argv[0]).stem.casefold()
-    else:  # Running from source, by default.
-        log_name = app_name = 'bee2'
+        app_name = sys.argv[1].lower()
+    else:
+        app_name = Path(sys.argv[0]).stem.casefold()
+        if 'python' in app_name:
+            # Running from source, by default.
+            app_name = 'bee2'
+    log_name = app_name
 
     if app_name not in ('backup', 'compiler_settings'):
         log_name = 'bee2'
