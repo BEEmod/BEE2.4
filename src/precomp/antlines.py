@@ -88,26 +88,31 @@ class AntTex:
         return cls(tex, scale, static)
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, kw_only=True)
 class AntType:
     """Defines the style of antline to use.
 
-    For broken antlines, 'broken_chance' is the percentage chance for brokenness
-    per dot.
-
     Corners can be omitted, if corner/straight antlines are the same.
+
+    broken_chance: percentage chance for brokenness per dot.
+    broken_min: Straight antlines must be at least this long to be eligable for brokenness.
+    broken_max_run: Force working antlines if this many broken ones are in a row.
     """
     tex_straight: list[AntTex]
     tex_corner: list[AntTex]
 
-    broken_straight: list[AntTex]
-    broken_corner: list[AntTex]
-    broken_chance: float
+    broken_straight: list[AntTex] = attrs.Factory(list)
+    broken_corner: list[AntTex] = attrs.Factory(list)
+    broken_chance: float = 0.0
+    broken_min: int = 0
+    broken_max_run: int = 1
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> AntType:
         """Parse this from a property block."""
         broken_chance = kv.float('broken_chance')
+        broken_min = kv.int('broken_min')
+        broken_max_run = kv.int('broken_max_run')
         tex_straight: list[AntTex] = []
         tex_corner: list[AntTex] = []
         brok_straight: list[AntTex] = []
@@ -126,6 +131,12 @@ class AntType:
         if broken_chance > 100.0:
             LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', kv['broken_chance'])
             broken_chance = 100.0
+        if broken_min < 0:
+            LOGGER.warning('Antline broken minumum must be positive, got "{}"!', kv['broken_min'])
+            broken_min = 0
+        if broken_max_run < 1:
+            LOGGER.warning('Antline broken minumum must be at least 1, got "{}"!', kv['broken_min'])
+            broken_max_run = 1
 
         if broken_chance == 0.0:
             brok_straight.clear()
@@ -136,20 +147,19 @@ class AntType:
             brok_corner.clear()
 
         return cls(
-            tex_straight,
-            tex_corner,
-            brok_straight,
-            brok_corner,
-            broken_chance,
+            tex_straight=tex_straight, tex_corner=tex_corner,
+            broken_straight=brok_straight, broken_corner=brok_corner,
+            broken_chance=broken_chance,
+            broken_min=broken_min,
+            broken_max_run=broken_max_run,
         )
 
     @classmethod
     def default(cls) -> AntType:
         """Make a copy of the original PeTI antline config."""
         return AntType(
-            [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
-            [AntTex(consts.Antlines.CORNER, 1.0, False)],
-            [], [], 0.0,
+            tex_straight=[AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
+            tex_corner=[AntTex(consts.Antlines.CORNER, 1.0, False)],
         )
 
 
@@ -401,34 +411,44 @@ class Segment:
         """Return if this segment is on the floor/wall."""
         return abs(self.normal.z) > 1e-6
 
-    def broken_iter(
-        self,
-        chance: float,
-    ) -> Iterator[tuple[Vec, Vec, bool]]:
+    @property
+    def count(self) -> int:
+        """Return the number of 'dots' in this segment."""
+        offset = self.end - self.start
+        return int(offset.mag() // 16)
+
+    def broken_iter(self, conf: AntType) -> Iterator[tuple[Vec, Vec, bool]]:
         """Iterator to compute positions for straight segments.
 
         This produces point pairs which fill the space from 0-dist.
         Neighbouring sections will be merged when they have the same
         type.
         """
+        chance = conf.broken_chance
         rng = rand.seed(b'ant_broken', self.start, self.end, float(chance))
         offset = self.end - self.start
         dist = offset.mag() // 16
-        norm = 16 * offset.norm()
+        forward = 16 * offset.norm()
 
-        if dist < 3 or chance == 0.0:
-            # Short antlines always are either on/off.
-            yield self.start, self.end, (rng.randrange(100) < chance)
+        if dist < conf.broken_min or chance == 0.0:
+            # Short antlines must always be on.
+            yield self.start, self.end, False
         else:
             run_start = self.start
-            last_type = rng.randrange(100) < chance
+            run_broken = rng.randrange(100) < chance
+            run_size = 0
             for i in range(1, int(dist)):
-                next_type = rng.randrange(100) < chance
-                if next_type != last_type:
-                    yield run_start, self.start + i * norm, last_type
-                    last_type = next_type
-                    run_start = self.start + i * norm
-            yield run_start, self.end, last_type
+                if run_broken and run_size >= conf.broken_max_run:
+                    next_broken = False
+                else:
+                    next_broken = rng.randrange(100) < chance
+                if next_broken is not run_broken:
+                    yield run_start, self.start + i * forward, run_broken
+                    run_broken = next_broken
+                    run_size = 0
+                    run_start = self.start + i * forward
+                run_size += 1
+            yield run_start, self.end, run_broken
 
 
 @attrs.define(eq=False)
@@ -486,7 +506,7 @@ class Antline:
             self.line[:] = [seg for seg in collapse_line if seg is not None]
             LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
 
-        for seg in self.line:
+        for neigh_prev, seg, neigh_next in utils.iter_neighbours(self.line):
             conf = style.floor if seg.on_floor else style.wall
             # Check tiledefs in the voxels, and assign just in case.
             # antline corner items don't have them defined, and some embed-faces don't work
@@ -508,7 +528,21 @@ class Antline:
             rng = rand.seed(b'antline', seg.start, seg.end)
             if seg.type is SegType.CORNER:
                 mat: AntTex
-                if rng.randrange(100) < conf.broken_chance:
+                # Corners can only break if a neighbour is a straight with the same normal
+                # and that matches the min length.
+                # That ensures a working antline should be visible near it.
+                allow_break = (
+                    neigh_prev is not None
+                    and neigh_prev.type is SegType.STRAIGHT
+                    and neigh_prev.count >= conf.broken_min
+                    and Vec.dot(neigh_prev.normal, seg.normal) > 0.9
+                ) or (
+                    neigh_next is not None
+                    and neigh_next.type is SegType.STRAIGHT
+                    and neigh_next.count >= conf.broken_min
+                    and Vec.dot(neigh_next.normal, seg.normal) > 0.9
+                )
+                if allow_break and rng.randrange(100) < conf.broken_chance:
                     mat = rng.choice(conf.broken_corner or conf.broken_straight)
                 else:
                     mat = rng.choice(conf.tex_corner or conf.tex_straight)
@@ -527,7 +561,7 @@ class Antline:
                 )
             else:  # Straight
                 side = 16 * Vec.cross(seg.normal, seg.start - seg.end).norm()
-                for a, b, is_broken in seg.broken_iter(conf.broken_chance):
+                for a, b, is_broken in seg.broken_iter(conf):
                     mat = rng.choice(conf.broken_straight if is_broken else conf.tex_straight)
                     self._make_overlay(
                         vmf,
