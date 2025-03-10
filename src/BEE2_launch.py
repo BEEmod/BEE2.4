@@ -108,3 +108,7 @@ if __name__ == '__main__':
         start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
+    # noinspection PyProtectedMember
+    if app._WANTS_RESTART:
+        # A restart was desired, we're quit completely. Switch to that.
+        utils.restart_app(app_name)

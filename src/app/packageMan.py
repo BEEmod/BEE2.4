@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import background_run
+from app import background_run, restart as restart_app
 from app.dialogs import Dialogs
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
@@ -12,7 +12,6 @@ from ui_tk.check_table import CheckDetails, Item as CheckItem
 from ui_tk.dialogs import TkDialogs
 from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
-import utils
 
 
 window = tk.Toplevel(TK_ROOT, name='packagesWin')
@@ -70,7 +69,7 @@ async def apply_changes(dialog: Dialogs) -> None:
             if pack.id not in packages.MANDATORY_PACKAGES:
                 pack.enabled = item.state
         packages.PACK_CONFIG.save_check()
-        utils.restart_app()
+        restart_app()
 
 
 def cancel() -> None:

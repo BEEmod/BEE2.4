@@ -710,7 +710,7 @@ def group_runs[ValueT](iterable: Iterable[ValueT]) -> Iterator[tuple[ValueT, int
     yield obj, min_ind, max_ind
 
 
-def restart_app() -> NoReturn:
+def restart_app(component: str) -> NoReturn:
     """Restart this python application.
 
     This will not return!
@@ -719,7 +719,10 @@ def restart_app() -> NoReturn:
     # it'll our program.
     # We need to add the program to the arguments list, since python
     # strips that off.
-    args = [sys.executable] + sys.argv
+    args = [sys.executable, *sys.argv]
+    if len(args) == 1:
+        # We were run directly in frozen form, add on the component name to ensure it executes.
+        args.append(component)
     logging.root.info(f'Restarting using "{sys.executable}", with args {args!r}')
     logging.shutdown()
     os.execv(sys.executable, args)
