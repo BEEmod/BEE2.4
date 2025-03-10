@@ -526,17 +526,15 @@ class Antline:
                     mat,
                 )
             else:  # Straight
-                # TODO: Break up these segments.
+                side = 16 * Vec.cross(seg.normal, seg.start - seg.end).norm()
                 for a, b, is_broken in seg.broken_iter(conf.broken_chance):
-                    if is_broken:
-                        mat = rng.choice(conf.broken_straight)
-                    else:
-                        mat = rng.choice(conf.tex_straight)
-                    self._make_straight(
+                    mat = rng.choice(conf.broken_straight if is_broken else conf.tex_straight)
+                    self._make_overlay(
                         vmf,
                         seg,
-                        a,
-                        b,
+                        (a + b) / 2,
+                        a - b,
+                        side,
                         mat,
                     )
 
@@ -565,33 +563,6 @@ class Antline:
 
         for tile in segment.tiles:
             tile.bind_overlay(overlay)
-
-    def _make_straight(
-        self,
-        vmf: VMF,
-        segment: Segment,
-        start: Vec,
-        end: Vec,
-        mat: AntTex,
-    ) -> None:
-        """Construct a straight antline between two points.
-
-        The two points will be the end of the antlines.
-        """
-        offset = start - end
-        forward = offset.norm()
-        side = Vec.cross(segment.normal, forward).norm()
-
-        length = offset.mag()
-
-        self._make_overlay(
-            vmf,
-            segment,
-            (start + end) / 2,
-            length * forward,
-            16 * side,
-            mat,
-        )
 
 
 def parse_antlines(vmf: VMF) -> tuple[
