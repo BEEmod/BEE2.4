@@ -676,6 +676,9 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         if self._visible:
             # Only update UI if it is actually visible.
             self.sel_item(item_id)
+        else:
+            # Ensure this is selected if we re-open.
+            self.selected = item_id
         self.chosen.value = item_id
         self.set_disp()
         if self.store_last_selected:
