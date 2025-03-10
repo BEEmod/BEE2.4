@@ -328,6 +328,7 @@ class Handle(User):
         *,
         subkey: str = '',
         subfolder: str = '',
+        default_ext: DefaultExt = 'png',
     ) -> Handle:
         """Parse a keyvalue into an image handle.
 
@@ -349,13 +350,13 @@ class Handle(User):
                     children.append(cls.parse(
                         child, pack,
                         width, height,
-                        subfolder=subfolder,
+                        subfolder=subfolder, default_ext=default_ext,
                     ).with_alpha_stripped())
                 elif child.name in ('image', 'img', 'layer'):
                     children.append(cls.parse(
                         child, pack,
                         width, height,
-                        subfolder=subfolder,
+                        subfolder=subfolder, default_ext=default_ext,
                     ))
                 elif child.name == 'transform':
                     try:
@@ -365,7 +366,7 @@ class Handle(User):
                     orig = cls.parse(
                         child,
                         pack, width, height, subkey='child',
-                        subfolder=subfolder,
+                        subfolder=subfolder, default_ext=default_ext,
                     )
                     children.append(orig.transform(transpose=orient))
                 else:
@@ -378,7 +379,11 @@ class Handle(User):
                 case _:
                     return cls.composite(children, width, height)
 
-        return cls.parse_uri(utils.PackagePath.parse(kv.value, pack), width, height, subfolder=subfolder)
+        return cls.parse_uri(
+            utils.PackagePath.parse(kv.value, pack),
+            width, height,
+            subfolder=subfolder, default_ext=default_ext,
+        )
 
     @classmethod
     def parse_uri(
