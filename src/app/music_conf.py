@@ -296,13 +296,16 @@ async def make_widgets(
             # If collapsed, the hidden ones follow the base always.
             set_suggested(packset, music_id)
 
-            # If we have an instance, it's "custom" behaviour, so disable
-            # all the sub-channels.
-            try:
-                has_inst = bool(packset.obj_by_id(Music, music_id).inst)
-            except KeyError:  # <none>
-                has_inst = False
+            if music_id == utils.ID_NONE:
+                disable_children = True
+            else:
+                # If we have an instance, it's "custom" behaviour, so disable
+                # all the sub-channels.
+                try:
+                    disable_children = bool(packset.obj_by_id(Music, music_id).inst)
+                except KeyError:  # Unknown, assume instances are allowed.
+                    disable_children = False
 
             for win_chan, win in WINDOWS.items():
                 if win_chan is not MusicChannel.BASE:
-                    win.readonly = has_inst
+                    win.readonly = disable_children

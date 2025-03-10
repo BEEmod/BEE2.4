@@ -345,6 +345,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     @readonly.setter
     def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
+        self.set_disp()
 
     def _get_data(self, item_id: utils.SpecialID) -> SelitemData:
         """Call func_get_data, handling KeyError."""
