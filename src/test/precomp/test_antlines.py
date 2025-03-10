@@ -1,4 +1,5 @@
 """Test antline configs."""
+import re
 
 import pytest
 from srctools import Keyvalues
@@ -30,3 +31,5 @@ def test_parse_ant_tex() -> None:
     assert AntTex.parse(
         Keyvalues('ant', '0.5|signage/another|static')
     ) == AntTex('signage/another', 0.5, True)
+    with pytest.raises(ValueError, match=re.escape('Invalid antline material config')):
+        AntTex.parse(Keyvalues('invalid', '0.3|material|static|toomany'))

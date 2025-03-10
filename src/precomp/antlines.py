@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import final
 
-from collections.abc import Iterator, Container, Callable, Mapping, Sequence
+from collections.abc import Iterator, Callable, Mapping, Sequence
 from collections import defaultdict
 from enum import Enum
 import math
@@ -61,19 +61,29 @@ class AntTex:
             scale = kv.float('scale', 0.25)
             static = kv.bool('static')
         else:
-            vals = kv.value.split('|')
-            opts: Container[str] = ()
-            scale_str = '0.25'
-
-            if len(vals) == 2:
-                scale_str, tex = vals
-            elif len(vals) > 2:
-                scale_str, tex, *opts = vals
-            else:
-                # Unpack to ensure it only has 1 section
-                [tex] = vals
-            scale = conv_float(scale_str, 0.25)
-            static = 'static' in opts
+            match kv.value.split('|'):
+                case [scale_str, tex]:
+                    scale = conv_float(scale_str, 0.25)
+                    static = False
+                case [scale_str, tex, 'static']:
+                    scale = conv_float(scale_str, 0.25)
+                    static = True
+                case [tex]:
+                    scale = 0.25
+                    static = False
+                case _:
+                    raise ValueError(
+                        f'''Invalid antline material config "{kv.value}"! Valid forms:
+- "antline_kind" "material"
+- "antline_kind" "<scale>|material"
+- "antline_kind" "<scale>|material|static"
+"antline_kind"
+    {{
+    "tex"    "<mat>"
+    "scale"  "<scale>"
+    "static" "<is_static>"
+    }}
+''')
 
         return cls(tex, scale, static)
 
