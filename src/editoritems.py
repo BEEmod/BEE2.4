@@ -34,7 +34,7 @@ LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
 type _SubTypeState = tuple[
     TransToken, list[str], list[str], list[int],
-    TransToken, int, int, FSPath | None,
+    TransToken, int, int, Keyvalues | None,
 ]
 
 
@@ -695,8 +695,10 @@ class SubType:
     pal_name: TransToken = TransToken.BLANK
     # X/Y position on the palette, or None if not on the palette
     pal_pos: tuple[int, int] | None = None
-    # The path to the icon VTF, in 'models/props_map_editor'.
-    pal_icon: FSPath | None = None
+    # Palette icon, if provided. Normally in 'models/props_map_editor',
+    # but we allow PNGs and image handle blocks. Unparsed here since the compiler
+    # reads this, parsed by the app as it loads packages.
+    pal_icon: Keyvalues | None = None
 
     def copy(self) -> SubType:
         """Duplicate this subtype."""
@@ -808,8 +810,10 @@ class SubType:
                     if subkey == 'tooltip':
                         subtype.pal_name = TransToken.parse(pak_id, tok.expect(Token.STRING))
                     elif subkey == 'image':
-                        # Usually defined in file as PNG, but actually VTF.
-                        subtype.pal_icon = FSPath(tok.expect(Token.STRING)).with_suffix('.vtf')
+                        # Parse as arbitrary keyvalues, the app will convert this to an
+                        # image handle later.
+                        tok.push_back(Token.STRING, "Image")  # Root name.
+                        subtype.pal_icon = Keyvalues.parse(tok, single_block=True)
                     elif subkey == 'position':
                         points = tok.expect(Token.STRING).split()
                         # The "Z" axis is not used.
@@ -850,9 +854,14 @@ class SubType:
             f.write('\t\t\t"Palette"\n\t\t\t\t{\n')
             f.write(f'\t\t\t\t"Tooltip"  "{self.pal_name.as_game_token()}"\n')
             if self.pal_icon is not None:
-                # Similarly needs to be PNG even though it's really VTF.
-                pal_icon = self.pal_icon.with_suffix('.png')
-                f.write(f'\t\t\t\t"Image"    "{pal_icon}"\n')
+                if self.pal_icon.has_children():
+                    # Output unchanged.
+                    self.pal_icon.serialise(f, start_indent='\t\t\t\t')
+                else:
+                    # If a string, just try and output as a filename.
+                    # The suffix must be PNG, but it's really VTF.
+                    pal_icon = FSPath(self.pal_icon.value).with_suffix('.png')
+                    f.write(f'\t\t\t\t"Image"    "{pal_icon}"\n')
             x, y = self.pal_pos
             f.write(f'\t\t\t\t"Position" "{x} {y} 0"\n')
             f.write('\t\t\t\t}\n')
