@@ -525,6 +525,25 @@ def iter_grid(
             yield x, y
 
 
+def iter_neighbours[T](iterable: Iterable[T]) -> Iterator[tuple[T | None, T, T | None]]:
+    """Iterate over values, passing along the previous and next value too."""
+    it = iter(iterable)
+    try:
+        prev = next(it)
+    except StopIteration:
+        return  # Empty.
+    try:
+        current = next(it)
+    except StopIteration:  # Singular.
+        yield None, prev, None
+        return
+    yield None, prev, current
+    for next_ in it:
+        yield prev, current, next_
+        prev, current = current, next_
+    yield prev, current, None
+
+
 def check_cython(report: Callable[[str], None] = print) -> None:
     """Check if srctools has its Cython accelerators installed correctly."""
     from srctools import math, tokenizer
