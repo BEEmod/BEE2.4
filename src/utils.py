@@ -20,7 +20,6 @@ import math
 import os
 import stat
 import sys
-import zipfile
 
 from srctools import Angle, conv_bool
 import trio_util
@@ -331,20 +330,6 @@ def _exc_freeze[EnumT: Enum, RetT](
             exc_type, args = data_exc[value]
             raise exc_type(*args) from None
     return getter
-
-
-# Patch zipfile to fix an issue with it not being threadsafe.
-# See https://bugs.python.org/issue42369
-if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
-    # noinspection PyProtectedMember
-    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            # tell() reads the actual file position, but that may have been
-            # changed by another thread - instead keep our own private value.
-            self.tell = lambda: self._pos
-
-    zipfile._SharedFile = _SharedZipFile
 
 
 # Special ID includes <>/[] names.
