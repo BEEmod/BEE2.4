@@ -141,7 +141,6 @@ class Icon:
 
 class ItemVariant:
     """Data required for an item in a particular style."""
-
     def __init__(
         self,
         pak_id: utils.ObjectID,
@@ -151,11 +150,10 @@ class ItemVariant:
         authors: list[str],
         tags: list[str],
         desc: MarkdownData,
-        icons: dict[str, img.Handle],
+        icons: dict[IconKey, Icon],
         ent_count: str = '',
         url: str | None = None,
         all_name: TransToken = TransToken.BLANK,
-        all_icon: FSPath | None = None,
         source: str = '',
     ) -> None:
         self.editor = editoritems
@@ -171,9 +169,8 @@ class ItemVariant:
         self.ent_count = ent_count
         self.url = url
 
-        # The name and VTF for grouped items
+        # The name for grouped items
         self.all_name = all_name
-        self.all_icon = all_icon
 
         # Cached Markdown data with a representation of the instances used.
         self._inst_desc: MarkdownData | None = None
@@ -192,13 +189,12 @@ class ItemVariant:
             self.ent_count,
             self.url,
             self.all_name,
-            self.all_icon,
             self.source,
         )
 
     def can_group(self) -> bool:
         """Does this variant have the data needed to group?"""
-        return self.all_icon is not None and bool(self.all_name)
+        return 'all' in self.icons and bool(self.all_name)
 
     def override_from_folder(self, other: ItemVariant) -> None:
         """Perform the override from another item folder."""
@@ -279,7 +275,6 @@ class ItemVariant:
             ent_count=kv['ent_count', self.ent_count],
             url=kv['url', self.url],
             all_name=self.all_name,
-            all_icon=self.all_icon,
             source=f'{source} from {self.source}',
         )
         [variant.editor] = variant._modify_editoritems(
@@ -359,23 +354,27 @@ class ItemVariant:
         # Implement overriding palette items
         for item in kv.find_children('Palette'):
             try:
-                pal_icon = FSPath(item['icon'])
+                game_icon_kv = item.find_key('icon')
             except LookupError:
-                pal_icon = None
+                game_icon = None
+            else:
+                game_icon = Icon.parse_editoritems(pak_id, game_icon_kv)
+            try:
+                app_icon_kv = item.find_key('bee2')
+            except LookupError:
+                app_icon = None
+            else:
+                app_icon = img.Handle.parse(
+                    app_icon_kv, pak_id,
+                    64, 64,
+                    subfolder='items',
+                )
+            icon = Icon.select(app_icon, game_icon)
 
             try:  # Name for the palette icon
                 pal_name = TransToken.parse(pak_id, item['pal_name'])
             except LookupError:
                 pal_name = None
-
-            try:
-                bee2_icon = img.Handle.parse(
-                    item.find_key('BEE2'), pak_id,
-                    64, 64,
-                    subfolder='items',
-                )
-            except LookupError:
-                bee2_icon = None
 
             if item.name == 'all':
                 if is_extra:
@@ -383,14 +382,10 @@ class ItemVariant:
                         'Cannot specify "all" for hidden '
                         f'editoritems blocks in {source}!'
                     )
-                if pal_icon is not None:
-                    self.all_icon = pal_icon
-                    # If a previous BEE icon was present, remove so we use the VTF.
-                    self.icons.pop('all', None)
                 if pal_name is not None:
                     self.all_name = pal_name
-                if bee2_icon is not None:
-                    self.icons['all'] = bee2_icon
+                if icon is not None:
+                    self.icons['all'] = icon
                 continue
 
             try:
@@ -417,21 +412,16 @@ class ItemVariant:
             if 'name' in item:  # Name for the subtype
                 subtype.name = TransToken.parse(pak_id, item['name'])
 
-            if bee2_icon:
+            if icon is not None:
                 if is_extra:
                     raise ValueError(
-                        'Cannot specify BEE2 icons for hidden '
+                        'Cannot specify palette icons for hidden '
                         f'editoritems blocks in {source}!'
                     )
-                self.icons[item.name] = bee2_icon
-            elif pal_icon is not None:
-                # If a previous BEE icon was present, remove it so we use the VTF.
-                self.icons.pop(item.name, None)
+                self.icons[subtype_ind] = icon
 
             if pal_name is not None:
                 subtype.pal_name = pal_name
-            if pal_icon is not None:
-                subtype.pal_icon = pal_icon
 
         if 'Collisions' in kv:
             # Adjust collisions.
@@ -854,40 +844,20 @@ class Item(PakObject, needs_foreground=True):
         variant = self.selected_version().get(style)
         if not variant.can_group():
             return None
-        try:
-            icon = variant.icons['all']
-        except KeyError:
-            icon = img.Handle.file(utils.PackagePath(
-                variant.pak_id, str(variant.all_icon)
-            ), 64, 64)
+        icon = variant.icons['all'].app
         return self._inherit_overlay(style, icon)
 
     def _get_icon(self, style: PakRef[Style], subKey: int) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         variant = self.selected_version().get(style)
         try:
-            return variant.icons[str(subKey)]
+            return variant.icons[subKey].app
         except KeyError:
-            # Read from editoritems.
-            pass
-        try:
-            subtype = variant.editor.subtypes[subKey]
-        except IndexError:
-            LOGGER.warning(
-                'No subtype number {} for {} in {} style!',
-                subKey, self.id, style,
-            )
-            return img.Handle.error(64, 64)
-        if subtype.pal_icon is None:
             LOGGER.warning(
                 'No palette icon for {} subtype {} in {} style!',
                 self.id, subKey, style,
             )
             return img.Handle.error(64, 64)
-
-        return img.Handle.file(utils.PackagePath(
-            variant.pak_id, str(subtype.pal_icon)
-        ), 64, 64)
 
 
 class ItemConfig(PakObject, allow_mult=True):
@@ -1066,33 +1036,52 @@ async def parse_item_folder(
                 subtype.pal_icon = subtype.pal_pos = None
                 subtype.pal_name = TransToken.BLANK
 
-    # In files this is specified as PNG, but it's always really VTF.
+    game_icons: dict[IconKey, img.Handle | None] = {}
+    for i, subtype in enumerate(first_item.subtypes):
+        if subtype.pal_icon is not None:
+            game_icons[i] = Icon.parse_editoritems(data.pak_id, subtype.pal_icon)
+        else:
+            game_icons[i] = None
     try:
-        all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
+        all_icon_kv = props.find_key('all_icon')
     except LookupError:
-        all_icon = None
+        game_icons['all'] = None
+    else:
+        game_icons['all'] = Icon.parse_editoritems(data.pak_id, all_icon_kv)
 
     try:
         all_name = TransToken.parse(data.pak_id, props['all_name'])
     except LookupError:
         all_name = TransToken.BLANK
 
-    icons: dict[str, img.Handle] = {}
+    app_icons: dict[IconKey, img.Handle] = {}
     for ico_kv in props.find_all('icon'):
         if ico_kv.has_children():
             for child in ico_kv:
-                icons[child.name] = img.Handle.parse(
+                try:
+                    subtype_ind = int(child.name)
+                except (ValueError, TypeError):
+                    raise Exception(
+                        f'Invalid subtype index "{child.name}" for palette icon!'
+                    ) from None
+                app_icons[subtype_ind] = img.Handle.parse(
                     child, data.pak_id,
                     64, 64,
                     subfolder='items',
                 )
         else:
             # Put it as the first/only icon.
-            icons["0"] = img.Handle.parse(
+            app_icons[0] = img.Handle.parse(
                 ico_kv, data.pak_id,
                 64, 64,
                 subfolder='items',
             )
+    # Merge the two dicts together, discarding any if they are both None.
+    icons = {
+        key: icon
+        for key in game_icons | app_icons
+        if (icon := Icon.select(app_icons.get(key), game_icons.get(key))) is not None
+    }
 
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
@@ -1111,7 +1100,6 @@ async def parse_item_folder(
         url=props['infoURL', None],
         icons=icons,
         all_name=all_name,
-        all_icon=all_icon,
         vbsp_config=await lazy_conf.from_file(
             data.packset,
             utils.PackagePath(data.pak_id, config_path),
@@ -1129,9 +1117,10 @@ async def parse_item_folder(
 
     # If we have one of the grouping icon definitions but not both required
     # ones then notify the author.
-    has_name = bool(variant.all_name)
-    has_icon = variant.all_icon is not None
-    if (has_name or has_icon or 'all' in variant.icons) and (not has_name or not has_icon):
+    if len({
+        variant.all_name is not TransToken.BLANK,
+        'all' in icons
+    }) == 2:
         data.warn_auth(data.pak_id, TRANS_INCOMPLETE_GROUPING.format(
             filename=f'{data.pak_id}:{prop_path}'
         ))
