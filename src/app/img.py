@@ -24,7 +24,7 @@ from srctools import Keyvalues, Vec
 from srctools.filesys import (
     File as FSFile, FileSystem, FileSystemChain, RawFileSystem,
 )
-from srctools.vtf import VTF
+from srctools.vtf import ImageFormats, VTF
 import attrs
 import srctools.logger
 import trio
@@ -148,6 +148,34 @@ PATH_BLACK = utils.PackagePath(PAK_COLOR, '000')
 PATH_WHITE = utils.PackagePath(PAK_COLOR, 'fff')
 
 
+# TODO: Use ImageFormats.is_transparent once srctools updates.
+TRANSPARENT_VTF = {
+    fmt for fmt in ImageFormats
+    if fmt.a > 0
+} | {
+    ImageFormats.BGR888_BLUESCREEN, ImageFormats.RGB888_BLUESCREEN,
+    ImageFormats.DXT1_ONEBITALPHA, ImageFormats.DXT5,
+} - {ImageFormats.BGRX5551, ImageFormats.BGRX8888}
+
+
+@attrs.frozen
+class Metadata:
+    """Image metadata extracted from an image."""
+    # Source width/height. Might be cropped down at the end, mainly
+    # indicates the max resolution possible.
+    width: int
+    height: int
+    # If it's transparent
+    transparent: bool = attrs.field(kw_only=True)
+    # Uses a theme.
+    uses_theme: bool = attrs.field(kw_only=True)
+
+    @classmethod
+    def error(cls, width: int, height: int) -> Self:
+        """Default metadata for an error icon. Assume themes are required."""
+        return cls(width, height, transparent=False, uses_theme=True)
+
+
 def current_theme() -> Theme:
     """Retrieve the currently selected theme."""
     return _current_theme
@@ -159,7 +187,10 @@ def _find_file(
     default_ext: DefaultExt,
     check_other_packages: bool = False,
 ) -> tuple[FSFile | None, bool]:
-    """Locate an image within the filesystem."""
+    """Locate an image within the filesystem.
+
+    Returns the FS file, and indicates if it was a themed file.
+    """
     path = uri.path.casefold()
     if path[-4:-3] == '.':
         path, ext = path[:-4], path[-3:]
@@ -198,17 +229,29 @@ def _find_file(
 def _load_file(
     file: FSFile,
     uri: utils.PackagePath,
+    uses_theme: bool,
     width: int, height: int,
-) -> Image.Image:
+) -> tuple[Image.Image, Metadata]:
     """Load an image, given the filesystem reference."""
     try:
         with file.open_bin() as stream:
             if file.path.endswith('.vtf'):
-                image = VTF.read(stream).get().to_PIL()
+                vtf = VTF.read(stream)
+                metadata = Metadata(
+                    vtf.width, vtf.height,
+                    transparent=vtf.format in TRANSPARENT_VTF,
+                    uses_theme=uses_theme,
+                )
+                image = vtf.get().to_PIL()
             else:
                 image = Image.open(stream)
                 image.load()
-                if image.mode != 'RGBA':
+                metadata = Metadata(
+                    image.width, image.height,
+                    transparent=image.mode == 'RGBA',
+                    uses_theme=uses_theme,
+                )
+                if not metadata.transparent:
                     image = image.convert('RGBA')
     except Exception:
         LOGGER.warning(
@@ -216,8 +259,40 @@ def _load_file(
             uri,
             exc_info=True,
         )
-        return Handle.error(width, height).get_pil()
-    return image
+        return Handle.error(width, height).get_pil(), Metadata.error(width, height)
+    return image, metadata
+
+
+def _load_file_metadata(
+    file: FSFile,
+    uri: utils.PackagePath,
+    uses_theme: bool,
+    width: int, height: int,
+) -> Metadata:
+    """Load metadata for a file."""
+    try:
+        with file.open_bin() as stream:
+            if file.path.endswith('.vtf'):
+                vtf = VTF.read(stream, header_only=True)
+                return Metadata(
+                    vtf.width, vtf.height,
+                    transparent=vtf.format in TRANSPARENT_VTF,
+                    uses_theme=uses_theme,
+                )
+            else:
+                image = Image.open(stream)
+                return Metadata(
+                    image.width, image.height,
+                    transparent=image.has_transparency_data,
+                    uses_theme=uses_theme,
+                )
+    except Exception:
+        LOGGER.warning(
+            'Could not parse image file {}:',
+            uri,
+            exc_info=True,
+        )
+        return Metadata.error(width, height)
 
 
 class User:
@@ -248,6 +323,8 @@ class Handle(User):
     _cancel_cleanup: trio.CancelScope = attrs.field(init=False, factory=trio.CancelScope, repr=False)
     # This is set if a PeTI background was automatically composited behind a transparent image.
     _bg_composited: bool = attrs.field(init=False, default=False)
+    # Cached metadata for this handle.
+    _metadata: Metadata | None = attrs.field(init=False, default=None)
 
     # Determines whether `get_pil()` and `get_tk()` can be called directly.
     allow_raw: ClassVar[bool] = False
@@ -285,19 +362,19 @@ class Handle(User):
         raise NotImplementedError
 
     @abstractmethod
-    def _is_themed(self) -> bool:
-        """Return if this image may need to reload when the theme changes.
-
-        This only needs to be set after the image is loaded at least once.
-        """
+    def _get_metadata(self) -> Metadata:
+        """Partially load the image enough to get metadata."""
         raise NotImplementedError
 
-    def is_themed(self) -> bool:
-        """Return if this image may need to reload when the theme changes.
+    def metadata(self) -> Metadata:
+        """Load and cache metadata."""
+        if self._metadata is None:
+            self._metadata = self._get_metadata()
+        return self._metadata
 
-        This only needs to be set after the image is loaded at least once.
-        """
-        return self._bg_composited or self._is_themed()
+    def is_themed(self) -> bool:
+        """Return if this image may need to reload when the theme changes."""
+        return self._bg_composited or self.metadata().uses_theme
 
     @abstractmethod
     def uses_packsys(self) -> bool:
@@ -575,6 +652,8 @@ class Handle(User):
             return False
 
         self._cached_pil = None
+        self._metadata = None
+        self._bg_composited = False
         self._request_load(force=True)
         if _UI_IMPL is not None:
             _UI_IMPL.ui_force_load(self)
@@ -716,9 +795,9 @@ class ImgColor(Handle):
         return self._deduplicate(width, height)
 
     @override
-    def _is_themed(self) -> bool:
-        """This is never themed."""
-        return False
+    def _get_metadata(self) -> Metadata:
+        """This uses the specified size, and never uses themes."""
+        return Metadata(self.width, self.height, transparent=False, uses_theme=False)
 
     @override
     def uses_packsys(self) -> bool:
@@ -745,9 +824,9 @@ class ImgBackground(Handle):
         return self._deduplicate(width, height)
 
     @override
-    def _is_themed(self) -> bool:
-        """This image must reload when the theme changes."""
-        return True
+    def _get_metadata(self) -> Metadata:
+        """This uses the specified size, and always uses themes."""
+        return Metadata(self.width, self.height, transparent=False, uses_theme=True)
 
     @override
     def uses_packsys(self) -> bool:
@@ -770,9 +849,9 @@ class ImgAlpha(Handle):
         return self._deduplicate(width, height)
 
     @override
-    def _is_themed(self) -> bool:
-        """This is never themed."""
-        return False
+    def _get_metadata(self) -> Metadata:
+        """This uses the specified size, and but never themes."""
+        return Metadata(self.width, self.height, transparent=True, uses_theme=False)
 
     @override
     def uses_packsys(self) -> bool:
@@ -805,9 +884,9 @@ class ImgStripAlpha(Handle):
         yield self.original
 
     @override
-    def _is_themed(self) -> bool:
-        """This is themed if the original is."""
-        return self.original.is_themed()
+    def _get_metadata(self) -> Metadata:
+        """Pass along the original's metadata."""
+        return self.original.metadata()
 
     @override
     def uses_packsys(self) -> bool:
@@ -838,23 +917,34 @@ class ImgFile(Handle):
             return Handle.error(self.width, self.height).get_pil()
 
         file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
-        if file is not None:
-            img = _load_file(file, self.uri, self.width, self.height)
-        else:
-            img = Handle.error(self.width, self.height).get_pil()
         if uses_theme:
             self._uses_theme = True
-        return img
+        if file is not None:
+            img, self._metadata = _load_file(file, self.uri, uses_theme, self.width, self.height)
+            return img
+        else:
+            self._metadata = Metadata.error(self.width, self.height)
+            return Handle.error(self.width, self.height).get_pil()
+
+    @override
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata."""
+        try:
+            fsys = PACK_SYSTEMS[self.uri.package]
+        except KeyError:
+            LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
+            return Metadata.error(self.width, self.height)
+
+        file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
+        if file is not None:
+            return _load_file_metadata(file, self.uri, uses_theme, self.width, self.height)
+        else:
+            return Metadata.error(self.width, self.height)
 
     @override
     def resize(self, width: int, height: int) -> ImgFile:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
-
-    @override
-    def _is_themed(self) -> bool:
-        """Return it this uses a themed image."""
-        return self._uses_theme
 
     @override
     def uses_packsys(self) -> bool:
@@ -895,7 +985,8 @@ class ImgBuiltin(Handle):
         if uses_theme:
             self._uses_theme = True
         if file is not None:
-            return _load_file(file, self.uri, self.width, self.height)
+            img, self._metadata = _load_file(file, self.uri, uses_theme, self.width, self.height)
+            return img
         else:
             return Handle.error(self.width, self.height).get_pil()
 
@@ -905,9 +996,13 @@ class ImgBuiltin(Handle):
         return self._deduplicate(width, height, self.uri)
 
     @override
-    def _is_themed(self) -> bool:
-        """Return if this uses a themed image."""
-        return self._uses_theme
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata."""
+        file, uses_theme = _find_file(FSYS_BUILTIN, self.uri, 'png')
+        if file is not None:
+            return _load_file_metadata(file, self.uri, uses_theme, self.width, self.height)
+        else:
+            return Metadata.error(self.width, self.height)
 
     @override
     def uses_packsys(self) -> bool:
@@ -933,9 +1028,18 @@ class ImgComposite(Handle):
         return tuple(map(id, children))
 
     @override
-    def _is_themed(self) -> bool:
-        """Check if this needs to be updated for theming."""
-        return any(layer.is_themed() for layer in self.layers)
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata."""
+        children = [
+            child.metadata()
+            for child in self.layers
+        ]
+        return Metadata(
+            max(child.width for child in children),
+            max(child.height for child in children),
+            transparent=all(child.transparent for child in children),
+            uses_theme=any(child.uses_theme for child in children),
+        )
 
     @override
     def _children(self) -> Iterator[Handle]:
@@ -1008,8 +1112,10 @@ class ImgTransform(Handle):
         return (id(child), bounds, transpose)
 
     @override
-    def _is_themed(self) -> bool:
-        return self.source.is_themed()
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata."""
+        # Could apply cropping sizes here.
+        return self.source.metadata()
 
     @override
     def uses_packsys(self) -> bool:
@@ -1094,9 +1200,9 @@ class ImgIcon(Handle):
         return self._deduplicate(width, height, self.icon_name)
 
     @override
-    def _is_themed(self) -> bool:
-        """This includes the background."""
-        return True
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata. This always includes a themed background."""
+        return Metadata(self.width, self.height, transparent=False, uses_theme=True)
 
     @override
     def uses_packsys(self) -> bool:
@@ -1172,9 +1278,9 @@ class ImgTextOverlay(Handle):
         return self._deduplicate(width, height, self.text, self.size)
 
     @override
-    def _is_themed(self) -> bool:
-        """This includes the background."""
-        return True
+    def _get_metadata(self) -> Metadata:
+        """Compute metadata. This always includes a themed background."""
+        return Metadata(self.width, self.height, transparent=True, uses_theme=True)
 
     @override
     def uses_packsys(self) -> bool:
@@ -1281,9 +1387,13 @@ def set_theme(new_theme: Theme) -> None:
         done = 0
 
         for handle in list(_handles.values()):
+            # We only need to reload if it's already loaded - metadata would have been computed then.
             # noinspection PyProtectedMember
-            if (handle._bg_composited or handle.is_themed()) and handle.reload():
-                done += 1
+            if handle._bg_composited or (
+                handle._metadata is not None and handle._metadata.uses_theme
+            ):
+                if handle.reload():
+                    done += 1
         # Invalidate all loading images, these need to be redone.
         for load, load_frames in ImgLoading.load_anims.values():
             for handle in load_frames:
