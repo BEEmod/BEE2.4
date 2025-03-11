@@ -7,7 +7,7 @@ Unparsed style IDs can be <special>, used usually for unstyled items.
 Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
-from typing import Final, Self, override
+from typing import Final, Literal, Self, override
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from enum import Enum
@@ -45,6 +45,7 @@ TRANS_EXTRA_PALETTES = TransToken.untranslated(
     '"{filename}" has palette set for extra item blocks. Deleting.'
 )
 TRANS_INCOMPLETE_GROUPING = TransToken.untranslated('"{filename}" has incomplete grouping icon definition!')
+type IconKey = Literal['all'] | int
 
 
 class InheritKind(Enum):
@@ -80,6 +81,62 @@ class UnParsedVersion:
     styles: dict[utils.SpecialID, UnParsedItemVariant | ItemVariant]
     def_style: utils.SpecialID
     inherit_kind: dict[str, InheritKind]
+
+
+@attrs.define
+class Icon:
+    """Bundles the parsed BEE2 and game icon."""
+    # Image used for the app.
+    app: img.Handle
+    # Image used for editoritems, or None if the app image should be used for both.
+    game: img.Handle | None
+
+    @classmethod
+    def parse_editoritems(cls, pak_id: utils.ObjectID, kv: Keyvalues) -> img.Handle:
+        """Parse settings for icons in editoritems."""
+        # Valve's VTFs are 256, gives some extra detail.
+        return img.Handle.parse(kv, pak_id, 256, 256, default_ext='vtf')
+
+    @classmethod
+    def select(cls, app: img.Handle | None, game: img.Handle | None) -> Self | None:
+        """Select the appropriate icon for each situation, then combine.
+
+        Returns None if both are None.
+        """
+        if app is not None:
+            if game is None:
+                return cls(app, None)
+            # else: both present, need to pick between.
+        else:
+            if game is not None:
+                return cls(game, None)
+            else:
+                return None
+
+        app_meta = app.metadata()
+        game_meta = game.metadata()
+        app_size = (app_meta.width * app_meta.height)
+        game_size = (game_meta.width * game_meta.height)
+        # In both cases, if equal sizes, prefer the app handle - more likely to be an uncompressed PNG.
+
+        # If either is themed, prefer that, otherwise pick largest.
+        if app_meta.uses_theme and not game_meta.uses_theme:
+            chosen_app = app
+        elif game_meta.uses_theme and not app_meta.uses_theme:
+            chosen_app = game
+        else:
+            chosen_app = game if game_size > app_size else app
+        # If either is a direct VTF, use that for the game, otherwise largest.
+        if game_meta.palette_filename is not None:
+            chosen_game = game
+        elif app_meta.palette_filename is not None:
+            chosen_game = app
+        else:
+            chosen_game = game if game_size > app_size else app
+        if chosen_app is chosen_game:
+            return cls(chosen_app, None)
+        else:
+            return cls(chosen_app, chosen_game)
 
 
 class ItemVariant:
