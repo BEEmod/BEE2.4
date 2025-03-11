@@ -10,7 +10,6 @@ from typing import Any, ClassVar, Final, Literal, override, Self
 
 from abc import abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
-from contextlib import aclosing
 from fractions import Fraction
 from pathlib import Path, PurePath
 import abc
@@ -22,7 +21,7 @@ import weakref
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
 from srctools.filesys import (
-    File as FSFile, FileSystem, FileSystemChain, RawFileSystem,
+    File as FSFile, FileSystem, RawFileSystem,
 )
 from srctools.vtf import ImageFormats, VTF
 import attrs
@@ -31,6 +30,18 @@ import trio
 
 from consts import Theme
 import utils
+
+
+__all__ = [
+    'Handle', 'Metadata', 'UIImage', 'User',
+    'ImgAlpha', 'ImgBuiltin', 'ImgBackground', 'ImgColor', 'ImgComposite',
+    'ImgFile', 'ImgIcon', 'ImgLoading', 'ImgSprite', 'ImgStripAlpha', 'ImgTextOverlay',
+    'ImgTransform',
+    'FLIP_LEFT_RIGHT', 'FLIP_ROTATE', 'FLIP_TOP_BOTTOM', 'ROTATE_CW', 'ROTATE_CCW',
+    'PAK_BEE2', 'PAK_COLOR', 'PAK_SPECIAL', 'PATH_BG', 'PATH_BLACK', 'PATH_BLANK', 'PATH_ERROR',
+    'PATH_LOAD', 'PATH_WHITE', 'PATH_NONE', 'PETI_ITEM_BG', 'PETI_ITEM_BG_HEX',
+    'get_pil_font', 'current_theme', 'init', 'mount_package_fsys', 'make_splash_screen', 'set_theme',
+]
 
 
 # Used to deduplicate handles with existing ones. But if they're totally unused, let them die.
