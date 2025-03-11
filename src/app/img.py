@@ -38,8 +38,9 @@ __all__ = [
     'ImgFile', 'ImgIcon', 'ImgLoading', 'ImgSprite', 'ImgStripAlpha', 'ImgTextOverlay',
     'ImgTransform',
     'FLIP_LEFT_RIGHT', 'FLIP_ROTATE', 'FLIP_TOP_BOTTOM', 'ROTATE_CW', 'ROTATE_CCW',
-    'PAK_BEE2', 'PAK_COLOR', 'PAK_SPECIAL', 'PATH_BG', 'PATH_BLACK', 'PATH_BLANK', 'PATH_ERROR',
-    'PATH_LOAD', 'PATH_WHITE', 'PATH_NONE', 'PETI_ITEM_BG', 'PETI_ITEM_BG_HEX',
+    'PAK_BEE2', 'PAK_COLOR', 'PAK_SPECIAL', 'PAK_VALVE',
+    'PATH_BG', 'PATH_BLACK', 'PATH_BLANK', 'PATH_ERROR', 'PATH_LOAD', 'PATH_WHITE', 'PATH_NONE',
+    'PETI_ITEM_BG', 'PETI_ITEM_BG_HEX',
     'get_pil_font', 'current_theme', 'init', 'mount_package_fsys', 'make_splash_screen', 'set_theme',
 ]
 
@@ -156,6 +157,7 @@ _early_loads: set[Handle] = set()
 PAK_SPECIAL = utils.special_id('<special>')
 PAK_COLOR = utils.special_id('<color>')
 PAK_BEE2 = utils.special_id('<bee2>')
+PAK_VALVE = utils.special_id('<valve>')
 
 PATH_BLANK = utils.PackagePath(PAK_SPECIAL, 'blank')
 PATH_ERROR = utils.PackagePath(PAK_SPECIAL, 'error')
@@ -549,6 +551,8 @@ class Handle(User):
                     if subfolder:
                         uri = uri.in_folder(subfolder)
                     return cls.builtin(uri, width, height)
+                case 'VALVE':  # Palette icon
+                    return cls.file(uri, width, height, 'vtf')
                 case _:
                     raise ValueError(f'Unknown special icon type "{uri}"!')
         else:  # File item
