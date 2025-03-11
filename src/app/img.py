@@ -187,7 +187,7 @@ class Metadata:
     height: int
     # If it's transparent
     transparent: bool = attrs.field(kw_only=True)
-    # Uses a theme.
+    # Known to directly use a theme. If transparent, the composite also causes this.
     uses_theme: bool = attrs.field(kw_only=True)
     # If set, this image can be directly referenced by the puzzlemaker, and this is the path
     # to use. Only valid for a direct ImgFile.
@@ -220,33 +220,37 @@ def _find_file(
     else:
         ext = default_ext
 
-    try:
-        img_file = fsys[f'{path}.{_current_theme.value}.{ext}']
-        uses_theme = True
-    except (KeyError, FileNotFoundError):
+    extensions = [ext, 'png' if ext == 'vtf' else 'vtf']
+    theme = _current_theme.value
+    for ext in extensions:
         try:
-            img_file = fsys[f'{path}.{ext}']
-        except (KeyError, FileNotFoundError):
-            img_file = None
-        uses_theme = False
+            return fsys[f'{path}.{theme}.{ext}'], True
+        except FileNotFoundError:
+            pass
+    for ext in extensions:
+        try:
+            return fsys[f'{path}.{ext}'], False
+        except FileNotFoundError:
+            pass
 
     # Deprecated behaviour, check the other packages.
-    if img_file is None and check_other_packages:
+    if check_other_packages:
         for pak_id, other_fsys in PACK_SYSTEMS.items():
-            try:
-                img_file = other_fsys[f'{path}.{ext}']
-                LOGGER.warning(
-                    'Image "{}" was found in package "{}", '
-                    'fix the reference.',
-                    uri, pak_id,
-                )
-                break
-            except (KeyError, FileNotFoundError):
-                pass
+            for ext in extensions:
+                try:
+                    img_file = other_fsys[f'{path}.{ext}']
+                except (KeyError, FileNotFoundError):
+                    pass
+                else:
+                    LOGGER.warning(
+                        'Image "{}" was found in package "{}", '
+                        'fix the reference.',
+                        uri, pak_id,
+                    )
+                    return img_file, False
 
-    if img_file is None:
-        LOGGER.error('"{}" does not exist!', uri)
-    return img_file, uses_theme
+    LOGGER.error('"{}" does not exist!', uri)
+    return None, False
 
 
 def _load_file(
