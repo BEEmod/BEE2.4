@@ -110,9 +110,9 @@ class AntType:
     @classmethod
     def parse(cls, kv: Keyvalues) -> AntType:
         """Parse this from a property block."""
-        broken_chance = kv.float('broken_chance')
-        broken_min = kv.int('broken_min')
-        broken_max_run = kv.int('broken_max_run')
+        broken_chance = kv.float('broken_chance', 0.0)
+        broken_min = kv.int('broken_min', 0)
+        broken_max_run = kv.int('broken_max_run', 1)
         tex_straight: list[AntTex] = []
         tex_corner: list[AntTex] = []
         brok_straight: list[AntTex] = []
@@ -135,12 +135,14 @@ class AntType:
             LOGGER.warning('Antline broken minumum must be positive, got "{}"!', kv['broken_min'])
             broken_min = 0
         if broken_max_run < 1:
-            LOGGER.warning('Antline broken minumum must be at least 1, got "{}"!', kv['broken_min'])
+            LOGGER.warning('Antline broken max run must be at least 1, got "{}"!', kv['broken_max_run'])
             broken_max_run = 1
 
         if broken_chance == 0.0:
             brok_straight.clear()
             brok_corner.clear()
+            broken_min = 0
+            broken_max_run = 1
 
         # Cannot have broken corners if corners/straights are the same.
         if not tex_corner:
