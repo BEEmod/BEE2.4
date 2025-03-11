@@ -89,11 +89,14 @@ class Icon:
     # Image used for the app.
     app: img.Handle
     # Image used for editoritems, or None if the app image should be used for both.
-    game: img.Handle | None
+    game: img.Handle
 
     @classmethod
     def parse_editoritems(cls, pak_id: utils.ObjectID, kv: Keyvalues) -> img.Handle:
         """Parse settings for icons in editoritems."""
+        # Editoritems files must be defined with png extensions, but they're always VTF. Strip.
+        if not kv.has_children() and kv.value.casefold().endswith('.png'):
+            kv = Keyvalues('Icon', kv.value[:-4])
         # Valve's VTFs are 256, gives some extra detail.
         return img.Handle.parse(kv, pak_id, 256, 256, default_ext='vtf')
 
@@ -105,11 +108,11 @@ class Icon:
         """
         if app is not None:
             if game is None:
-                return cls(app, None)
+                return cls(app.resize(64, 64), app)
             # else: both present, need to pick between.
         else:
             if game is not None:
-                return cls(game, None)
+                return cls(game.resize(64, 64), game)
             else:
                 return None
 
@@ -120,12 +123,15 @@ class Icon:
         # In both cases, if equal sizes, prefer the app handle - more likely to be an uncompressed PNG.
 
         # If either is themed, prefer that, otherwise pick largest.
-        if app_meta.uses_theme and not game_meta.uses_theme:
+        app_themed = app_meta.uses_theme or app_meta.transparent
+        game_themed = game_meta.uses_theme or game_meta.transparent
+        if app_themed and not game_themed:
             chosen_app = app
-        elif game_meta.uses_theme and not app_meta.uses_theme:
+        elif game_themed and not app_themed:
             chosen_app = game
         else:
             chosen_app = game if game_size > app_size else app
+
         # If either is a direct VTF, use that for the game, otherwise largest.
         if game_meta.palette_filename is not None:
             chosen_game = game
@@ -133,10 +139,7 @@ class Icon:
             chosen_game = app
         else:
             chosen_game = game if game_size > app_size else app
-        if chosen_app is chosen_game:
-            return cls(chosen_app, None)
-        else:
-            return cls(chosen_app, chosen_game)
+        return cls(chosen_app.resize(64, 64), chosen_game)
 
 
 class ItemVariant:
@@ -1058,12 +1061,15 @@ async def parse_item_folder(
     for ico_kv in props.find_all('icon'):
         if ico_kv.has_children():
             for child in ico_kv:
-                try:
-                    subtype_ind = int(child.name)
-                except (ValueError, TypeError):
-                    raise Exception(
-                        f'Invalid subtype index "{child.name}" for palette icon!'
-                    ) from None
+                if child.name == 'all':
+                    subtype_ind = 'all'
+                else:
+                    try:
+                        subtype_ind = int(child.name)
+                    except (ValueError, TypeError):
+                        raise Exception(
+                            f'Invalid subtype index "{child.name}" for palette icon!'
+                        ) from None
                 app_icons[subtype_ind] = img.Handle.parse(
                     child, data.pak_id,
                     64, 64,
