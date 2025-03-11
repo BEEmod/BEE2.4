@@ -161,8 +161,6 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
 
     def fill_palette(self) -> None:
         """Fill the palette with random items."""
-        include_mandatory = mandatory_unlocked()
-
         empty_slots = [
             slot for slot in self.slots_pal
             if slot.contents is None

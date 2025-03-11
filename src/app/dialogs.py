@@ -1,6 +1,6 @@
 """API for dialog boxes."""
 import sys
-from typing import ClassVar, Literal, assert_never
+from typing import ClassVar, Literal
 
 from collections.abc import Callable
 from enum import Enum

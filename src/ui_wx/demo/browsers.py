@@ -34,6 +34,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     panel_main = wx.Panel(MAIN_WINDOW)
     sizer_main = wx.BoxSizer(wx.VERTICAL)
 
+    nursery: trio.Nursery
     btn_browse = wx.Button(panel_main, wx.ID_OPEN)
     btn_browse.Bind(wx.EVT_BUTTON, lambda evt: nursery.start_soon(browse))
     sizer_main.Add(btn_browse)

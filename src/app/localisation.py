@@ -276,7 +276,7 @@ def get_lang_name(lang: Language) -> str:
 async def find_basemodui(games: Iterable[gameMan.Game], langs: list[str]) -> trio.Path | None:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
     # Check Portal 2 first, others might not be fully correct?
-    sorted(games, key=lambda gm: gm.steamID != '620')
+    games = sorted(games, key=lambda gm: gm.steamID != '620')
 
     for lang in langs:
         try:
