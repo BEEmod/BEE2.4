@@ -169,6 +169,9 @@ class Metadata:
     transparent: bool = attrs.field(kw_only=True)
     # Uses a theme.
     uses_theme: bool = attrs.field(kw_only=True)
+    # If set, this image can be directly referenced by the puzzlemaker, and this is the path
+    # to use. Only valid for a direct ImgFile.
+    palette_filename: PurePath | None = attrs.field(kw_only=True, default=None)
 
     @classmethod
     def error(cls, width: int, height: int) -> Self:
@@ -920,7 +923,8 @@ class ImgFile(Handle):
         if uses_theme:
             self._uses_theme = True
         if file is not None:
-            img, self._metadata = _load_file(file, self.uri, uses_theme, self.width, self.height)
+            img, meta = _load_file(file, self.uri, uses_theme, self.width, self.height)
+            self._metadata = self._check_palette_filename(meta, file.path)
             return img
         else:
             self._metadata = Metadata.error(self.width, self.height)
@@ -937,9 +941,24 @@ class ImgFile(Handle):
 
         file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if file is not None:
-            return _load_file_metadata(file, self.uri, uses_theme, self.width, self.height)
+            meta = _load_file_metadata(file, self.uri, uses_theme, self.width, self.height)
+            return self._check_palette_filename(meta, file.path)
         else:
             return Metadata.error(self.width, self.height)
+
+    @staticmethod
+    def _check_palette_filename(meta: Metadata, path_str: str) -> Metadata:
+        """If this file is a directly usable VTF, indicate that in the metadata."""
+        if meta.uses_theme or meta.transparent:
+            return meta  # Cannot use.
+        path = PurePath(path_str)
+        if path.suffix.casefold() != '.vtf':
+            return meta
+        try:
+            pal_path = PurePath(path).relative_to(FOLDER_PROPS_MAP_EDITOR)
+        except ValueError:
+            return meta
+        return attrs.evolve(meta, palette_filename=pal_path.with_suffix('.png'))
 
     @override
     def resize(self, width: int, height: int) -> ImgFile:
@@ -950,24 +969,6 @@ class ImgFile(Handle):
     def uses_packsys(self) -> bool:
         """This always uses package resources."""
         return True
-
-    def palette_filename(self) -> PurePath | None:
-        """Determine if this image can be directly referenced by the puzzlemaker.
-
-        If so, return the filename to use.
-        """
-        try:
-            fsys = PACK_SYSTEMS[self.uri.package]
-        except KeyError:
-            return None
-        file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
-        if uses_theme or file is None:
-            return None
-        path = PurePath(file.path)
-        try:
-            return path.relative_to(FOLDER_PROPS_MAP_EDITOR).with_suffix('.png')
-        except ValueError:
-            return None
 
 
 @attrs.define(eq=False)
