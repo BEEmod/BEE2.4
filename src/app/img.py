@@ -6,7 +6,9 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-from typing import Any, ClassVar, Final, Literal, override, Self
+
+from contextlib import aclosing
+from typing import Any, ClassVar, Final, Literal, override, Self, TYPE_CHECKING
 
 from abc import abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
@@ -21,9 +23,10 @@ import weakref
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
 from srctools.filesys import (
-    File as FSFile, FileSystem, RawFileSystem,
+    File as FSFile, FileSystem, FileSystemChain, RawFileSystem,
 )
 from srctools.vtf import ImageFormats, VTF
+from trio_util import AsyncValue
 import attrs
 import srctools.logger
 import trio
@@ -44,6 +47,9 @@ __all__ = [
     'get_pil_font', 'current_theme', 'init', 'mount_package_fsys', 'make_splash_screen', 'set_theme',
 ]
 
+if TYPE_CHECKING:  # Import cycle
+    from app import gameMan
+
 
 # Used to deduplicate handles with existing ones. But if they're totally unused, let them die.
 _handles: weakref.WeakValueDictionary[
@@ -58,6 +64,8 @@ FOLDER_PROPS_MAP_EDITOR = PurePath('resources', 'materials', 'models', 'props_ma
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 # Our list of mounted package filesystems.
 PACK_SYSTEMS: dict[str, FileSystem[Any]] = {}
+# Filesystem for the currently loaded game.
+_GAME_FSYS = FileSystemChain()
 # Force-loaded handles must be kept alive.
 _force_loaded_handles: list[Handle] = []
 # Package folders to mount.
@@ -235,6 +243,16 @@ def _find_file(
 
     # Deprecated behaviour, check the other packages.
     if check_other_packages:
+        try:
+            img_file = _GAME_FSYS[f'{path}.vtf']
+        except FileNotFoundError:
+            pass
+        else:
+            LOGGER.warning(
+                'Image "{}" is a Valve icon. Use "<valve>:{}"!',
+                uri, uri.path
+            )
+            return img_file, False
         for pak_id, other_fsys in PACK_SYSTEMS.items():
             for ext in extensions:
                 try:
@@ -404,8 +422,11 @@ class Handle(User):
         return self._bg_composited or self.metadata().uses_theme
 
     @abstractmethod
-    def uses_packsys(self) -> bool:
-        """Returns whether this image uses package resources."""
+    def uses_packsys(self, valve_only: bool) -> bool:
+        """Returns whether this image uses package resources.
+
+        If valve_only is true, this checks if it uses specifically game resources.
+        """
         return False
 
     @classmethod
@@ -829,7 +850,7 @@ class ImgColor(Handle):
         return Metadata(self.width, self.height, transparent=False, uses_theme=False)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This doesn't use package resources."""
         return False
 
@@ -858,7 +879,7 @@ class ImgBackground(Handle):
         return Metadata(self.width, self.height, transparent=False, uses_theme=True)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This doesn't use package resources."""
         return False
 
@@ -883,7 +904,7 @@ class ImgAlpha(Handle):
         return Metadata(self.width, self.height, transparent=True, uses_theme=False)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This doesn't use package resources."""
         return False
 
@@ -918,8 +939,8 @@ class ImgStripAlpha(Handle):
         return self.original.metadata()
 
     @override
-    def uses_packsys(self) -> bool:
-        return self.original.uses_packsys()
+    def uses_packsys(self, valve_only: bool) -> bool:
+        return self.original.uses_packsys(valve_only)
 
     @classmethod
     @override
@@ -933,17 +954,21 @@ class ImgStripAlpha(Handle):
 class ImgFile(Handle):
     """An image loaded from a package."""
     uri: utils.PackagePath
-    _uses_theme: bool = False
     default_ext: DefaultExt = 'png'
+    _uses_theme: bool = attrs.field(init=False, default=False)
+    _uses_game_res: bool = attrs.field(init=False, default=False)
 
     @override
     def _make_image(self) -> Image.Image:
         """Load from a app package."""
-        try:
-            fsys = PACK_SYSTEMS[self.uri.package]
-        except KeyError:
-            LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
-            return Handle.error(self.width, self.height).get_pil()
+        if self.uri.package == PAK_VALVE:
+            fsys = _GAME_FSYS
+        else:
+            try:
+                fsys = PACK_SYSTEMS[self.uri.package]
+            except KeyError:
+                LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
+                return Handle.error(self.width, self.height).get_pil()
 
         file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if uses_theme:
@@ -959,11 +984,14 @@ class ImgFile(Handle):
     @override
     def _get_metadata(self) -> Metadata:
         """Compute metadata."""
-        try:
-            fsys = PACK_SYSTEMS[self.uri.package]
-        except KeyError:
-            LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
-            return Metadata.error(self.width, self.height)
+        if self.uri.package == PAK_VALVE:
+            fsys = _GAME_FSYS
+        else:
+            try:
+                fsys = PACK_SYSTEMS[self.uri.package]
+            except KeyError:
+                LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
+                return Metadata.error(self.width, self.height)
 
         file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if file is not None:
@@ -992,9 +1020,12 @@ class ImgFile(Handle):
         return self._deduplicate(width, height, self.uri)
 
     @override
-    def uses_packsys(self) -> bool:
-        """This always uses package resources."""
-        return True
+    def uses_packsys(self, valve_only: bool) -> bool:
+        """This always uses package resources, but may only sometimes use Valve files."""
+        if valve_only:
+            return self.uri.package == PAK_VALVE or self._uses_game_res
+        else:
+            return True
 
 
 @attrs.define(eq=False)
@@ -1032,7 +1063,7 @@ class ImgBuiltin(Handle):
             return Metadata.error(self.width, self.height)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This doesn't use package resources."""
         return False
 
@@ -1074,9 +1105,9 @@ class ImgComposite(Handle):
         yield from self.layers
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """Check if any children use package resources."""
-        return any(layer.uses_packsys() for layer in self.layers)
+        return any(layer.uses_packsys(valve_only) for layer in self.layers)
 
     @override
     def _make_image(self) -> Image.Image:
@@ -1145,8 +1176,8 @@ class ImgTransform(Handle):
         return self.source.metadata()
 
     @override
-    def uses_packsys(self) -> bool:
-        return self.source.uses_packsys()
+    def uses_packsys(self, valve_only: bool) -> bool:
+        return self.source.uses_packsys(valve_only)
 
     def _crop(self, ratio: Fraction, image: Image.Image) -> Image.Image:
         # Alter the image to have the specified ratio.
@@ -1232,7 +1263,7 @@ class ImgIcon(Handle):
         return Metadata(self.width, self.height, transparent=False, uses_theme=True)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This doesn't use package resources."""
         return False
 
@@ -1310,7 +1341,7 @@ class ImgTextOverlay(Handle):
         return Metadata(self.width, self.height, transparent=True, uses_theme=True)
 
     @override
-    def uses_packsys(self) -> bool:
+    def uses_packsys(self, valve_only: bool) -> bool:
         """This only uses UI resources."""
         return False
 
@@ -1346,20 +1377,35 @@ def mount_package_fsys(systems: dict[str, FileSystem]) -> None:
     PACK_SYSTEMS = systems
     done = 0
     for handle in list(_handles.values()):
-        if handle.uses_packsys() and handle.has_users() and handle.reload():
+        if handle.uses_packsys(False) and handle.has_users() and handle.reload():
             done += 1
     if done:
         LOGGER.info('Reloaded {} handles that use packages.', done)
 
 
+async def _mount_game_task(game_value: AsyncValue[gameMan.Game]) -> None:
+    """Load the current game's filesystem, reloading images."""
+    global _GAME_FSYS
+    async with aclosing(game_value.eventual_values()) as agen:
+        async for game in agen:
+            _GAME_FSYS.systems = [(game.get_filesystem(), 'materials/models/props_map_editor')]
+            done = 0
+            for handle in list(_handles.values()):
+                if handle.uses_packsys(True) and handle.has_users() and handle.reload():
+                    done += 1
+            if done:
+                LOGGER.info('Reloaded {} handles that use game files.', done)
+
+
 # noinspection PyProtectedMember
 async def init(
     implementation: UIImage,
+    game_value: AsyncValue[gameMan.Game],
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
-    """Start the background loading of images, using the specified filesystem and implementation.
-    """
+    """Start the background loading of images, using the provided UI implementation."""
     global _load_nursery, _UI_IMPL
+    _GAME_FSYS.systems = [(game_value.value.get_filesystem(), 'materials/models/props_map_editor')]
 
     try:
         async with trio.open_nursery() as nursery:
@@ -1375,6 +1421,7 @@ async def init(
                     load_handle = Handle.ico_loading(handle.width, handle.height)
                     nursery.start_soon(Handle._load_task, handle, load_handle, False)
             nursery.start_soon(ImgLoading.anim_task, implementation)
+            nursery.start_soon(_mount_game_task, game_value)
             task_status.started()
             # Sleep, until init() is potentially cancelled.
             await trio.sleep_forever()

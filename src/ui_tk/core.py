@@ -65,6 +65,8 @@ async def init_app(core_nursery: trio.Nursery) -> None:
             gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
+        # Needs to load the game fsys before loading packages.
+        await core_nursery.start(img.init, TK_IMG, gameMan.selected_game)
 
         export_trig = async_util.EdgeTrigger[exporting.ExportInfo]()
         export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
@@ -76,7 +78,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         )
         packset, _ = await packages.LOADED.wait_transition()
         await loadScreen.MAIN_UI.step('pre_ui')
-        core_nursery.start_soon(img.init, TK_IMG)
         core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
         LOGGER.info('Initialising UI...')
