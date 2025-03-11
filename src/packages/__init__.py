@@ -17,7 +17,10 @@ from config import Config
 from trio_util import AsyncValue
 from srctools import Keyvalues, NoKeyError, Vec
 from srctools.tokenizer import TokenSyntaxError
-from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem, File
+from srctools.filesys import (
+    FileSystem, FileSystemChain, RawFileSystem, ZipFileSystem,
+    VPKFileSystem, File,
+)
 import attrs
 import trio
 import srctools
@@ -1025,6 +1028,15 @@ async def _load_packages(
     for obj_type in OBJ_TYPES.values():
         packset.unparsed[obj_type] = {}
         packset.objects[obj_type] = {}
+
+    # Mount packages into images, so they can be used during parsing.
+    img_fsys = {}
+    for pack in packset.packages.values():
+        fsys = FileSystemChain()
+        for folder in img.IMAGE_MOUNTS:
+            fsys.add_sys(pack.fsys, folder)
+        img_fsys[pack.id] = fsys
+    img.mount_package_fsys(img_fsys)
 
     async with trio.open_nursery() as nursery:
         for pack in packset.packages.values():

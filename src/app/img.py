@@ -44,9 +44,16 @@ LOGGER.setLevel('INFO')
 
 FOLDER_PROPS_MAP_EDITOR = PurePath('resources', 'materials', 'models', 'props_map_editor')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
+# Our list of mounted package filesystems.
 PACK_SYSTEMS: dict[str, FileSystem[Any]] = {}
 # Force-loaded handles must be kept alive.
 _force_loaded_handles: list[Handle] = []
+# Package folders to mount.
+IMAGE_MOUNTS = [
+    'resources/bee2/',
+    'resources/materials/',
+    FOLDER_PROPS_MAP_EDITOR.as_posix(),
+]
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
@@ -1314,33 +1321,16 @@ class UIImage(abc.ABC):
         raise NotImplementedError
 
 
-async def _load_fsys_task(*, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED) -> None:
-    """When packages change, reload images."""
-    # Circular import
-    from packages import LOADED, PackagesSet
-    props_map_editor = FOLDER_PROPS_MAP_EDITOR.as_posix()
-
+def mount_package_fsys(systems: dict[str, FileSystem]) -> None:
+    """Load a new package filesystem, reloading images."""
     global PACK_SYSTEMS
-    async with aclosing(LOADED.eventual_values()) as agen:
-        packset: PackagesSet
-        async for packset in agen:
-            PACK_SYSTEMS = {
-                pack.id: FileSystemChain(
-                    (pack.fsys, 'resources/bee2/'),
-                    (pack.fsys, 'resources/materials/'),
-                    (pack.fsys, props_map_editor),
-                )
-                for pack in packset.packages.values()
-            }
-            done = 0
-            for handle in list(_handles.values()):
-                if handle.uses_packsys() and handle.has_users() and handle.reload():
-                    done += 1
-            LOGGER.info('Reloaded {} handles that use packages.', done)
-
-            task_status.started()
-            # Real task statuses raises if called multiple twice.
-            task_status = trio.TASK_STATUS_IGNORED
+    PACK_SYSTEMS = systems
+    done = 0
+    for handle in list(_handles.values()):
+        if handle.uses_packsys() and handle.has_users() and handle.reload():
+            done += 1
+    if done:
+        LOGGER.info('Reloaded {} handles that use packages.', done)
 
 
 # noinspection PyProtectedMember
@@ -1358,8 +1348,6 @@ async def init(
                 raise AssertionError('Only one image system can be run at a time!')
             _load_nursery = nursery
             _UI_IMPL = implementation
-
-            await nursery.start(_load_fsys_task)
 
             LOGGER.debug('Early loads: {}', _early_loads)
             while _early_loads:
