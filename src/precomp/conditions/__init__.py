@@ -982,9 +982,9 @@ async def dump_conditions(filename: trio.Path) -> None:
             (ALL_TESTS, 'Tests'),
             (ALL_RESULTS, 'Results'),
         ]
-        for lookup, name in all_cond_types:
+        for lookup, type_name in all_cond_types:
             await file.write('<!------->\n')
-            await file.write(f'## {name}\n')
+            await file.write(f'## {type_name}\n')
             await file.write('<!------->\n')
 
             lookup_grouped: dict[str, list[
@@ -1006,6 +1006,19 @@ async def dump_conditions(filename: trio.Path) -> None:
             if not lookup_grouped['']:
                 del lookup_grouped['']
 
+            await file.write('\n<details open>\n<summary>Table Of Contents</summary>\n\n')
+            for (group, funcs) in sorted(lookup_grouped.items()):
+                if group == '':
+                    await file.write('* Ungrouped Conditions\n')
+                else:
+                    await file.write(f'* {group}\n')
+                for test_key, aliases, func in funcs:
+                    names = '/'.join(f'`{name}`' for name in [test_key, *aliases])
+                    await file.write(
+                        f'\t* [{names}](#beecond-{type_name.casefold()}-{test_key.casefold()})\n'
+                    )
+            await file.write('</details>\n\n')
+
             for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
                 if group == '':
                     group = 'Ungrouped Conditions'
@@ -1022,7 +1035,10 @@ async def dump_conditions(filename: trio.Path) -> None:
                 LOGGER.info('Doing {} group...', group)
 
                 for test_key, aliases, func in funcs:
-                    await file.write(f'#### `{test_key}`:\n\n')
+                    await file.write(
+                        f'#### <a id="beecond-{type_name.casefold()}-{test_key.casefold()}">'
+                        f'`{test_key}`</a>:\n\n'
+                    )
                     if aliases:
                         await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n')
                     if func.valid_after or func.valid_before:
