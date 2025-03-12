@@ -26,9 +26,9 @@ def res_set_marker(inst: Entity, res: Keyvalues) -> None:
     """Set a marker at a specific position.
 
     Parameters:
-        * `global`: If true, the position is an absolute position, ignoring this instance.
-        * `name`: A name to store to identify this marker/item.
-        * `pos`: The position or offset to use for the marker.
+    * `global`: If true, the position is an absolute position, ignoring this instance.
+    * `name`: A name to store to identify this marker/item.
+    * `pos`: The position or offset to use for the marker.
     """
     origin = Vec.from_str(inst['origin'])
     orient = Matrix.from_angstr(inst['angles'])
@@ -53,18 +53,18 @@ def check_marker(inst: Entity, kv: Keyvalues) -> bool:
     """Check if markers are present at a position.
 
     Parameters:
-        * `name`: The name to look for. This can contain one `*` to match prefixes/suffixes.
-        * `nameVar`: If found, set this variable to the actual name.
-        * `pos`: The position to check.
-        * `pos2`: If specified, the position is a bounding box from 1 to 2.
-        * `radius`: Check markers within this distance. If this is specified, `pos2` is not permitted.
-        * `global`: If true, positions are an absolute position, ignoring this instance.
-        * `removeFound`: If true, remove the found marker. If you don't need it, this will improve
-          performance.
-        * `copyto`: Copies fixup vars from the searching instance to the one which set the
-          marker. The value is in the form `$src $dest`.
-        * `copyfrom`: Copies fixup vars from the one that set the marker to the searching instance.
-          The value is in the form `$src $dest`.
+    * `name`: The name to look for. This can contain one `*` to match prefixes/suffixes.
+    * `nameVar`: If found, set this variable to the actual name.
+    * `pos`: The position to check.
+    * `pos2`: If specified, the position is a bounding box from 1 to 2.
+    * `radius`: Check markers within this distance. If this is specified, `pos2` is not permitted.
+    * `global`: If true, positions are an absolute position, ignoring this instance.
+    * `removeFound`: If true, remove the found marker. If you don't need it, this will improve
+      performance.
+    * `copyto`: Copies fixup vars from the searching instance to the one which set the
+      marker. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the one that set the marker to the searching instance.
+      The value is in the form `$src $dest`.
     """
     origin = Vec.from_str(inst['origin'])
     orient = Matrix.from_angstr(inst['angles'])
