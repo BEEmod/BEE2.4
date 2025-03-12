@@ -222,17 +222,17 @@ class Item:
         self.inst['targetname'] = value
 
     @property
-    def timer(self) -> int | None:
+    def timer(self) -> float | None:
         """Return the current $timer_delay value for this item, or None if it is not timed."""
         if consts.FixupVars.TIM_DELAY in self.inst.fixup:
-            timer_delay = self.inst.fixup.int(consts.FixupVars.TIM_DELAY)
-            if 1 <= timer_delay <= 30:
+            timer_delay = self.inst.fixup.float(consts.FixupVars.TIM_DELAY)
+            if 0 < timer_delay <= 30:
                 return timer_delay
             # else, it's an infinite timer.
         return None
 
     @timer.setter
-    def timer(self, value: int | None) -> None:
+    def timer(self, value: float | None) -> None:
         """Set the current timer delay value for this item."""
         if value is not None and 1 <= value <= 30:
             self.inst.fixup[consts.FixupVars.TIM_DELAY] = value
@@ -657,7 +657,7 @@ def calc_connections(
                 if item.timer is None:
                     if pan.fixup.bool(consts.FixupVars.TIM_ENABLED):
                         item.timer = tim = pan.fixup.int(consts.FixupVars.TIM_DELAY)
-                        if not (1 <= tim <= 30):
+                        if not (0 < tim <= 30):
                             # These would be infinite.
                             item.timer = None
             else:
@@ -1032,7 +1032,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         )
         packing.pack_files(item.inst.map, timer_sound, file_type='sound')
 
-        for delay in range(timer_delay):
+        for delay in range(int(timer_delay)):
             relay.add_out(Output(
                 'OnTrigger',
                 '!self',
