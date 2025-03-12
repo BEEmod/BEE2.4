@@ -719,11 +719,14 @@ def restart_app(component: str) -> NoReturn:
 
     This will not return!
     """
+    args = list(sys.argv)
     # sys.executable is the program which ran us - when frozen,
     # it'll our program.
     # We need to add the program to the arguments list, since python
     # strips that off.
-    args = [sys.executable, *sys.argv]
+    if not args or Path(args[0]) != Path(sys.executable):
+        args.insert(0, sys.executable)
+
     if len(args) == 1:
         # We were run directly in frozen form, add on the component name to ensure it executes.
         args.append(component)
