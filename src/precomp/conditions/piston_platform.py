@@ -69,8 +69,6 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     Parameters:
     * `itemid`: If set, instances will be looked up on this item, as mentioned above.
-    * `has_dn_fizz`: If true, enable the VScript's Think function to automatically enable/disable
-      fizzler triggers. This kills players/objects only if the piston gets jammed when retracting.
     * `auto_var`: This should be a 0/1 (or fixup variable containing the same) to indicate if
       the piston has automatic movement, and so cannot use the "full static" instances.
     * `source_ent`: If sounds are used, set this to the name of an entity which is used as the
@@ -78,6 +76,9 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
     * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
     * `speed`: Speed of the piston in units per second. Defaults to 150.
+    * `dn_fizz_name`: Defaults to `dn_fizz`. The name of the 'downward' hurt trigger.
+       This is enabled to kill players/objects only if the piston gets jammed when retracting.
+       If blank, this is disabled.
     * `template`: Specifies a brush template ID used to generate the `func_movelinear`s. This
        should contain brushes for collision, each with different visgroups. The brushes are then
        offset as required to the starting position, and tied to the appropriate entities.
@@ -111,7 +112,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         LazyValue.parse(res['visgroup_top', 'pist_4']),
     ]
 
-    has_dn_fizz = res.bool('has_dn_fizz')
+    dn_fizz_name = res['dn_fizz_name', '']
     automatic_var = res['auto_var', '']
     source_ent = res['source_ent', '']
     snd_start = res['snd_start', '']
@@ -142,7 +143,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 conditions.ALL_INST.add(fname.casefold())
                 return
 
-        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}'
+        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}; DN_FIZZ_NAME <- `{dn_fizz_name}`'
 
         if snd_start and snd_stop:
             packing.pack_files(vmf, snd_start, snd_stop, file_type='sound')
