@@ -196,6 +196,7 @@ def make_legend(
     overlay: Image.Image | None = None
     blank_img: Image.Image | None = None
     num_sheet: Image.Image | None = None
+    background: Image.Image | None = None
     num_step = num_x = num_y = 0
     for style in exp.selected_style.bases:
         try:
@@ -212,7 +213,12 @@ def make_legend(
                     Image.Resampling.LANCZOS,
                 )
             if legend_info.background is not None:
-                legend.paste(legend_info.background.get_pil(), (0, 0))
+                # Ensure it's exactly the same size as the legend.
+                background = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
+                background.paste(legend_info.background.get_pil())
+                # To allow this to be reused for both legends, skip copying the unused bits
+                # of the cells area. So here only copy the bits for the model geometry.
+                legend.alpha_composite(background, (0, 623), (0, 623))
             if legend_info.numbers is not None:
                 num_sheet = legend_info.numbers.get_pil()
                 num_x, num_y = legend_info.num_off
@@ -234,6 +240,13 @@ def make_legend(
                 ico = handle.get_pil()
             else:
                 ico = handle.result()
+        if background is not None:
+            # Copy in the background to fill this cell.
+            legend.alpha_composite(
+                background,
+                (x, y),
+                (x, y, x + cell_size, y + cell_size),
+            )
         if ico is None:
             if blank_img is None:
                 # Blank this section.
@@ -246,8 +259,8 @@ def make_legend(
         ico = ico.resize(
             (cell_size, cell_size),
             Image.Resampling.LANCZOS,
-        ).convert('RGB')
-        legend.paste(ico, (x, y))
+        ).convert('RGBA')
+        legend.alpha_composite(ico, (x, y))
         if num_sheet is not None and ico is not blank_img:
             tens, ones = divmod(num, 10)
             y += cell_size - num_y - num_sheet.height
@@ -270,7 +283,8 @@ def make_legend(
 
     if overlay is not None:
         legend = Image.alpha_composite(legend, overlay)
-
+    assert legend.size == LEGEND_SIZE, legend
+    assert legend.mode == 'RGBA', legend
     vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.DXT5)
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
@@ -278,6 +292,7 @@ def make_legend(
 
     sign_path.parent.mkdir(parents=True, exist_ok=True)
     LOGGER.info('Writing {}...', sign_path)
+
     with sign_path.open('wb') as f:
         try:
             vtf.save(f)
