@@ -6,10 +6,9 @@ from typing import Final
 from pathlib import Path
 
 from PIL import Image
-from srctools.filesys import VPKFileSystem
 
 from aioresult import ResultCapture
-from srctools import FileSystem, FileSystemChain, Keyvalues
+from srctools import FileSystem, Keyvalues
 from srctools.vtf import VTF, ImageFormats, VTFFlags
 import srctools.logger
 import trio.to_thread
@@ -17,7 +16,7 @@ import trio.to_thread
 from app.img import Handle as ImgHandle
 from packages import CLEAN_STYLE, PakRef, Style
 from packages.signage import (
-    CELL_SIZE, LEGEND_SIZE, Signage, SignageLegend, SignStyle,
+    CELL_ANT_SIZE, CELL_SIGN_SIZE, LEGEND_SIZE, Signage, SignageLegend, SignStyle,
 )
 from transtoken import AppError, TransToken
 
@@ -157,45 +156,59 @@ async def step_signage(exp_data: ExportData) -> None:
     async with trio.open_nursery() as nursery:
         nursery.start_soon(
             trio.to_thread.run_sync, make_legend,
-            exp_data, sign_path, sel_icons,
+            exp_data, sign_path, sel_icons, False,
         )
         nursery.start_soon(
             trio.to_thread.run_sync, make_legend,
-            exp_data, sign_ant_path, ant_icons,
+            exp_data, sign_ant_path, ant_icons, True,
         )
 
 
-def iter_cells() -> Iterator[tuple[int, int, int]]:
+def iter_sign_cells() -> Iterator[tuple[int, int, int]]:
     """Iterate over all timer values and the associated x/y pixel coordinates."""
     for i in range(3, 31):
         y, x = divmod(i - 3, 5)
         if y == 5:  # Last row is shifted over to center.
             x += 1
-        yield i, x * CELL_SIZE, y * CELL_SIZE
+        yield i, x * CELL_SIGN_SIZE, y * CELL_SIGN_SIZE
+
+
+def iter_ant_cells() -> Iterator[tuple[int, int, int]]:
+    """Iterate over all timer values and the associated x/y pixel coordinates."""
+    for i in range(3, 13):
+        y, x = divmod(i - 3, 4)
+        if y == 2:  # Last row is shifted over to center.
+            x += 1
+        yield i, x * CELL_ANT_SIZE, y * CELL_ANT_SIZE
 
 
 def make_legend(
     exp: ExportData,
     sign_path: Path,
     icons: dict[int, ImgHandle | ResultCapture[Image.Image | None]],
+    is_antline: bool,
 ) -> None:
     """Construct the legend texture for the signage."""
+    cell_size = CELL_ANT_SIZE if is_antline else CELL_SIGN_SIZE
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
-    ico: Image.Image | None = None
+    ico: Image.Image | None
+    overlay: Image.Image | None = None
     blank_img: Image.Image | None = None
     num_sheet: Image.Image | None = None
     num_step = num_x = num_y = 0
     for style in exp.selected_style.bases:
         try:
-            legend_info = exp.packset.obj_by_id(SignageLegend, style.id, optional=True)
+            legend_obj = exp.packset.obj_by_id(SignageLegend, style.id, optional=True)
         except KeyError:
             pass
         else:
-            overlay = legend_info.overlay.get_pil()
+            legend_info = legend_obj.antline_conf if is_antline else legend_obj.symbol_conf
+            if legend_info.overlay is not None:
+                overlay = legend_info.overlay.get_pil()
             if legend_info.blank is not None:
                 blank_img = legend_info.blank.get_pil().resize(
-                    (CELL_SIZE, CELL_SIZE),
+                    (cell_size, cell_size),
                     Image.Resampling.LANCZOS,
                 )
             if legend_info.background is not None:
@@ -211,7 +224,7 @@ def make_legend(
         exp.warn_auth(exp.selected_style.pak_id, TRANS_NO_OVERLAY)
         overlay = None
 
-    for num, x, y in iter_cells():
+    for num, x, y in iter_ant_cells() if is_antline else iter_sign_cells():
         try:
             handle = icons[num]
         except KeyError:
@@ -226,18 +239,18 @@ def make_legend(
                 # Blank this section.
                 legend.paste(
                     (0, 0, 0, 0),
-                    (x, y, x + CELL_SIZE, y + CELL_SIZE),
+                    (x, y, x + cell_size, y + cell_size),
                 )
                 continue
             ico = blank_img
         ico = ico.resize(
-            (CELL_SIZE, CELL_SIZE),
+            (cell_size, cell_size),
             Image.Resampling.LANCZOS,
         ).convert('RGB')
         legend.paste(ico, (x, y))
         if num_sheet is not None and ico is not blank_img:
             tens, ones = divmod(num, 10)
-            y += CELL_SIZE - num_y - num_sheet.height
+            y += cell_size - num_y - num_sheet.height
             legend.alpha_composite(
                 num_sheet,
                 (x + num_x, y),
@@ -264,6 +277,7 @@ def make_legend(
     vtf.flags |= VTFFlags.ANISOTROPIC
 
     sign_path.parent.mkdir(parents=True, exist_ok=True)
+    LOGGER.info('Writing {}...', sign_path)
     with sign_path.open('wb') as f:
         try:
             vtf.save(f)

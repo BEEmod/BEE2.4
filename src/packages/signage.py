@@ -1,23 +1,28 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from typing import Final
+from typing import Final, Self
 
 from collections.abc import Sequence
 
 import attrs
 import srctools.logger
 import trio
+from srctools import Keyvalues, NoKeyError
 
 from app.img import Handle as ImgHandle
 from packages import ExportKey, Item, PakObject, PakRef, ParseData, Style
 import utils
 
 
-__all__ = ['LEGEND_SIZE', 'CELL_SIZE', 'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle']
+__all__ = [
+    'LEGEND_SIZE', 'CELL_SIGN_SIZE', 'CELL_ANT_SIZE',
+    'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle',
+]
 LOGGER = srctools.logger.get_logger(__name__)
-# Sizes for the generated legend texture.
+# Sizes for the generated legend textures.
 LEGEND_SIZE: Final = (512, 1024)
-CELL_SIZE: Final = 102
+CELL_SIGN_SIZE: Final = 102
+CELL_ANT_SIZE: Final = 128
 # The signage item, used to trigger adding the "Configure Signage" button to its UI.
 ITEM_ID: Final = PakRef(Item, utils.obj_id('ITEM_BEE2_SIGNAGE'))
 
@@ -31,8 +36,9 @@ class SignStyle:
     type: str
 
 
-class SignageLegend(PakObject):
-    """Allows specifying image resources used to construct the legend texture.
+@attrs.frozen(kw_only=True)
+class LegendInfo:
+    """Image resources used to construct one of the two legend textures.
 
     The background texture if specified is added to the upper-left of the image.
     It is useful to provide a backing, or to fill in unset signages.
@@ -42,46 +48,84 @@ class SignageLegend(PakObject):
     model parts.
     Lastly, the numbers image is used as a spritesheet to add numbers to the sign.
     """
+    overlay: ImgHandle | None
+    background: ImgHandle | None
+    blank: ImgHandle | None
+    numbers: ImgHandle | None
+    num_off: tuple[int, int]
+
+    @staticmethod
+    def _get_img(
+        kv: Keyvalues, pak_id: utils.ObjectID, name: str,
+        width: int, height: int,
+    ) -> ImgHandle | None:
+        """Fetch an image."""
+        try:
+            subkey = kv.find_key(name)
+        except NoKeyError:
+            return None
+        else:
+            return ImgHandle.parse(subkey, pak_id, width, height)
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, pak_id: utils.ObjectID, cell_size: int) -> Self:
+        """Parse from KV data."""
+        try:
+            numbers_kv = kv.find_key('numbers')
+        except NoKeyError:
+            numbers = None
+            num_off = (0, 0)
+        else:
+            numbers = ImgHandle.parse(numbers_kv, pak_id, 0, 0)
+            num_off = kv.int('num_left'), kv.int('num_bottom')
+
+        return cls(
+            overlay=cls._get_img(kv, pak_id, 'overlay', *LEGEND_SIZE),
+            background=cls._get_img(kv, pak_id, 'background', 0, 0),
+            blank=cls._get_img(kv, pak_id, 'blank', cell_size, cell_size),
+            numbers=numbers, num_off=num_off,
+        )
+
+LEGEND_INFO_BLANK = LegendInfo(
+    overlay=None, background=None, blank=None,
+    numbers=None, num_off=(0, 0)
+)
+
+
+class SignageLegend(PakObject):
+    """Allows specifying image resources used to construct the legend texture.
+
+    'symbol' is for the standard item, 'connection' is for the antline variant.
+    """
     def __init__(
         self,
         sty_id: str,
-        overlay: ImgHandle,
-        background: ImgHandle | None,
-        blank: ImgHandle | None,
-        numbers: ImgHandle | None,
-        num_off: tuple[int, int],
+        symbol_conf: LegendInfo,
+        antline_conf: LegendInfo,
     ) -> None:
         self.id = sty_id
-        self.overlay = overlay
-        self.background = background
-        self.blank = blank
-        self.numbers = numbers
-        self.num_off = num_off
+        self.symbol_conf = symbol_conf
+        self.antline_conf = antline_conf
 
     @classmethod
     async def parse(cls, data: ParseData) -> SignageLegend:
         """Parse a signage legend."""
         await trio.lowlevel.checkpoint()
-        if 'blank' in data.info:
-            blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
+        try:
+            sym_kv = data.info.find_key('symbol')
+        except NoKeyError:
+            symbol_conf = LegendInfo.parse(data.info, data.pak_id, CELL_SIGN_SIZE)
         else:
-            blank = None
-        if 'background' in data.info:
-            bg = ImgHandle.parse(data.info, data.pak_id, 0, 0, subkey='background')
-        else:
-            bg = None
-        if 'numbers' in data.info:
-            numbers = ImgHandle.parse(data.info, data.pak_id, 0, 0, subkey='numbers')
-            num_off = data.info.int('num_left'), data.info.int('num_bottom')
-        else:
-            numbers = None
-            num_off = (0, 0)
+            symbol_conf = LegendInfo.parse(sym_kv, data.pak_id, CELL_SIGN_SIZE)
 
-        return cls(
-            data.id,
-            ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
-            bg, blank, numbers, num_off,
-        )
+        try:
+            ant_kv = data.info.find_key('antline')
+        except NoKeyError:
+            antline_conf = LEGEND_INFO_BLANK
+        else:
+            antline_conf = LegendInfo.parse(ant_kv, data.pak_id, CELL_ANT_SIZE)
+
+        return cls(data.id, symbol_conf, antline_conf)
 
 
 class Signage(PakObject, allow_mult=True, needs_foreground=True):
