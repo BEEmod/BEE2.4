@@ -5,10 +5,11 @@ from collections.abc import Callable
 from enum import Enum
 
 import attrs
-
-from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
 from srctools import FrozenVec, VMF, Keyvalues, Output, Vec, Entity, Matrix
+
+from precomp import instanceLocs, connections, conditions, antlines
+import user_errors
 
 
 COND_MOD_NAME: str | None = None
@@ -252,7 +253,17 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             timer_delay = item.inst.fixup.int('$timer_delay')
             # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not
             # being selectable issue.
-            pos = CORNER_POS[max(0, timer_delay - 3) % 8] @ orient + pos
+            offset = max(0, item.inst.fixup.int('$timer_delay') - 3)
+            try:
+                pos = CORNER_POS[timer_delay] @ orient + pos
+            except IndexError:
+                raise user_errors.UserError(
+                    user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
+                        value=timer_delay,
+                        corrected=offset % 8 + 3,
+                    ),
+                    points=[(point @ orient + pos) for point in CORNER_POS],
+                )
         nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:
