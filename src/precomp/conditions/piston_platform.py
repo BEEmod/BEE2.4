@@ -1,12 +1,12 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Dict, Optional
-
 from precomp import packing, template_brush, conditions
 import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
 from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec
+
+from precomp.lazy_value import LazyValue
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -44,8 +44,8 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     This does assume the item behaves similar to the original platform, and will use that VScript.
 
     The first thing this result does is determine if the piston is able to move (has inputs, or
-    automatic mode is enabled). If it cannot, the entire piston can use `prop_static` props,
-    so a single  "full static" instance is used. Otherwise, it will need to move, so
+    automatic mode is enabled). If it cannot, the entire piston doesn't need mechanisms, so a
+    "full static" instance is able to be used. Otherwise, it will need to move, so
     `func_movelinears` must be generated. In this case, 4 pistons are generated. The ones below
     the bottom point set for the piston (if any) aren't going to move, so they can still be static.
     But the moving sections must be dynamic.
@@ -58,33 +58,33 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     be looked up under the `<ITEM_ID:bee2_pist_XXX>` names.
 
     Instances:
-        * `fullstatic_0` - `fullstatic_4`: A fully assembled piston at the specified height, used
-          when it will not move at all. The template below is not used, so this should be included
-          in the instance.
-        * `static_1` - `static_3`: Single piston section, below the moving ones and therefore
-          doesn't need to move. 4 isn't present since if the piston is able to move, the tip/platform
-          will always be moving.
-        * `dynamic_1` - `dynamic_4`: Single piston section, which can move and is parented to
-           `pistX`. These should probably be identical to the corresponding `static_X` instance, but
-           just movable.
+    * `fullstatic_0` - `fullstatic_4`: A fully assembled piston at the specified height, used when
+      it will not move at all. The template below is not generated, so this should be included in
+      the instance.
+    * `static_1` - `static_3`: Single piston section, below the moving ones and therefore doesn't
+      need to move. 4 isn't present since if the piston is able to move, the tip/platform will
+      always be moving.
+    * `dynamic_1` - `dynamic_4`: Single piston section, which can move and is parented to `pistX`.
+      These should be visually identical to the corresponding `static_X` instance, just movable.
 
     Parameters:
-        * `itemid`: If set, instances will be looked up on this item, as mentioned above.
-        * `has_dn_fizz`: If true, enable the VScript's Think function to enable/disable fizzler
-          triggers.
-        * `auto_var`: This should be a 0/1 (or fixup variable containing the same) to indicate if
-          the piston has automatic movement, and so cannot use the "full static" instances.
-        * `source_ent`: If sounds are used, set this to the name of an entity which is used as the
-          source location for the sounds.
-        * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
-        * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
-        * `speed`: Speed of the piston in units per second. Defaults to 150.
-        * `template`: Specifies a brush template ID used to generate the `func_movelinear`s. This
-           should contain brushes for collision, each with different visgroups. This is then
-           offset as required to the starting position, and tied to the appropriate entities.
-           Static parts are made `func_detail`.
-        * `visgroup_1`-`visgroup_3`, `visgroup_top`: Names of the visgroups in the template for each
-           piston segment. Defaults to `pist_1`-`pist_4`.
+    * `itemid`: If set, instances will be looked up on this item, as mentioned above.
+    * `auto_var`: This should be a 0/1 (or fixup variable containing the same) to indicate if
+      the piston has automatic movement, and so cannot use the "full static" instances.
+    * `source_ent`: If sounds are used, set this to the name of an entity which is used as the
+      source location for the sounds.
+    * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
+    * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
+    * `speed`: Speed of the piston in units per second. Defaults to 150.
+    * `dn_fizz_name`: Defaults to `dn_fizz`. The name of the 'downward' hurt trigger.
+       This is enabled to kill players/objects only if the piston gets jammed when retracting.
+       If blank, this is disabled.
+    * `template`: Specifies a brush template ID used to generate the `func_movelinear`s. This
+       should contain brushes for collision, each with different visgroups. The brushes are then
+       offset as required to the starting position, and tied to the appropriate entities.
+       If static, the brushes are made `func_detail` instead of `func_movelinear`.
+    * `visgroup_1`-`visgroup_3`, `visgroup_top`: Names of the visgroups in the template for each
+       piston segment. Defaults to `pist_1`-`pist_4`.
     """
     # Allow reading instances direct from the ID.
     # But use direct ones first.
@@ -105,14 +105,14 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     template = template_brush.get_template(res['template'])
 
-    conf_visgroup_names = [
-        res['visgroup_1', 'pist_1'],
-        res['visgroup_2', 'pist_2'],
-        res['visgroup_3', 'pist_3'],
-        res['visgroup_top', 'pist_4'],
+    visgroup_names = [
+        LazyValue.parse(res['visgroup_1', 'pist_1']),
+        LazyValue.parse(res['visgroup_2', 'pist_2']),
+        LazyValue.parse(res['visgroup_3', 'pist_3']),
+        LazyValue.parse(res['visgroup_top', 'pist_4']),
     ]
 
-    has_dn_fizz = res.bool('has_dn_fizz')
+    dn_fizz_name = res['dn_fizz_name', '']
     automatic_var = res['auto_var', '']
     source_ent = res['source_ent', '']
     snd_start = res['snd_start', '']
@@ -127,12 +127,6 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
         speed = inst.fixup.substitute(speed_var)
 
-        # Allow doing variable lookups here.
-        visgroup_names = [
-            conditions.resolve_value(inst, fname)
-            for fname in conf_visgroup_names
-        ]
-
         if len(ITEMS[inst['targetname']].inputs) == 0:
             # No inputs. Check for the 'auto' var if applicable.
             if automatic_var and inst.fixup.bool(automatic_var):
@@ -146,10 +140,10 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 static_inst = inst.copy()
                 vmf.add_ent(static_inst)
                 static_inst['file'] = fname = inst_filenames['fullstatic_' + str(position)]
-                conditions.ALL_INST.add(fname)
+                conditions.ALL_INST.add(fname.casefold())
                 return
 
-        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}'
+        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}; DN_FIZZ_NAME <- `{dn_fizz_name}`'
 
         if snd_start and snd_stop:
             packing.pack_files(vmf, snd_start, snd_stop, file_type='sound')
@@ -161,16 +155,18 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             packing.pack_files(vmf, snd_stop, file_type='sound')
             init_script += f'; STOP_SND <- `{snd_stop}`'
 
+        origin = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angstr(inst['angles'])
+
+        script_pos = origin + orient.up(-64)
         script_ent = vmf.create_ent(
             classname='info_target',
             targetname=conditions.local_name(inst, 'script'),
             vscripts='BEE2/piston/common.nut',
             vscript_init_code=init_script,
-            origin=inst['origin'],
+            thinkfunction='Think',
+            origin=script_pos,
         )
-
-        if has_dn_fizz:
-            script_ent['thinkfunction'] = 'FizzThink'
 
         if start_up:
             st_pos, end_pos = max_pos, min_pos
@@ -181,14 +177,11 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             Output('OnUser1', '!self', 'RunScriptCode', f'moveto({st_pos})'),
             Output('OnUser2', '!self', 'RunScriptCode', f'moveto({end_pos})'),
         )
-
-        origin = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angstr(inst['angles'])
         off = orient.up(128)
         move_ang = off.to_angle()
 
         # Index -> func_movelinear.
-        pistons: Dict[int, Entity] = {}
+        pistons: dict[int, Entity] = {}
 
         static_ent = vmf.create_ent('func_brush', origin=origin)
 
@@ -251,20 +244,20 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 orient,
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
-                additional_visgroups={visgroup_names[pist_ind - 1]},
+                additional_visgroups={visgroup_names[pist_ind - 1](inst)},
             )
             temp_targ.solids.extend(temp_result.world)
 
             template_brush.retexture_template(
                 temp_result,
                 origin,
-                pist_ent.fixup,
+                pist_ent,
                 generator=GenCat.PANEL,
             )
 
         # Associate any set panel with the same entity, if it's present.
         tile_pos = origin - orient.up(128)
-        panel: Optional[Panel] = None
+        panel: Panel | None = None
         try:
             tiledef = TILES[tile_pos.as_tuple(), off.norm().as_tuple()]
         except KeyError:
@@ -286,16 +279,19 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             static_ent.remove()
 
         if snd_loop:
-            script_ent['classname'] = 'ambient_generic'
+            # Using ambient_generic doesn't stop properly, func_rotating does...
+            script_ent['classname'] = 'func_rotating'
             script_ent['message'] = snd_loop
             script_ent['health'] = 10  # Volume
-            script_ent['pitch'] = 100
-            script_ent['spawnflags'] = 16  # Start silent, looped.
-            script_ent['radius'] = 1024
+            script_ent['spawnflags'] = 64  # Not solid
+
+            script_ent.solids.append(vmf.make_prism(
+                script_pos - 4, script_pos + 4,
+                'BEE2/nodraw_nonsolid',
+            ).solid)
 
             if source_ent:
-                # Parent is irrelevant for actual entity locations, but it
-                # survives for the script to read.
-                script_ent['SourceEntityName'] = script_ent['parentname'] = conditions.local_name(inst, source_ent)
+                # Store this off for the ent to read.
+                script_ent['parentname'] = conditions.local_name(inst, source_ent)
 
     return modify_platform

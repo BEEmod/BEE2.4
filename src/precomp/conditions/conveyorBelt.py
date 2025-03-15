@@ -1,5 +1,7 @@
 """Continuously moving belts, like in BTS.
 """
+from __future__ import annotations
+
 from srctools import Keyvalues, Vec, Entity, Output, VMF, Matrix
 
 import srctools.logger
@@ -7,7 +9,7 @@ from precomp import instanceLocs, template_brush, conditions
 import consts
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.conveyorBelt')
 
 
@@ -140,8 +142,8 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
             drawinfastreflection=1,
         ).solids = rail_temp_solids
 
-    if teleport_to_start:
-        # Link back to the first track..
+    if teleport_to_start and last_track is not None:
+        # Link back to the first track...
         last_track['target'] = track_name.format(1) + '-track'
 
     # Generate an env_beam pointing from the start to the end of the track.
@@ -171,13 +173,14 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
         ) @ orient
 
     # Allow adding outputs to the last path_track.
-    for prop in res.find_all('EndOutput'):
-        output = Output.parse(prop)
-        output.output = 'OnPass'
-        output.inst_out = None
-        output.comma_sep = False
-        output.target = conditions.local_name(inst, output.target)
-        last_track.add_out(output)
+    if last_track is not None:
+        for prop in res.find_all('EndOutput'):
+            output = Output.parse(prop)
+            output.output = 'OnPass'
+            output.inst_out = None
+            output.comma_sep = False
+            output.target = conditions.local_name(inst, output.target)
+            last_track.add_out(output)
 
     if motion_filter is not None:
         motion_trig = vmf.create_ent(

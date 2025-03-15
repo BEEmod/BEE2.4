@@ -1,18 +1,26 @@
+# Misc
 attrs >= 22.1.0
-mistletoe >= 1.0.1
-Pillow == 9.5.0  # 10.0 removes 32-bit wheels.
-pyglet == 1.5.18  # Later versions have some issues on 3.8
-PyInstaller >= 5.12.0
-pygtrie >= 2.4.0
-babel >= 2.12.1
-trio >= 0.22.0
-outcome >= 1.1.0  # Trio dependency
-exceptiongroup >= 1.1.1
-versioningit >= 2.1.0
-srctools >= 2.3.14
+srctools >= 2.4.1
+typing_extensions >= 4.12.0
 rtree >= 0.9.7
-typing_extensions >= 4.1.1
-hypercorn>=0.14.3
-quart>=0.18.3
-quart-trio>=0.10.0
+# Async
+trio >= 0.27.0
+outcome >= 1.3.0  # Trio dependency
+aioresult >= 1.0.0
+trio-util >= 0.7.0
+# Build tools
+PyInstaller >= 6.7.0
+versioningit >= 2.1.0
+# UI
+mistletoe >= 1.3.0
+Pillow >= 10.3.0
+# wxpython >= 4.2.1
+pyglet >= 2.0.15
+pygtrie >= 2.4.0
+babel >= 2.15.0
+# Web server
+hypercorn >= 0.14.3
+quart >= 0.19.4
+quart-trio >= 0.11.1
+psutil >= 5.9.8
 astar >= 0.99

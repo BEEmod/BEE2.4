@@ -1,18 +1,24 @@
 """Test the localisation system."""
 from srctools import EmptyMapping
+
 from transtoken import TransToken, NS_GAME, NS_UI, NS_UNTRANSLATED
+import utils
 
 
 def token_constructor() -> None:
     """Test the constructors work as expected."""
-    tok = TransToken("SOME_PACKAGE", "ORIG_PACK", "Style: {style}", {"style": "Clean"})
+    tok = TransToken(
+        utils.obj_id("SOME_pACKAGE"),
+        utils.obj_id("ORIG_PACK"),
+        "Style: {style}", {"style": "Clean"},
+    )
     assert tok.namespace == "SOME_PACKAGE"
     assert tok.orig_pack == "ORIG_PACK"
     assert tok.token == "Style: {style}"
     assert tok.parameters == {"style": "Clean"}
 
     # If not provided, it uses the singleton object.
-    tok = TransToken("PACK", "PACK", "No Parameters", {})
+    tok = TransToken(utils.obj_id("PACK"), utils.obj_id("PACK"), "No Parameters", {})
     assert tok.parameters is EmptyMapping
 
     tok = TransToken.from_valve('PORTAL2_PuzzleEditor_Palette_sphere')
@@ -28,20 +34,23 @@ def token_constructor() -> None:
 
 def test_token_parse() -> None:
     """Test that the parsing code works correctly."""
-    assert TransToken.parse("SOME_PACKAGE", "Regular text") == TransToken(
-        "SOME_PACKAGE", "SOME_PACKAGE", "Regular text", EmptyMapping
+    pack = utils.obj_id("SOME_PACKAGE")
+    owner = utils.obj_id("OWNER")
+
+    assert TransToken.parse(pack, "Regular text") == TransToken(
+        pack, pack, "Regular text", EmptyMapping
     )
 
-    assert TransToken.parse("OWNER", "[[PACKAGE]] The Blah device\n") == TransToken(
-        "PACKAGE", "OWNER", "The Blah device\n", EmptyMapping
+    assert TransToken.parse(owner, "[[SOME_packAGE]] The Blah device\n") == TransToken(
+        pack, owner, "The Blah device\n", EmptyMapping
     )
 
     # Blank = no translation.
-    assert TransToken.parse("OWNER", "[[]] The Blah device\n") == TransToken(
-        NS_UNTRANSLATED, "OWNER", "The Blah device\n", EmptyMapping
+    assert TransToken.parse(owner, "[[]] The Blah device\n") == TransToken(
+        NS_UNTRANSLATED, owner, "The Blah device\n", EmptyMapping
     )
 
     # Invalid -> treated as if no syntax is involved.
-    assert TransToken.parse("OWNER", "[[PACKAGE The Blah device\n") == TransToken(
-        "OWNER", "OWNER", "[[PACKAGE The Blah device\n", EmptyMapping
+    assert TransToken.parse(owner, "[[PACKAGE The Blah device\n") == TransToken(
+        owner, owner, "[[PACKAGE The Blah device\n", EmptyMapping
     )

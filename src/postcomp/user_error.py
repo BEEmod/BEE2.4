@@ -1,19 +1,16 @@
 """Inject VScript if a user error occurs."""
-import json
-
-from typing import Tuple
-
-import subprocess
-
-import trio
-import sys
 from urllib.request import urlopen
+import json
+import subprocess
+import sys
 
-import srctools.logger
-
-import utils
 from hammeraddons.bsp_transform import Context, trans
+import srctools.logger
+import trio
+
 from user_errors import SERVER_INFO_FILE, ServerInfo
+import utils
+
 
 # Repeatedly show the URL whenever the user switches to the page.
 # If it returns true, it has popped up the Steam Overlay.
@@ -87,7 +84,7 @@ async def start_error_server(ctx: Context) -> None:
             webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
 
-async def load_server() -> Tuple[int, str]:
+async def load_server() -> tuple[int, str]:
     """Load the webserver, then return the port and the localised error text."""
     # We need to boot the web server.
     try:
@@ -127,13 +124,16 @@ async def load_server() -> Tuple[int, str]:
 
     # Wait for it to boot, and update the ports file.
     with trio.move_on_after(5.0):
+        await trio.lowlevel.checkpoint()
         while proc.returncode is None:
+            await trio.lowlevel.checkpoint()
             try:
                 data = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
             except (FileNotFoundError, json.JSONDecodeError):
                 await trio.sleep(0.1)
                 continue
             else:
+                await trio.lowlevel.checkpoint()
                 port = data['port']
                 coop_text = data.get('coop_text', '')
                 assert isinstance(port, int), data
@@ -141,6 +141,6 @@ async def load_server() -> Tuple[int, str]:
                 # Successfully booted. Hack: set the return code of the subprocess.Process object,
                 # so it thinks the server has already quit and doesn't try killing it when we exit.
                 # TODO: Move upstream?
-                proc._proc.returncode = 0  # type: ignore[attr-defined] # noqa
+                proc._proc.returncode = 0  # noqa
                 return port, coop_text
     raise ValueError('Failed to start error server!')

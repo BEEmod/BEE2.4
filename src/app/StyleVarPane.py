@@ -1,18 +1,19 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import Callable, TypedDict
-from tkinter import IntVar
-from tkinter import ttk
-import operator
+from typing import TypedDict, cast
+
+from tkinter import IntVar, ttk
 import itertools
+import operator
 
 from srctools.logger import get_logger
 import trio
 
-from packages import Style, StyleVar, PackagesSet
-from app import localisation, tooltip
-from transtoken import TransToken
 from config.stylevar import State
+from packages import PackagesSet, Style, StyleVar
+from transtoken import TransToken
+from ui_tk import tooltip
+from ui_tk.wid_transtoken import set_text
 import config
 
 
@@ -30,32 +31,10 @@ styleOptions = [
     ),
 
     StyleVar.unstyled(
-        id='FixFizzlerBump',
-        name=TransToken.ui('Prevent Portal Bump (fizzler)'),
-        default=False,
-        desc=TransToken.ui(
-            'Add portal bumpers to make it more difficult to portal across '
-            'fizzler edges. This can prevent placing portals in tight spaces '
-            'near fizzlers, or fizzle portals on activation.'
-        ),
-    ),
-
-    StyleVar.unstyled(
         id='NoMidVoices',
         name=TransToken.ui('Suppress Mid-Chamber Dialogue'),
         default=False,
         desc=TransToken.ui('Disable all voicelines other than entry and exit lines.'),
-    ),
-
-    StyleVar.unstyled(
-        id='UnlockDefault',
-        name=TransToken.ui('Unlock Default Items'),
-        default=False,
-        desc=TransToken.ui(
-            'Allow placing and deleting the mandatory Entry/Exit Doors and '
-            'Large Observation Room. Use with caution, this can have weird '
-            'results!'
-        ),
     ),
 
     StyleVar.unstyled(
@@ -93,10 +72,11 @@ styleOptions = [
 ]
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """Todo: Remove."""
     stylevar_chosen_none: ttk.Label
     stylevar_other_none: ttk.Label
+
 
 checkbox_all: dict[str, ttk.Checkbutton] = {}
 checkbox_chosen: dict[str, ttk.Checkbutton] = {}
@@ -104,7 +84,7 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 TRANS_DEFAULT = {
     # i18n: StyleVar default value.
@@ -120,14 +100,6 @@ TRANS_ALL_STYLES = TransToken.ui('Styles: All')
 # i18n: Order of lines in the tooltip.
 TRANS_TOOLTIP = TransToken.ui('{desc}\n{defaults}\n{styles}')
 TRANS_COMMA = TransToken.ui(', ')
-
-
-def mandatory_unlocked() -> bool:
-    """Return whether mandatory items are unlocked currently."""
-    try:
-        return tk_vars['UnlockDefault'].get() != 0
-    except KeyError:  # Not loaded yet
-        return False
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:
@@ -173,7 +145,7 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
     return res
 
 
-def refresh(selected_style: Style) -> None:
+def refresh(packset: PackagesSet, selected_style: Style) -> None:
     """Move the stylevars to the correct position.
 
     This depends on which apply to the current style.
@@ -181,7 +153,7 @@ def refresh(selected_style: Style) -> None:
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
-        if var.applies_to_all():
+        if var.applies_to_all(packset):
             continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
@@ -213,94 +185,88 @@ def refresh(selected_style: Style) -> None:
 async def make_stylevar_pane(
     frame: ttk.Frame,
     packset: PackagesSet,
-    update_item_vis: Callable[[], None],
+    *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED
 ) -> None:
     """Construct the stylevar pane."""
     frame_all = ttk.Labelframe(frame)
-    localisation.set_text(frame_all, TransToken.ui("All:"))
+    set_text(frame_all, TransToken.ui("All:"))
     frame_all.grid(row=0, sticky='EW')
 
     frm_chosen = ttk.Labelframe(frame)
-    localisation.set_text(frm_chosen, TransToken.ui("Selected Style:"))
+    set_text(frm_chosen, TransToken.ui("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(frame, orient='horizontal').grid(row=2, sticky='EW', pady=(10, 5))
 
     frm_other = ttk.Labelframe(frame)
-    localisation.set_text(frm_other, TransToken.ui("Other Styles:"))
+    set_text(frm_other, TransToken.ui("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
-    UI['stylevar_chosen_none'] = localisation.set_text(ttk.Label(
+    UI['stylevar_chosen_none'] = set_text(ttk.Label(
         frm_chosen,
         font='TkMenuFont',
         justify='center',
     ), TransToken.ui('No Options!'))
 
-    UI['stylevar_other_none'] = localisation.set_text(ttk.Label(
+    UI['stylevar_other_none'] = set_text(ttk.Label(
         frm_other,
         font='TkMenuFont',
         justify='center',
     ), TransToken.ui('None!'))
     VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
-    async def add_state_syncers(
+    async def state_sync_task(
         var_id: str,
         tk_var: IntVar,
         *checks: ttk.Checkbutton,
-        cback: Callable[[], object] = lambda: None,
     ) -> None:
-        """Makes functions for syncing stylevar state. """
-        async def apply_state(state: State) -> None:
-            """Applies the given state."""
-            tk_var.set(state.value)
-            cback()
-        await config.APP.set_and_run_ui_callback(State, apply_state, var_id)
+        """Syncs stylevar state."""
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
             config.APP.store_conf(State(tk_var.get() != 0), var_id)
-            cback()
 
+        cmd = frame.register(cmd_func)
         for check in checks:
-            check['command'] = cmd_func
+            check['command'] = cmd
 
-    all_pos = 0
-    for all_pos, var in enumerate(styleOptions):
-        # Add the special stylevars which apply to all styles
-        tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
-        localisation.set_text(chk, var.name)
-        chk.grid(row=all_pos, column=0, sticky="W", padx=3)
-        tooltip.add_tooltip(chk, make_desc(packset, var))
+        # Apply loaded state.
+        with config.APP.get_ui_channel(State, var_id) as channel:
+            async for state in channel:
+                tk_var.set(state.value)
 
-        # Special case - this needs to refresh the filter when swapping,
-        # so the items disappear or reappear.
-        if var.id == 'UnlockDefault':
-            await add_state_syncers(var.id, int_var, chk, cback=update_item_vis)
-        else:
-            await add_state_syncers(var.id, int_var, chk)
-
-    # The nursery is mainly used so constructing all the checkboxes can be done immediately,
-    # then the UI callbacks are done after.
     async with trio.open_nursery() as nursery:
+        all_pos = 0
+        for all_pos, var in enumerate(styleOptions):
+            # Add the special stylevars which apply to all styles
+            tk_vars[var.id] = int_var = IntVar(value=var.default)
+            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
+            set_text(chk, var.name)
+            chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+            tooltip.add_tooltip(chk, make_desc(packset, var))
+            nursery.start_soon(state_sync_task, var.id, int_var, chk)
+
         for var in VAR_LIST:
+            await trio.lowlevel.checkpoint()
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
             desc = make_desc(packset, var)
-            if var.applies_to_all():
+            if var.applies_to_all(packset):
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1
                 checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id])
-                localisation.set_text(chk, var.name)
+                set_text(chk, var.name)
                 chk.grid(row=all_pos, column=0, sticky="W", padx=3)
                 tooltip.add_tooltip(chk, desc)
-                nursery.start_soon(add_state_syncers, var.id, int_var, chk)
+                nursery.start_soon(state_sync_task,  var.id, int_var, chk)
             else:
                 # Swap between checkboxes depending on style.
                 checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id])
                 checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id])
 
-                localisation.set_text(chk_chose, var.name)
-                localisation.set_text(chk_other, var.name)
+                set_text(chk_chose, var.name)
+                set_text(chk_other, var.name)
                 tooltip.add_tooltip(checkbox_chosen[var.id], desc)
                 tooltip.add_tooltip(checkbox_other[var.id], desc)
-                nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)
+                nursery.start_soon(state_sync_task, var.id, int_var, chk_chose, chk_other)
+
+        task_status.started()

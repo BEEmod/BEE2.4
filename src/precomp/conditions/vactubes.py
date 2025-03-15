@@ -2,16 +2,17 @@
 """
 from __future__ import annotations
 from collections.abc import Iterator, Iterable
+from typing import Callable, Sequence
 
 import attrs
-from srctools import Vec, Keyvalues, Entity, VMF, Solid, Matrix
+from srctools import Angle, FrozenVec, Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
 import utils
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.vactubes')
 
@@ -19,7 +20,7 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
+PUSH_TRIGS: dict[FrozenVec, Entity] = {}
 VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
@@ -39,11 +40,11 @@ class Config:
 
     # For straight instances, a size (multiple of 128) -> instance.
     inst_straight: dict[int, str]
-    # And those sizes from large to small.
-    inst_straight_sizes: list[int] = attrs.field(init=False)
-    @inst_straight_sizes.default
-    def _straight_size(self) -> list[int]:
-        return sorted(self.inst_straight.keys(), reverse=True)
+    # Then a "fitter" to assemble those into an optimum pattern.
+    inst_straight_fitter: Callable[[int], Sequence[int]] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
+        self.inst_straight_fitter = utils.get_piece_fitter(self.inst_straight.keys())
 
 
 @attrs.define
@@ -67,6 +68,8 @@ class Marker:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
+            if vac_node.next is None:
+                return
             try:
                 next_ent = vac_list[vac_node.next]
             except KeyError:
@@ -80,12 +83,39 @@ class Marker:
 VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
-@conditions.make_result('CustVactube')
+@conditions.make_result(
+    'CustVactube',
+    valid_before=[conditions.MetaCond.Connections, conditions.MetaCond.Vactubes],
+)
 def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 
     Only runs once, and then quits the condition list. After priority 400,
     the ents will actually be placed.
+
+    Options:
+    * `group`: Specifies the group this belongs to. Items with the same group can be connected
+      together.
+    * `Instances`: Configuration for a set of instances.
+        * `trig_size`: The width of the automatically generated `trigger_vphysics_motion` and
+          `trigger_push`es. If zero, no triggers will be produced.
+        * `straight_inst`: Instance to use for straight segments. This can itself be a block to
+           specify different length variants - the key should be the length in units (128, 256, 192, etc).
+        * `corner_small_inst`, `corner_medium_inst`, `corner_large_inst`: The instance for each size
+          of corner turn.
+        * `temp_corner_small`, `temp_corner_medium`, `temp_corner_large`: Template IDs
+          (and optionally `:visgroups`) corresponding to these corner instances. These produce a
+          `trigger_vphysics_motion` for the corner.
+        * `support_inst`: For straight segments, up to 4 of these are placed to attach the segment
+          to any walls, if adjacient tiles are present.
+        * `support_ring_inst`: Placed over a straight instance, if any `support_inst` are placed in
+           that voxel.
+        * `entry_floor_inst`: Placed on the start of the tube, if the tube points downward into
+          the floor.
+        * `entry_ceil_inst`: Placed on the start of the tube, if the tube points upward into the
+          ceiling.
+        * `entry_inst`: Placed on the start of the tube, if it faces horizontally.
+        * `exit_inst`: Placed on the end of the tube.
     """
     group = res['group', 'DEFAULT_GROUP']
 
@@ -216,7 +246,7 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     return result
 
 
-@conditions.meta_cond(400)
+@conditions.MetaCond.Vactubes.register
 def vactube_gen(vmf: VMF) -> None:
     """Generate the vactubes, after most conditions have run."""
     if not VAC_TRACKS:
@@ -264,16 +294,16 @@ def vactube_gen(vmf: VMF) -> None:
             conditions.ALL_INST.add(end.conf.inst_exit.casefold())
 
 
-def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
+def push_trigger(vmf: VMF, loc: Vec | FrozenVec, normal: FrozenVec, solids: list[Solid]) -> None:
     """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
-        ent = PUSH_TRIGS[normal.as_tuple()]
+        ent = PUSH_TRIGS[normal]
     except KeyError:
-        ent = PUSH_TRIGS[normal.as_tuple()] = vmf.create_ent(
+        ent = PUSH_TRIGS[normal] = vmf.create_ent(
             classname='trigger_push',
             origin=loc,
-            # The z-direction is reversed..
+            # The z-direction is reversed...
             pushdir=normal.to_angle(),
             speed=(
                 UP_PUSH_SPEED if normal.z > 1e-6 else
@@ -306,8 +336,8 @@ def motion_trigger(vmf: VMF, *solids: Solid) -> None:
 
 def make_straight(
     vmf: VMF,
-    origin: Vec,
-    normal: Vec,
+    origin: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
     dist: int,
     config: Config,
     is_start: bool = False,
@@ -320,19 +350,20 @@ def make_straight(
     # point_push entity.
     start_off = -96 if is_start else -64
 
-    p1, p2 = Vec.bbox(
-        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
-        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
-    )
+    if config.trig_radius > 0.0:
+        p1, p2 = Vec.bbox(
+            origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+            origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+        )
 
-    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
+        solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
-    motion_trigger(vmf, solid.copy())
+        motion_trigger(vmf, solid.copy())
 
-    push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, FrozenVec(normal), [solid])
 
     off = 0
-    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
+    for seg_dist in config.inst_straight_fitter(dist):
         conditions.add_inst(
             vmf,
             origin=origin + off * orient.forward(),
@@ -361,7 +392,7 @@ def make_straight(
                     conditions.add_inst(
                         vmf,
                         origin=position,
-                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        angles=Angle.from_basis(x=normal, z=supp_dir),
                         file=config.inst_support,
                     )
                     placed_support = True
@@ -392,7 +423,7 @@ def make_corner(
     )
 
     temp, visgroups = config.temp_corner[int(size)]
-    if temp is not None:
+    if temp is not None and config.trig_radius > 0.0:
         temp_solids = template_brush.import_template(
             vmf,
             temp,
@@ -487,7 +518,7 @@ def make_ubend(
 
     side_norm = offset.norm()
 
-    for side_axis, side_dist_flt in zip('xyz', offset):
+    for side_axis, side_dist_flt in zip('xyz', offset, strict=True):
         if abs(side_dist_flt) > 0.01:
             side_dist = int(abs(side_dist_flt)) + 128
             break
@@ -603,7 +634,7 @@ def make_ubend(
         )
 
 
-def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
+def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool = False) -> None:
     """Join two marker ents together with corners."""
     origin_a = Vec.from_str(mark_a.ent['origin'])
     origin_b = Vec.from_str(mark_b.ent['origin'])

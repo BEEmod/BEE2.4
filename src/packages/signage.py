@@ -1,26 +1,34 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from typing import NamedTuple, Optional
-from typing_extensions import Self
+from typing import Final, Self
 
-from io import BytesIO
+from collections.abc import Sequence
 
-from PIL import Image
-from srctools.vtf import ImageFormats, VTF, VTFFlags
-from srctools import Keyvalues
+import attrs
 import srctools.logger
+import trio
+from srctools import Keyvalues, NoKeyError
 
-from packages import PackagesSet, PakObject, ParseData, ExportData, Style
 from app.img import Handle as ImgHandle
+from packages import ExportKey, Item, PakObject, PakRef, ParseData, Style
 import utils
 
+
+__all__ = [
+    'LEGEND_SIZE', 'CELL_SIGN_SIZE', 'CELL_ANT_SIZE',
+    'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle',
+]
 LOGGER = srctools.logger.get_logger(__name__)
-LEGEND_SIZE = (512, 1024)
-CELL_SIZE = 102
-SIGN_LOC = 'bee2/materials/BEE2/models/props_map_editor/signage/signage.vtf'
+# Sizes for the generated legend textures.
+LEGEND_SIZE: Final = (512, 1024)
+CELL_SIGN_SIZE: Final = 102
+CELL_ANT_SIZE: Final = 128
+# The signage item, used to trigger adding the "Configure Signage" button to its UI.
+ITEM_ID: Final = PakRef(Item, utils.obj_id('ITEM_BEE2_SIGNAGE'))
 
 
-class SignStyle(NamedTuple):
+@attrs.frozen
+class SignStyle:
     """Signage information for a specific style."""
     world: str
     overlay: str
@@ -28,57 +36,107 @@ class SignStyle(NamedTuple):
     type: str
 
 
-class SignageLegend(PakObject):
-    """Allows specifying image resources used to construct the legend texture.
+@attrs.frozen(kw_only=True)
+class LegendInfo:
+    """Image resources used to construct one of the two legend textures.
 
     The background texture if specified is added to the upper-left of the image.
     It is useful to provide a backing, or to fill in unset signages.
     If provided, the blank image is inserted instead of unset signage.
 
-    Finally the overlay is composited on top, to allow setting the unwrapped
+    The overlay is composited on top, to allow setting the unwrapped
     model parts.
+    Lastly, the numbers image is used as a spritesheet to add numbers to the sign.
+    """
+    overlay: ImgHandle | None
+    background: ImgHandle | None
+    blank: ImgHandle | None
+    numbers: ImgHandle | None
+    num_off: tuple[int, int]
+
+    @staticmethod
+    def _get_img(
+        kv: Keyvalues, pak_id: utils.ObjectID, name: str,
+        width: int, height: int,
+    ) -> ImgHandle | None:
+        """Fetch an image."""
+        try:
+            subkey = kv.find_key(name)
+        except NoKeyError:
+            return None
+        else:
+            return ImgHandle.parse(subkey, pak_id, width, height)
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, pak_id: utils.ObjectID, cell_size: int) -> Self:
+        """Parse from KV data."""
+        try:
+            numbers_kv = kv.find_key('numbers')
+        except NoKeyError:
+            numbers = None
+            num_off = (0, 0)
+        else:
+            numbers = ImgHandle.parse(numbers_kv, pak_id, 0, 0)
+            num_off = kv.int('num_left'), kv.int('num_bottom')
+
+        return cls(
+            overlay=cls._get_img(kv, pak_id, 'overlay', *LEGEND_SIZE),
+            background=cls._get_img(kv, pak_id, 'background', 0, 0),
+            blank=cls._get_img(kv, pak_id, 'blank', cell_size, cell_size),
+            numbers=numbers, num_off=num_off,
+        )
+
+LEGEND_INFO_BLANK = LegendInfo(
+    overlay=None, background=None, blank=None,
+    numbers=None, num_off=(0, 0)
+)
+
+
+class SignageLegend(PakObject):
+    """Allows specifying image resources used to construct the legend texture.
+
+    'symbol' is for the standard item, 'connection' is for the antline variant.
     """
     def __init__(
         self,
         sty_id: str,
-        overlay: ImgHandle,
-        background: Optional[ImgHandle],
-        blank: Optional[ImgHandle],
+        symbol_conf: LegendInfo,
+        antline_conf: LegendInfo,
     ) -> None:
         self.id = sty_id
-        self.overlay = overlay
-        self.background = background
-        self.blank = blank
+        self.symbol_conf = symbol_conf
+        self.antline_conf = antline_conf
 
     @classmethod
-    async def parse(cls, data: ParseData) -> Self:
+    async def parse(cls, data: ParseData) -> SignageLegend:
         """Parse a signage legend."""
-        if 'blank' in data.info:
-            blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
+        await trio.lowlevel.checkpoint()
+        try:
+            sym_kv = data.info.find_key('symbol')
+        except NoKeyError:
+            symbol_conf = LegendInfo.parse(data.info, data.pak_id, CELL_SIGN_SIZE)
         else:
-            blank = None
-        if 'background' in data.info:
-            bg = ImgHandle.parse(data.info, data.pak_id, 0, 0, subkey='background')
+            symbol_conf = LegendInfo.parse(sym_kv, data.pak_id, CELL_SIGN_SIZE)
+
+        try:
+            ant_kv = data.info.find_key('antline')
+        except NoKeyError:
+            antline_conf = LEGEND_INFO_BLANK
         else:
-            bg = None
+            antline_conf = LegendInfo.parse(ant_kv, data.pak_id, CELL_ANT_SIZE)
 
-        return cls(
-            data.id,
-            ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
-            bg, blank,
-        )
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """This is all performed in Signage."""
+        return cls(data.id, symbol_conf, antline_conf)
 
 
 class Signage(PakObject, allow_mult=True, needs_foreground=True):
     """Defines different square signage overlays."""
+    type ExportInfo = Sequence[tuple[str, utils.ObjectID]]
+    export_info: Final[ExportKey[ExportInfo]] = ExportKey()
+
     def __init__(
         self,
         sign_id: str,
-        styles: dict[str, SignStyle],
+        styles: dict[PakRef[Style], SignStyle],
         disp_name: str,
         primary_id: str | None = None,
         secondary_id: str | None = None,
@@ -97,9 +155,10 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
-        styles: dict[str, SignStyle] = {}
+        await trio.lowlevel.checkpoint()
+        styles: dict[PakRef[Style], SignStyle] = {}
         for prop in data.info.find_children('styles'):
-            sty_id = prop.name.upper()
+            sty_id = PakRef.parse(Style, prop.real_name)
 
             if not prop.has_children():
                 # Style lookup.
@@ -171,137 +230,3 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                     f'signage "{self.id}"! '
                     f'({self.sec_id} != {override.sec_id})'
                 )
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the selected signage to the config, and produce the legend."""
-        # Timer value -> sign ID.
-        sel_ids: list[tuple[str, str]] = exp_data.selected
-
-        # Special case, arrow is never selectable.
-        sel_ids.append(('arrow', 'SIGN_ARROW'))
-
-        sel_icons: dict[int, ImgHandle] = {}
-
-        conf = Keyvalues('Signage', [])
-
-        for tim_id, sign_id in sel_ids:
-            try:
-                sign = exp_data.packset.obj_by_id(Signage, sign_id)
-            except KeyError:
-                LOGGER.warning('Signage "{}" does not exist!', sign_id)
-                continue
-            prop_block = Keyvalues(str(tim_id), [])
-
-            sty_sign = sign._serialise(prop_block, exp_data.selected_style)
-
-            for sub_name, sub_id in [
-                ('primary', sign.prim_id),
-                ('secondary', sign.sec_id),
-            ]:
-                if sub_id:
-                    try:
-                        sub_sign = exp_data.packset.obj_by_id(Signage, sub_id)
-                    except KeyError:
-                        LOGGER.warning(
-                            'Signage "{}"\'s {} "{}" '
-                            'does not exist!', sign_id, sub_name, sub_id)
-                    else:
-                        sub_block = Keyvalues(sub_name, [])
-                        sub_sign._serialise(sub_block, exp_data.selected_style)
-                        if sub_block:
-                            prop_block.append(sub_block)
-
-            if prop_block:
-                conf.append(prop_block)
-
-            # Valid timer number, store to be placed on the texture.
-            if tim_id.isdigit() and sty_sign is not None:
-                sel_icons[int(tim_id)] = sty_sign.icon
-
-        exp_data.vbsp_conf.append(conf)
-        exp_data.resources[SIGN_LOC] = build_texture(
-            exp_data.packset, exp_data.selected_style, sel_icons,
-        )
-
-    def _serialise(self, parent: Keyvalues, style: Style) -> Optional[SignStyle]:
-        """Write this sign's data for the style to the provided property."""
-        for potential_style in style.bases:
-            try:
-                data = self.styles[potential_style.id.upper()]
-                break
-            except KeyError:
-                pass
-        else:
-            LOGGER.warning(
-                'No valid "{}" style for "{}" signage!',
-                style.id,
-                self.id,
-            )
-            try:
-                data = self.styles['BEE2_CLEAN']
-            except KeyError:
-                return None
-        parent.append(Keyvalues('world', data.world))
-        parent.append(Keyvalues('overlay', data.overlay))
-        parent.append(Keyvalues('type', data.type))
-        return data
-
-
-def build_texture(
-    packset: PackagesSet,
-    sel_style: Style,
-    icons: dict[int, ImgHandle],
-) -> bytes:
-    """Construct the legend texture for the signage."""
-    legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
-
-    blank_img: Optional[Image.Image] = None
-    for style in sel_style.bases:
-        try:
-            legend_info = packset.obj_by_id(SignageLegend, style.id)
-        except KeyError:
-            pass
-        else:
-            overlay = legend_info.overlay.get_pil()
-            if legend_info.blank is not None:
-                blank_img = legend_info.blank.get_pil().convert('RGB')
-            if legend_info.background is not None:
-                legend.paste(legend_info.background.get_pil(), (0, 0))
-            break
-    else:
-        LOGGER.warning('No Signage style overlay defined.')
-        overlay = None
-
-    for i in range(28):
-        y, x = divmod(i, 5)
-        if y == 5:  # Last row is shifted over to center.
-            x += 1
-        try:
-            ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.Resampling.LANCZOS).convert('RGB')
-        except KeyError:
-            if blank_img is None:
-                continue
-            ico = blank_img
-        legend.paste(ico, (x * CELL_SIZE, y * CELL_SIZE))
-
-    if overlay is not None:
-        legend = Image.alpha_composite(legend, overlay)
-
-    vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.DXT5)
-    vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
-    vtf.clear_mipmaps()
-    vtf.flags |= VTFFlags.ANISOTROPIC
-
-    buf = BytesIO()
-    try:
-        vtf.save(buf)
-    except NotImplementedError:
-        LOGGER.warning('No DXT compressor, using BGRA8888.')
-        # No libsquish, so DXT compression doesn't work.
-        vtf.format = vtf.low_format = ImageFormats.BGRA4444
-
-        buf = BytesIO()
-        vtf.save(buf)
-
-    return buf.getvalue()

@@ -1,0 +1,28 @@
+"GameInfo"
+{
+	game 		"PORTAL 2"
+	title 		"PORTAL 2"
+	GameData	"portal2.fgd"
+	gamelogo 	1
+
+	SupportsDX8     0
+	SupportsXbox360 1
+
+	FileSystem
+	{
+		SteamAppId				620		// This will mount all the GCFs we need (240=CS:S, 220=HL2).
+		ToolsAppId				211		// Tools will load this (ie: source SDK caches) to get things like materials\debug, materials\editor, etc.
+		
+		//
+		// Blah blah
+		// someplace like c:\program files\valve\steam\steamapps\half-life 2.
+		//
+
+		SearchPaths
+		{
+			Game				|gameinfo_path|.
+				Game some_other_mod
+			Game	|gameinfo_path|../bee2
+		}
+	}
+}

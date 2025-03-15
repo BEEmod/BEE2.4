@@ -1,101 +1,208 @@
 from __future__ import annotations
-from typing import List
 
-from srctools import Keyvalues
-from srctools.dmx import Attribute as DMAttr, Element, ValueType as DMXValue
+from typing import Self, override
+from collections.abc import Mapping
+
+from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
+from srctools.dmx import Element, ValueType as DMXValue
 import attrs
 
-from corridor import Direction, GameMode, Orient
+from corridor import Attachment, Direction, GameMode, ORIENT_TO_ATTACH, Option, Orient
 import config
+import utils
 
 
-__all__ = [
-    'Direction', 'GameMode', 'Orient',  # Re-export
-    'Config', 'UIState',
-]
+LOGGER = logger.get_logger(__name__)
+__all__ = ['Config', 'Options', 'UIState']
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
-class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
+@attrs.frozen
+class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
     """The current configuration for a corridor."""
-    selected: List[str] = attrs.field(factory=list, kw_only=True)
-    unselected: List[str] = attrs.field(factory=list, kw_only=True)
+    enabled: Mapping[str, bool] = EmptyMapping
 
     @staticmethod
     def get_id(
         style: str,
         mode: GameMode,
         direction: Direction,
-        orient: Orient,
+        attach: Attachment,
     ) -> str:
         """Given the style and kind of corridor, return the ID for config lookup."""
-        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
+        # We did use to use orientation here, but since only 1 corridor for each type was made
+        # at the time, they couldn't be disabled so no configs actually got saved.
+        # Only horizontal could be, but that didn't change.
+        return f'{style.casefold()}:{mode.value}_{direction.value}_{attach.value}'
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Config:
         """Parse from KeyValues1 configs."""
-        assert version == 1, version
-        selected = []
-        unselected = []
-        for child in data.find_children('Corridors'):
-            if child.name == 'selected' and not child.has_children():
-                selected.append(child.value)
-            elif child.name == 'unselected' and not child.has_children():
-                unselected.append(child.value)
+        enabled: dict[str, bool] = {}
+        if version == 2:
+            for child in data:
+                enabled[child.name] = conv_bool(child.value)
+        elif version == 1:
+            for child in data.find_children('Corridors'):
+                if child.name == 'selected' and not child.has_children():
+                    enabled[child.value.casefold()] = True
+                elif child.name == 'unselected' and not child.has_children():
+                    enabled[child.value.casefold()] = False
+        else:
+            raise config.UnknownVersion(version, '1 or 2')
 
-        return Config(selected=selected, unselected=unselected)
+        return Config(enabled)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Serialise to a Keyvalues1 config."""
-        kv = Keyvalues('Corridors', [])
-        for corr in self.selected:
-            kv.append(Keyvalues('selected', corr))
-        for corr in self.unselected:
-            kv.append(Keyvalues('unselected', corr))
-
-        return Keyvalues('Corridor', [kv])
+        return Keyvalues('Corridor', [
+            Keyvalues(corr, bool_as_int(enabled))
+            for corr, enabled in self.enabled.items()
+        ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> Config:
         """Parse from DMX configs."""
-        assert version == 1, version
-        try:
-            selected = list(data['selected'].iter_str())
-        except KeyError:
-            selected = []
-        try:
-            unselected = list(data['unselected'].iter_str())
-        except KeyError:
-            unselected = []
+        enabled: dict[str, bool] = {}
+        if version == 2:
+            for key, attr in data.items():
+                if attr.type is DMXValue.BOOL:
+                    enabled[attr.name.casefold()] = attr.val_bool
+        elif version == 1:
+            try:
+                selected = data['selected']
+            except KeyError:
+                pass
+            else:
+                for inst in selected.iter_str():
+                    enabled[inst.casefold()] = True
+            try:
+                unselected = data['unselected']
+            except KeyError:
+                pass
+            else:
+                for inst in unselected.iter_str():
+                    enabled[inst.casefold()] = False
+        else:
+            raise config.UnknownVersion(version, '1 or 2')
 
-        return Config(selected=selected, unselected=unselected)
+        return Config(enabled)
 
+    @override
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
-        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.selected)
-        elem['unselected'] = unselected = DMAttr.array('unselected', DMXValue.STR)
-        unselected.extend(self.unselected)
+        for inst, enabled in self.enabled.items():
+            elem[inst] = enabled
 
         return elem
 
 
+@config.COMPILER.register
+@config.PALETTE.register
+@config.APP.register
+@attrs.frozen
+class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1):
+    """Configuration defined for a specific corridor group."""
+    options: Mapping[utils.ObjectID, utils.SpecialID] = EmptyMapping
+
+    @staticmethod
+    def get_id(
+        style: str,
+        mode: GameMode,
+        direction: Direction,
+    ) -> str:
+        """Given the style and kind of corridor, return the ID for config lookup.
+
+        Orientation is not included.
+        """
+        return f'{style.casefold()}:{mode.value}_{direction.value}'
+
+    @classmethod
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+        options = {}
+        for child in data:
+            opt_id = utils.obj_id(child.real_name, 'corridor option ID')
+            value = utils.special_id(child.value, 'corridor option value')
+            if utils.not_special_id(value) or value == utils.ID_RANDOM:
+                options[opt_id] = value
+            else:
+                raise ValueError(f'Invalid option value "{child.value}" for option "{opt_id}"!')
+        return cls(options)
+
+    @override
+    def export_kv1(self) -> Keyvalues:
+        return Keyvalues('', [
+            Keyvalues(opt_id, value)
+            for opt_id, value in self.options.items()
+        ])
+
+    @classmethod
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> Self:
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+        options = {}
+        for child in data.values():
+            if child.name == 'name':
+                continue
+            opt_id = utils.obj_id(child.name, 'corridor option ID')
+            value = utils.special_id(child.val_string, 'corridor option value')
+            if utils.not_special_id(value) or value == utils.ID_RANDOM:
+                options[opt_id] = value
+            else:
+                raise ValueError(f'Invalid option value "{value}" for option "{opt_id}"!')
+
+        return cls(options)
+
+    @override
+    def export_dmx(self) -> Element:
+        elem = Element('CorridorOptions', 'DMConfig')
+        for opt_id, value in self.options.items():
+            elem[opt_id] = value
+        return elem
+
+    def value_for(self, option: Option) -> utils.SpecialID:
+        """Return the currently selected value for the specified option."""
+        try:
+            opt_id = self.options[option.id]
+        except KeyError:
+            return option.default
+        if opt_id == utils.ID_RANDOM:
+            return opt_id
+        for value in option.values:
+            if opt_id == value.id:
+                return opt_id
+        LOGGER.warning(
+            'Configured ID "{}" is not valid for option "{}"',
+            opt_id, option.id,
+        )
+        return option.default
+
+
 @config.APP.register
 @attrs.frozen(slots=False)
-class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
+class UIState(config.Data, conf_name='CorridorUIState'):
     """The current window state for saving and restoring."""
     last_mode: GameMode = GameMode.SP
     last_direction: Direction = Direction.ENTRY
-    last_orient: Orient = Orient.HORIZONTAL
+    last_attach: Attachment = Attachment.HORIZONTAL
     width: int = -1
     height: int = -1
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> UIState:
         """Parse Keyvalues 1 configuration."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             last_mode = GameMode(data['mode'])
         except (LookupError, ValueError):
@@ -107,30 +214,38 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             last_direction = Direction.ENTRY
 
         try:
-            last_orient = Orient(data['orient'])
+            last_attach = Attachment(data['attach'])
         except (LookupError, ValueError):
-            last_orient = Orient.HORIZONTAL
+            try:
+                last_orient = Orient(data['orient'])
+            except (LookupError, ValueError):
+                last_attach = Attachment.HORIZONTAL
+            else:
+                last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         return UIState(
-            last_mode, last_direction, last_orient,
+            last_mode, last_direction, last_attach,
             data.int('width', -1),
             data.int('height', -1),
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export Keyvalues 1 configuration."""
         return Keyvalues('', [
             Keyvalues('mode', self.last_mode.value),
             Keyvalues('direction', self.last_direction.value),
-            Keyvalues('orient', self.last_orient.value),
+            Keyvalues('attach', self.last_attach.value),
             Keyvalues('width', str(self.width)),
             Keyvalues('height', str(self.height)),
         ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> UIState:
         """Parse Keyvalues 2 configuration."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             last_mode = GameMode(data['mode'].val_string)
         except (LookupError, ValueError):
@@ -145,6 +260,10 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             last_orient = Orient(data['orient'].val_string)
         except (LookupError, ValueError):
             last_orient = Orient.HORIZONTAL
+        try:
+            last_attach = Attachment(data['attach'].val_string)
+        except (LookupError, ValueError):
+            last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         try:
             width = data['width'].val_int
@@ -156,16 +275,17 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             height = -1
 
         return UIState(
-            last_mode, last_direction, last_orient,
+            last_mode, last_direction, last_attach,
             width, height,
         )
 
+    @override
     def export_dmx(self) -> Element:
         """Export Keyvalues 2 configuration."""
         element = Element('UIState', 'DMElement')
         element['mode'] = self.last_mode.value
         element['direction'] = self.last_direction.value
-        element['orient'] = self.last_orient.value
+        element['attach'] = self.last_attach.value
         element['width'] = self.width
         element['height'] = self.height
         return element

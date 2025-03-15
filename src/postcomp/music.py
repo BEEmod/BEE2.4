@@ -1,12 +1,12 @@
 """Generates the soundscript for background music."""
-import itertools
-from typing import Dict, List
 from io import StringIO
+import itertools
 
 
 from srctools.sndscript import SND_CHARS
 from srctools.packlist import PackList, FileType
 from srctools.vmf import VMF
+from srctools import conv_float
 from consts import MusicChannel as Channel
 import srctools.logger
 
@@ -240,12 +240,14 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
     # We also pack the filenames used for the tracks - that way funnel etc
     # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
     # we don't check there.
-    tracks: Dict[Channel, List[str]] = {}
+    tracks: dict[Channel, list[str]] = {}
+    volume: dict[Channel, float] = dict.fromkeys(Channel, 1.0)
     sync_funnel = False
 
     for conf_ent in bsp.by_class['bee2_music_channel']:
         conf_ent.remove()
         channel = Channel(conf_ent['channel'].casefold())
+        volume[channel] = conv_float(conf_ent['volume'], 1.0)
         if channel is Channel.TBEAM:
             sync_funnel = srctools.conv_bool(conf_ent['sync'])
 
@@ -262,10 +264,11 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
         return  # No music.
 
     file = StringIO()
+    LOGGER.info('Volume: {}', volume)
 
     # Write the base music track
     if Channel.BASE in tracks:
-        file.write(MUSIC_START.format(name='', vol='1'))
+        file.write(MUSIC_START.format(name='', vol=volume[Channel.BASE]))
         write_sound(file, tracks[Channel.BASE], pack_list, snd_prefix='#*')
     else:
         # It's not present, we need a sound to have the soundscript operating though.
@@ -295,7 +298,7 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
     if Channel.TBEAM in tracks:
         # Write the 'music.BEE2_funnel' sound entry
         file.write('\n')
-        file.write(MUSIC_START.format(name='_funnel', vol='1'))
+        file.write(MUSIC_START.format(name='_funnel', vol=volume[Channel.TBEAM]))
         write_sound(file, tracks[Channel.TBEAM], pack_list)
         # Some tracks want the funnel music to sync with the normal
         # track, others randomly choose a start.
@@ -308,7 +311,7 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
 
     if Channel.BOUNCE in tracks:
         file.write('\n')
-        file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
+        file.write(MUSIC_START.format(name='_gel_bounce', vol=volume[Channel.BOUNCE]))
         write_sound(file, tracks[Channel.BOUNCE], pack_list)
         # Fade in fast (we never get false positives, but fade out slow
         # since this disables when falling back..
@@ -316,10 +319,10 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
 
     if Channel.SPEED in tracks:
         file.write('\n')
-        file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
+        file.write(MUSIC_START.format(name='_gel_speed', vol=volume[Channel.SPEED]))
         write_sound(file, tracks[Channel.SPEED], pack_list)
         # We need to shut off the sound fast, so portals don't confuse it.
-        # Fade in slow so it doesn't make much sound (and also as we get
+        # Fade in slow so that it doesn't make much sound (and also as we get
         # up to speed). We stop almost immediately on gel too.
         file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
 
@@ -332,9 +335,9 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
 
 def write_sound(
     file: StringIO,
-    snds: List[str],
+    snds: list[str],
     pack_list: PackList,
-    snd_prefix: str='*',
+    snd_prefix: str = '*',
 ) -> None:
     """Write either a single sound, or multiple rndsound.
 
@@ -343,19 +346,9 @@ def write_sound(
     if len(snds) > 1:
         file.write('"rndwave"\n\t{\n')
         for snd in snds:
-            file.write(
-                '\t"wave" "{sndchar}{file}"\n'.format(
-                    file=snd.lstrip(SND_CHARS),
-                    sndchar=snd_prefix,
-                )
-            )
-            pack_list.pack_file('sound/' + snd.casefold())
+            file.write(f'\t"wave" "{snd_prefix}{snd.lstrip(SND_CHARS)}"\n')
+            pack_list.pack_file(f'sound/{snd.casefold()}')
         file.write('\t}\n')
     else:
-        file.write(
-            '"wave" "{sndchar}{file}"\n'.format(
-                file=snds[0].lstrip(SND_CHARS),
-                sndchar=snd_prefix,
-            )
-        )
-        pack_list.pack_file('sound/' + snds[0].casefold())
+        file.write(f'"wave" "{snd_prefix}{snds[0].lstrip(SND_CHARS)}"\n')
+        pack_list.pack_file(f'sound/{snds[0].casefold()}')

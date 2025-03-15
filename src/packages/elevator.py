@@ -2,23 +2,26 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Iterator, Optional
+from typing import Final, Iterator
 
-from packages import ExportData, PakObject, ParseData, SelitemData
+from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource
+import utils
 
 
-class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
+class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.
     """
+    export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
+
     def __init__(
         self,
         elev_id: str,
         selitem_data: SelitemData,
         video: str,
-        vert_video: Optional[str] = None,
+        vert_video: str | None = None,
     ) -> None:
         self.id = elev_id
 
@@ -60,28 +63,11 @@ class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
         """Yield translation tokens present in the elevator."""
         return self.selitem_data.iter_trans_tokens('elevators/' + self.id)
 
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the chosen video into the configs."""
-        if exp_data.selected is None:
-            elevator = None
+    @classmethod
+    def get_selector_attrs(cls, packset: PackagesSet, elev_id: utils.SpecialID) -> AttrMap:
+        """Return the attributes for the selector window."""
+        if utils.not_special_id(elev_id):
+            return {'ORIENT': packset.obj_by_id(cls, elev_id).has_orient}
         else:
-            try:
-                elevator = exp_data.packset.obj_by_id(Elevator, exp_data.selected)
-            except KeyError:
-                raise Exception(f"Selected elevator ({exp_data.selected}) doesn't exist?") from None
-
-        if exp_data.selected_style.has_video:
-            if elevator is None:
-                # Use a randomised video
-                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'RAND')
-            elif elevator.id == 'VALVE_BLUESCREEN':
-                # This video gets a special script and handling
-                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'BSOD')
-            else:
-                # Use the particular selected video
-                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'FORCE')
-                exp_data.vbsp_conf.set_key(('Elevator', 'horiz'), elevator.horiz_video)
-                exp_data.vbsp_conf.set_key(('Elevator', 'vert'), elevator.vert_video)
-        else:  # No elevator video for this style
-            exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'NONE')
+            # None, no orientation
+            return {}

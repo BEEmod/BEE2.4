@@ -1,47 +1,66 @@
 """Results for custom fizzlers."""
 from srctools import Keyvalues, Entity, Vec, VMF, Matrix
+import attrs
 import srctools.logger
 
+import consts
 import user_errors
+import utils
 from precomp.instanceLocs import resolve_one
 from precomp import conditions, connections, fizzler
 
 
 COND_MOD_NAME = 'Fizzlers'
-
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
+EMANCIPATION_GRID = utils.obj_id('VALVE_MATERIAL_EMANCIPATION_GRID')
 
 
 @conditions.make_test('FizzlerType')
-def test_fizz_type(inst: Entity, kv: Keyvalues) -> bool:
+def test_fizz_type(kv: Keyvalues) -> conditions.TestCallable:
     """Check if a fizzler is the specified type name."""
-    try:
-        fizz = fizzler.FIZZLERS[inst['targetname']]
-    except KeyError:
-        return False
-    return fizz.fizz_type.id.casefold() == kv.value.casefold()
+    fizz_id = utils.obj_id(kv.value, 'fizzler')
+
+    def test(inst: Entity) -> bool:
+        """Do the check."""
+        try:
+            fizz = fizzler.FIZZLERS[inst['targetname']]
+        except KeyError:
+            return False
+        return fizz.fizz_type.id == fizz_id
+
+    return test
 
 
-@conditions.make_result('ChangeFizzlerType')
-def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
+@conditions.make_result('ChangeFizzlerType', valid_before=conditions.MetaCond.Fizzler)
+def res_change_fizzler_type(res: Keyvalues) -> conditions.ResultCallable:
     """Change the type of the fizzler. Only valid when run on the base instance."""
-    fizz_name = inst['targetname']
     try:
-        fizz = fizzler.FIZZLERS[fizz_name]
+        fizz_type = fizzler.FIZZ_TYPES[utils.obj_id(res.value, 'fizzler')]
     except KeyError:
-        raise user_errors.UserError(user_errors.TOK_WRONG_ITEM_TYPE.format(
-            item=fizz_name,
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
             kind='Fizzler',
-            inst=inst['file'],
+            id=res.value,
         )) from None
 
-    try:
-        fizz.fizz_type = fizzler.FIZZ_TYPES[res.value]
-    except KeyError:
-        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value)) from None
+    def convert(inst: Entity) -> None:
+        """Modify the specified fizzler."""
+        fizz_name = inst['targetname']
+        try:
+            fizzler.FIZZLERS[fizz_name].fizz_type = fizz_type
+        except KeyError:
+            raise user_errors.UserError(user_errors.TOK_WRONG_ITEM_TYPE.format(
+                item=fizz_name,
+                kind='Fizzler',
+                inst=inst['file'],
+            )) from None
+
+    return convert
 
 
-@conditions.make_result('ReshapeFizzler')
+@conditions.make_result(
+    'ReshapeFizzler',
+    valid_before=[conditions.MetaCond.Fizzler, conditions.MetaCond.Connections],
+)
 def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     """Convert a fizzler connected via the output to a new shape.
 
@@ -72,8 +91,31 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         # Detach this connection and remove traces of it.
         conn.remove()
 
-        fizz.emitters.clear()  # Remove old positions.
-        fizz.up_axis = up_axis
+        if fizz.has_cust_position:
+            # This fizzler was already moved. We need to make a clone.
+            fizz_base = fizz.base_inst.copy()
+            vmf.add_ent(fizz_base)
+            fizz_base['targetname'] = shape_name
+            old_fizz_item = fizz_item
+            fizz = fizzler.FIZZLERS[shape_name] = attrs.evolve(
+                fizz,
+                base_inst=fizz_base,
+                emitters=[],
+                up_axis=up_axis,
+                has_cust_position=True,
+            )
+            fizz_item = old_fizz_item.clone(fizz_base, shape_name)
+            for fizz_conn in old_fizz_item.inputs:
+                connections.Connection(
+                    to_item=fizz_item,
+                    from_item=fizz_conn.from_item,
+                    conn_type=fizz_conn.type,
+                ).add()
+        else:
+            # Move the current fizzler.
+            fizz.emitters.clear()  # Remove old positions.
+            fizz.up_axis = up_axis
+            fizz.has_cust_position = True
         fizz.base_inst['origin'] = shape_inst['origin']
         fizz.base_inst['angles'] = shape_inst['angles']
         break
@@ -82,23 +124,24 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         # We create the fizzler instance, Fizzler object, and Item object
         # matching it.
         # This is hardcoded to use regular Emancipation Fields.
-        base_inst = conditions.add_inst(
+        fizz_base = conditions.add_inst(
             vmf,
             targetname=shape_name,
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
             file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>', error=True),
         )
-        base_inst.fixup.update(shape_inst.fixup)
+        fizz_base.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
-            fizz_type=fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
+            fizz_type=fizzler.FIZZ_TYPES[EMANCIPATION_GRID],
             up_axis=up_axis,
-            base_inst=base_inst,
+            base_inst=fizz_base,
             emitters=[],
+            has_cust_position=True,
         )
         fizz_item = connections.Item(
-            base_inst,
-            connections.ITEM_TYPES['item_barrier_hazard'],
+            fizz_base,
+            connections.ITEM_TYPES[consts.DefaultItems.fizzler.id],
             ind_style=shape_item.ind_style,
         )
         connections.ITEMS[shape_name] = fizz_item
@@ -120,7 +163,6 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     fizz_base['origin'] = shape_inst['origin']
     origin = Vec.from_str(shape_inst['origin'])
 
-    fizz.has_cust_position = True
     # Since the fizzler is moved elsewhere, it's the responsibility of
     # the new item to have holes.
     fizz.embedded = False

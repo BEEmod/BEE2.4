@@ -55,6 +55,7 @@ Icon
 /compiler/
 /dist/
 /build_tmp/
+/src/postcomp/_ha_transforms/
 
 # Ignore palettes
 palettes/*.bee2_palette
@@ -84,3 +85,8 @@ lib-64/
 lib-32/swresample-*
 lib-32/swscale-*
 lib-32/av*
+
+# wxGlade backups and generated Python
+wxGlade/*.bak
+wxGlade/*.py
+wxGlade/#~wxg.autosave*

@@ -1,17 +1,14 @@
 """The different properties defineable for items."""
 from __future__ import annotations
-from enum import Enum
-from typing import Any, Callable, Generic, Sequence, Type, TypeVar
+from typing import Any, Self
 
-import attrs
+from collections.abc import Callable, Sequence
+from enum import Enum
+
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
-from typing_extensions import Self
+import attrs
 
 from transtoken import TransToken
-
-
-ValueT = TypeVar('ValueT')
-EnumT = TypeVar('EnumT', bound=Enum)
 
 
 def _unknown_parse(value: str) -> str:
@@ -20,7 +17,7 @@ def _unknown_parse(value: str) -> str:
 
 
 @attrs.define(eq=False, kw_only=True, getstate_setstate=False)
-class ItemPropKind(Generic[ValueT]):
+class ItemPropKind[ValueT]:
     """A type of property for an item."""
     # Property name for this. This is case-sensitive!
     id: str
@@ -55,6 +52,12 @@ class ItemPropKind(Generic[ValueT]):
         """Check if this is an unknown property."""
         return self.parse is _unknown_parse
 
+    @property
+    def uses_index(self) -> bool:
+        """Check whether this needs an index set."""
+        # If unknown, assume it must.
+        return self.instvar != "" or self.parse is _unknown_parse
+
     def __hash__(self) -> int:
         """Allow using as a dict key."""
         return hash(self.id)
@@ -78,7 +81,7 @@ class ItemPropKind(Generic[ValueT]):
             return (ItemPropKind.unknown, (self.id,))
 
 
-class ItemProp(Generic[ValueT]):
+class ItemProp[ValueT]:
     """A property for an item."""
     def __init__(
         self,
@@ -137,8 +140,8 @@ def bool_prop(
     )
 
 
-def enum_prop(
-    enum: Type[EnumT],
+def enum_prop[EnumT: Enum](
+    enum: type[EnumT],
     id: str,
     name: TransToken,
     instvar: str,
@@ -341,7 +344,7 @@ prop_track_is_oscillating = bool_prop(
 )
 
 # The starting fractional position of Track Platforms.
-prop_track_starting_pos = ItemPropKind[float](
+prop_track_starting_pos: ItemPropKind[float] = ItemPropKind(
     id='StartingPosition',
     instvar='$starting_position',
     parse=conv_float,
@@ -351,7 +354,7 @@ prop_track_starting_pos = ItemPropKind[float](
 
 
 # The distance the Track Platform moves overall.
-prop_track_move_distance = ItemPropKind[float](
+prop_track_move_distance: ItemPropKind[float] = ItemPropKind(
     id='TravelDistance',
     instvar='$travel_distance',
     parse=conv_float,
@@ -361,7 +364,7 @@ prop_track_move_distance = ItemPropKind[float](
 
 # The speed the Track Platform moves at.
 # This is always 100 units/sec.
-prop_track_speed = ItemPropKind[float](
+prop_track_speed: ItemPropKind[float] = ItemPropKind(
     id='Speed',
     # Not really right, but should be about right.
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type_speed'),
@@ -371,7 +374,7 @@ prop_track_speed = ItemPropKind[float](
 )
 
 
-prop_track_move_direction = ItemPropKind[Angle](
+prop_track_move_direction: ItemPropKind[Angle] = ItemPropKind(
     id='TravelDirection',
     instvar='$travel_direction',
     name=TransToken.BLANK,  # Hidden prop
@@ -388,8 +391,7 @@ prop_track_move_direction = ItemPropKind[Angle](
 # 0
 def _parse_pist_lower(value: str) -> int:
     # Bug, previous versions mistakenly wrote rounded floats.
-    if value.endswith('.0'):
-        value = value[:-2]
+    value = value.removesuffix('.0')
     try:
         pos = int(value)
         if 0 <= pos < 4:
@@ -461,7 +463,7 @@ def paint_type_prop(
             return order[index]
         raise ValueError(f'{value} is not a valid paint type!') from None
 
-    return ItemPropKind[PaintTypes](
+    return ItemPropKind(
         id=id,
         instvar=instvar,
         name=name,
@@ -469,6 +471,7 @@ def paint_type_prop(
         parse=parse,
         export=lambda value: str(order.index(value)),
     )
+
 
 # The main paint type property, directly specifying each paint type.
 prop_paint_type = paint_type_prop(
@@ -529,7 +532,8 @@ def _parse_connection_count(value: str) -> int:
         raise ValueError('Connection count cannot be negative!')
     return count
 
-prop_connection_count = ItemPropKind[int](
+
+prop_connection_count: ItemPropKind[int] = ItemPropKind(
     id='ConnectionCount',
     instvar="$connectioncount",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_activate'),
@@ -537,7 +541,7 @@ prop_connection_count = ItemPropKind[int](
     export=str,
 )
 # Specific for funnels, tracks the number of polarity-type input items.
-prop_connection_count_polarity = ItemPropKind[int](
+prop_connection_count_polarity: ItemPropKind[int] = ItemPropKind(
     id='ConnectionCountPolarity',
     instvar="$connectioncountpolarity",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity'),
@@ -551,7 +555,8 @@ def _parse_timer_delay(value: str) -> int:
     time = conv_int(value, 3)
     return max(0, min(30, time))
 
-prop_timer_delay = ItemPropKind[int](
+
+prop_timer_delay: ItemPropKind[int] = ItemPropKind(
     id="TimerDelay",
     instvar="$timer_delay",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_timer_delay'),
@@ -576,7 +581,7 @@ prop_faith_vertical_alignment = bool_prop(
 )
 
 # Stores the Faith Plate's speed, defining the arc height.
-prop_faith_speed = ItemPropKind[float](
+prop_faith_speed: ItemPropKind[float] = ItemPropKind(
     id='CatapultSpeed',
     instvar='$catapult_speed',
     name=TransToken.BLANK,  # Not visible.
@@ -586,7 +591,7 @@ prop_faith_speed = ItemPropKind[float](
 
 
 # Set to the name of the overlay the env_texturetoggle should control.
-prop_antline_indicator = ItemPropKind[str](
+prop_antline_indicator: ItemPropKind[str] = ItemPropKind(
     id='IndicatorName',
     instvar='$indicator_name',
     name=TransToken.BLANK,  # Inaccessible to users.
@@ -604,7 +609,7 @@ prop_antline_is_timer = bool_prop(
 
 
 # Set on the placement helper instance, always 64.
-prop_helper_radius = ItemPropKind[float](
+prop_helper_radius: ItemPropKind[float] = ItemPropKind(
     id='HelperRadius',
     instvar='$helper_radius',
     name=TransToken.BLANK,  # Not visible.
@@ -631,7 +636,7 @@ prop_helper_force_placement = bool_prop(
 
 # Logically would store or produce the name of the target.
 # However, this never does anything.
-prop_faith_targetname = ItemPropKind[str](
+prop_faith_targetname: ItemPropKind[str] = ItemPropKind(
     id='TargetName',
     instvar='',
     parse=str,
@@ -642,7 +647,7 @@ prop_faith_targetname = ItemPropKind[str](
 
 # Differentiates between the two angled panel items, presumably.
 # Defaults to 2 always, so the value isn't important.
-prop_angled_panel_type = ItemPropKind[str](
+prop_angled_panel_type: ItemPropKind[str] = ItemPropKind(
     id='AngledPanelType',
     name=TransToken.BLANK,  # Hidden
     instvar='',  # None!
@@ -669,8 +674,9 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
     else:
         return PanelAnimation(int(value))
 
+
 # The angle the panel rises to.
-prop_angled_panel_anim = ItemPropKind[PanelAnimation](
+prop_angled_panel_anim: ItemPropKind[PanelAnimation] = ItemPropKind(
     id='AngledPanelAnimation',
     instvar='$animation',
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),

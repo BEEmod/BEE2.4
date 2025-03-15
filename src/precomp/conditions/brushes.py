@@ -1,11 +1,11 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 from collections import defaultdict
 from random import Random
 
 from srctools import Keyvalues, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, FrozenVec, to_matrix
+from srctools.math import Vec, Angle, Matrix, FrozenVec
 import srctools.logger
 
 from precomp import (
@@ -15,6 +15,9 @@ from precomp import (
 from editoritems_props import PanelAnimation
 import utils
 import consts
+from precomp.lazy_value import LazyValue
+from precomp.texturing import MaterialConf, QuarterRot
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Brushes'
@@ -28,6 +31,7 @@ PANEL_TYPES.update({
     for ang in ['ANGLE_30', 'ANGLE_45', 'ANGLE_60']
 })
 PANEL_TYPES[PanelAnimation.ANGLE_90.animation] = tiling.PanelType.NORMAL
+LAZY_MATRIX_IDENTITY = LazyValue.make(Matrix())
 
 # The spawnflags that we need to toggle for each classname
 FLAG_ROTATING = {
@@ -174,6 +178,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Keyvalues) -> None:
     for flag, value in zip(
         ('x', 'y', 'z', 'rev'),
         [axis.x > 1e-6, axis.y > 1e-6, axis.z > 1e-6, reverse],
+        strict=True,
     ):
         if flag not in flag_values:
             continue
@@ -218,6 +223,7 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
      the 128 brushes (Useful with fizzler/light strip items).
 
     `tex` is the texture to use.
+    `scale` allows you to scale up/down the material - this is a multiplier, not the actual value.
 
     If `template` is set, the template should be an axis aligned cube. This
     will be rotated by the instance angles, and then the face with the same
@@ -231,6 +237,15 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
     pos.localise(origin, angles)
 
     norm = round(Vec.from_str(res['dir', '0 0 1']) @ angles, 6)
+
+    scale = res.float('scale', 1.0)
+    if scale <= 0.0:
+        LOGGER.warning('Material scale should be positive, not {}!', scale)
+        scale = 1.0
+    try:
+        rotation = QuarterRot.parse(res['rotation'])
+    except LookupError:
+        rotation = QuarterRot.NONE
 
     if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
@@ -267,11 +282,14 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
             'no longer usable! ("{}")',
             tex
         )
-    elif tex.startswith('[') and tex.endswith(']'):
-        gen, name = texturing.parse_name(tex[1:-1])
-        tex = gen.get(pos - 64 * norm, name)
 
-    tile.override = (tex, temp)
+    if tex.startswith('[') and tex.endswith(']'):
+        gen, name = texturing.parse_name(tex[1:-1])
+        mat_conf = gen.get(pos - 64 * norm, name)
+    else:
+        mat_conf = MaterialConf(tex, scale=scale, rotation=rotation)
+
+    tile.override = (mat_conf, temp)
 
 
 @conditions.make_result('AddBrush')
@@ -337,36 +355,26 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     solids = vmf.make_prism(point1, point2)
     center = (point1 + point2) / 2
 
-    solids.north.mat = texturing.gen(
+    wall_gen = texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.N),
+        texturing.Orient.WALL,
         tex_type,
-    ).get(center, tile_grids['y'])
-    solids.south.mat = texturing.gen(
+    )
+
+    wall_gen.get(center, tile_grids['y']).apply(solids.north)
+    wall_gen.get(center, tile_grids['y']).apply(solids.south)
+    wall_gen.get(center, tile_grids['x']).apply(solids.east)
+    wall_gen.get(center, tile_grids['x']).apply(solids.west)
+    texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.S),
+        texturing.Orient.FLOOR,
         tex_type,
-    ).get(center, tile_grids['y'])
-    solids.east.mat = texturing.gen(
+    ).get(center, tile_grids['z']).apply(solids.top)
+    texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.E),
+        texturing.Orient.CEILING,
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
-    solids.west.mat = texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.W),
-        tex_type,
-    ).get(center, tile_grids['x'])
-    solids.top.mat = texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.T),
-        tex_type,
-    ).get(center, tile_grids['z'])
-    solids.bottom.mat = texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.B),
-        tex_type,
-    ).get(center, tile_grids['z'])
+    ).get(center, tile_grids['z']).apply(solids.bottom)
 
     if res.bool('detail'):
         # Add the brush to a func_detail entity
@@ -378,11 +386,57 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
         vmf.add_brush(solids.solid)
 
 
+def parse_tempbrush_force(value: str) -> tuple[
+    template_brush.ForceColour,
+    template_brush.TEMP_TYPES,
+    texturing.TileSize | None,
+    texturing.GenCat,
+]:
+    """Parse the 'force' option for TemplateBrush."""
+    colour: template_brush.ForceColour
+    grid: texturing.TileSize | None
+
+    force = value.casefold().split()
+    if 'white' in force:
+        colour = texturing.Portalable.white
+    elif 'black' in force:
+        colour = texturing.Portalable.black
+    elif 'invert' in force:
+        colour = template_brush.AppliedColour.INVERT
+    else:
+        colour = template_brush.AppliedColour.MATCH
+
+    if 'world' in force:
+        ent_type = template_brush.TEMP_TYPES.world
+    elif 'detail' in force:
+        ent_type = template_brush.TEMP_TYPES.detail
+    else:
+        ent_type = template_brush.TEMP_TYPES.default
+
+    size: texturing.TileSize
+    for size in texturing.TileSize:
+        if size in force:
+            grid = size
+            break
+    else:
+        grid = None
+
+    if 'bullseye' in force:
+        surf_cat = texturing.GenCat.BULLSEYE
+    elif 'special' in force or 'panel' in force:
+        surf_cat = texturing.GenCat.PANEL
+    else:
+        surf_cat = texturing.GenCat.NORMAL
+
+    return colour, ent_type, grid, surf_cat
+
+
 @conditions.make_result('TemplateBrush', 'BrushTemplate')
 def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
     info: corridor.Info,
+    voice: QuoteInfo,
     res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
@@ -452,43 +506,10 @@ def res_import_template(
         orig_temp_id = res.value
         res = Keyvalues('TemplateBrush', [])
 
-    force = res['force', ''].casefold().split()
-    conf_force_colour: template_brush.ForceColour
-    if 'white' in force:
-        conf_force_colour = texturing.Portalable.white
-    elif 'black' in force:
-        conf_force_colour = texturing.Portalable.black
-    elif 'invert' in force:
-        conf_force_colour = template_brush.AppliedColour.INVERT
-    else:
-        conf_force_colour = template_brush.AppliedColour.MATCH
-
-    if 'world' in force:
-        force_type = template_brush.TEMP_TYPES.world
-    elif 'detail' in force:
-        force_type = template_brush.TEMP_TYPES.detail
-    else:
-        force_type = template_brush.TEMP_TYPES.default
-
-    force_grid: texturing.TileSize | None
-    size: texturing.TileSize
-    for size in texturing.TileSize:
-        if size in force:
-            force_grid = size
-            break
-    else:
-        force_grid = None
-
-    if 'bullseye' in force:
-        surf_cat = texturing.GenCat.BULLSEYE
-    elif 'special' in force or 'panel' in force:
-        surf_cat = texturing.GenCat.PANEL
-    else:
-        surf_cat = texturing.GenCat.NORMAL
-
+    force_opts = LazyValue.parse(res['force', '']).map(parse_tempbrush_force)
     replace_tex: dict[str, list[str]] = {}
-    for prop in res.find_block('replace', or_blank=True):
-        replace_tex.setdefault(prop.name, []).append(prop.value)
+    for kv in res.find_block('replace', or_blank=True):
+        replace_tex.setdefault(kv.name, []).append(kv.value)
 
     if 'replaceBrush' in res:
         LOGGER.warning(
@@ -497,12 +518,12 @@ def res_import_template(
             orig_temp_id,
         )
     bind_tile_pos = [
-        # So it's the floor block location.
-        Vec.from_str(value) - (0, 0, 128)
-        for value in
-        res.find_key('BindOverlay', or_blank=True).as_array()
+        # Offset so that 0 0 0 is the floor block location.
+        LazyValue.parse(value).as_vec().map(lambda v: v - (0, 0, 128))
+        for child in res.find_all('BindOverlay')
+        for value in child.as_array()
     ]
-    align_bind_overlay = res.bool('alignBindOverlay')
+    align_bind_overlay = LazyValue.parse(res['alignBindOverlay', '']).as_bool()
 
     key_values = res.find_block("Keys", or_blank=True)
     if key_values:
@@ -514,12 +535,13 @@ def res_import_template(
         if 'origin' not in key_values:
             key_values['origin'] = '0 0 0'
 
-        # Spawn everything as detail, so they get put into a brush
-        # entity.
-        force_type = template_brush.TEMP_TYPES.detail
         outputs = [
-            Output.parse(prop)
-            for prop in
+            LazyValue.bimap(
+                lambda name, val: Output.parse(Keyvalues(name, val)),
+                LazyValue.parse(kv.real_name), LazyValue.parse(kv.value),
+                'Output.parse',
+            )
+            for kv in
             res.find_children('Outputs')
         ]
     else:
@@ -530,14 +552,15 @@ def res_import_template(
     visgroup_func: Callable[[Random, list[str]], Iterable[str]] | None = None
 
     try:  # allow both spellings.
-        visgroup_prop = res.find_key('visgroups')
+        visgroup_kv = res.find_key('visgroups')
     except NoKeyError:
-        visgroup_prop = res.find_key('visgroup', 'none')
-    if visgroup_prop.has_children():
-        visgroup_instvars = list(visgroup_prop)
+        visgroup_kv = res.find_key('visgroup', 'none')
+    if visgroup_kv.has_children():
+        visgroup_instvars = list(visgroup_kv)
     else:
         visgroup_instvars = []
-        visgroup_mode = res['visgroup', 'none'].casefold()
+        # TODO: Support fixups for this.
+        visgroup_mode = visgroup_kv.value.casefold()
         # Generate the function which picks which visgroups to add to the map.
         if visgroup_mode == 'none':
             pass
@@ -555,28 +578,25 @@ def res_import_template(
                             yield group
 
     picker_vars = [
-        (prop.real_name, prop.value)
+        (LazyValue.parse(prop.real_name), prop.value)
         for prop in res.find_children('pickerVars')
     ]
     try:
-        ang_override = Matrix.from_angstr(res['angles'])
+        ang_override = LazyValue.parse(res['angles']).as_matrix()
     except LookupError:
         ang_override = None
     try:
-        rotation = Matrix.from_angstr(res['rotation'])
+        rotation = LazyValue.parse(res['rotation']).as_matrix()
     except LookupError:
-        rotation = Matrix()
+        rotation = LAZY_MATRIX_IDENTITY
 
-    offset = res['offset', '0 0 0']
-    invert_var = res['invertVar', '']
-    color_var = res['colorVar', '']
-    if color_var.casefold() == '<editor>':
-        color_var = '<editor>'
+    offset = LazyValue.parse(res['offset', '0 0 0']).as_offset()
+    invert_var = LazyValue.parse(res['invertVar', '']).as_bool()
+    color_var = LazyValue.parse(res['colorVar', '']).casefold()
 
     # If true, force visgroups to all be used.
-    visgroup_force_var = res['forceVisVar', '']
-
-    sense_offset = res.vec('senseOffset')
+    visgroup_force = LazyValue.parse(res['forceVisVar', '']).as_bool()
+    sense_offset = LazyValue.parse(res['senseOffset', '']).as_vec()
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
@@ -607,48 +627,51 @@ def res_import_template(
             # We don't want an error, just quit.
             return
 
+        force_colour, force_type, force_grid, surf_cat = force_opts(inst)
+
+        if key_block is not None:
+            # Spawn everything as detail, so they get put into a brush
+            # entity.
+            force_type = template_brush.TEMP_TYPES.detail
+
         for vis_test_block in visgroup_instvars:
-            if all(conditions.check_test(test, coll, info, inst) for test in vis_test_block):
+            if all(conditions.check_test(test, coll, info, voice, inst) for test in vis_test_block):
                 visgroups.add(vis_test_block.real_name)
             if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
                 LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
 
-        force_colour = conf_force_colour
-        if color_var == '<editor>':
-            # Check traits for the colour it should be.
-            traits = instance_traits.get(inst)
-            if 'white' in traits:
+        match color_var(inst):
+            case '<editor>':
+                # Check traits for the colour it should be.
+                traits = instance_traits.get(inst)
+                if 'white' in traits:
+                    force_colour = texturing.Portalable.white
+                elif 'black' in traits:
+                    force_colour = texturing.Portalable.black
+                else:
+                    LOGGER.warning(
+                        '"{}": Instance "{}" ' "isn't one with inherent color!",
+                        temp_id,
+                        inst['file'],
+                    )
+            case 'white':
                 force_colour = texturing.Portalable.white
-            elif 'black' in traits:
+            case 'black':
                 force_colour = texturing.Portalable.black
-            else:
-                LOGGER.warning(
-                    '"{}": Instance "{}" '
-                    "isn't one with inherent color!",
-                    temp_id,
-                    inst['file'],
-                )
-        elif color_var:
-            color_val = conditions.resolve_value(inst, color_var).casefold()
+            # else: no color var
 
-            if color_val == 'white':
-                force_colour = texturing.Portalable.white
-            elif color_val == 'black':
-                force_colour = texturing.Portalable.black
-        # else: no color var
-
-        if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):
-            force_colour = template_brush.TEMP_COLOUR_INVERT[conf_force_colour]
+        if invert_var(inst):
+            force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
         # else: False value, no invert.
 
         if ang_override is not None:
-            orient = ang_override
+            orient = ang_override(inst)
         else:
-            orient = rotation @ Angle.from_str(inst['angles', '0 0 0'])
-        origin = conditions.resolve_offset(inst, offset)
+            orient = rotation(inst) @ Angle.from_str(inst['angles', '0 0 0'])
+        origin = offset(inst)
 
         # If this var is set, it forces all to be included.
-        if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+        if visgroup_force(inst):
             visgroups.update(template.visgroups)
         elif visgroup_func is not None:
             visgroups.update(visgroup_func(
@@ -656,7 +679,10 @@ def res_import_template(
                 list(template.visgroups),
             ))
 
-        LOGGER.debug('Placing template "{}" at ({} @ {}) with visgroups {}', template.id, origin, orient.to_angle(), visgroups)
+        LOGGER.debug(
+            'Placing template "{}" at ({} @ {}) with visgroups {}',
+            template.id, origin, orient.to_angle(), visgroups,
+        )
 
         temp_data = template_brush.import_template(
             vmf,
@@ -668,11 +694,11 @@ def res_import_template(
             add_to_map=True,
             coll=coll,
             additional_visgroups=visgroups,
-            bind_tile_pos=bind_tile_pos,
-            align_bind=align_bind_overlay,
+            bind_tile_pos=[value(inst) for value in bind_tile_pos],
+            align_bind=align_bind_overlay(inst),
         )
 
-        if key_block is not None:
+        if key_block is not None and temp_data.detail is not None:
             conditions.set_ent_keys(temp_data.detail, inst, key_block)
             br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
             br_origin.localise(origin, orient)
@@ -682,24 +708,24 @@ def res_import_template(
             if move_dir.startswith('<') and move_dir.endswith('>'):
                 temp_data.detail['movedir'] = (Vec.from_str(move_dir) @ orient).to_angle()
 
-            for out in outputs:
-                out = out.copy()
+            for lazy_out in outputs:
+                out = lazy_out(inst)
                 out.target = conditions.local_name(inst, out.target)
                 temp_data.detail.add_out(out)
 
         template_brush.retexture_template(
             temp_data,
             origin,
-            inst.fixup,
+            inst,
             replace_tex,
             force_colour,
             force_grid,
             surf_cat,
-            sense_offset,
+            sense_offset(inst),
         )
 
         for picker_name, picker_var in picker_vars:
-            picker_val = temp_data.picker_results.get(picker_name, None)
+            picker_val = temp_data.picker_results.get(picker_name(inst), None)
             if picker_val is not None:
                 inst.fixup[picker_var] = picker_val.value
             else:
@@ -734,7 +760,7 @@ def res_antigel(vmf: VMF, inst: Entity) -> None:
 
 # Position -> entity
 # We merge ones within 3 blocks of our item.
-CHECKPOINT_TRIG: dict[tuple[float, float, float], Entity] = {}
+CHECKPOINT_TRIG: dict[FrozenVec, Entity] = {}
 
 # Approximately a 3-distance from
 # the center.
@@ -782,7 +808,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
     for offset in CHECKPOINT_NEIGHBOURS:
         near_pos = pos + offset
         try:
-            trig = CHECKPOINT_TRIG[near_pos.as_tuple()]
+            trig = CHECKPOINT_TRIG[near_pos.freeze()]
             break
         except KeyError:
             pass
@@ -793,7 +819,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
             origin=pos,
         )
         trig.solids = []
-        CHECKPOINT_TRIG[pos.as_tuple()] = trig
+        CHECKPOINT_TRIG[pos.freeze()] = trig
 
     trig.solids.append(inst.map.make_prism(
         bbox_min,
@@ -838,6 +864,7 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
     - `B`: Black tile.
     - `b`: Black 4x4 only tile.
     - `g`: The side/bottom of goo pits.
+    - `G`: White goo side, if available.
     - `n`: Nodraw surface.
     - `i`: Invert the tile surface, if black/white.
     - `1`: Convert to a 1x1 only tile, if a black/white tile.
@@ -921,23 +948,24 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
                     norm,
                 )
                 continue
+            existing = tile[u, v]
 
             if size is None:
                 # Invert the tile.
-                tile[u, v] = tile[u, v].inverted
+                tile[u, v] = existing.inverted
                 continue
 
-            # Unless forcing is enabled don't alter the size of GOO_SIDE.
-            if tile[u, v].is_tile and tile[u, v] is not tiling.TileType.GOO_SIDE:
+            # Goo tiles and non-tiles must be forced to be changed.
+            # If forcing, keep goo colour, non-tiles become black.
+            if existing.is_tile and not existing.is_goo_side:
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
-                    tile[u, v].color
+                    existing.color
                 )
             elif force_tile:
-                # If forcing, make it black. Otherwise, no need to change.
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
-                    tiling.Portalable.BLACK
+                    existing.color if existing.is_goo_side else tiling.Portalable.BLACK,
                 )
 
 
@@ -1084,6 +1112,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
+    add_debug = conditions.fetch_debug_visgroup(vmf, 'EditPanel')
+
     points: set[FrozenVec] = set()
 
     if 'point' in props:
@@ -1104,11 +1134,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
+    normal_ang = normal.to_angle()
     for fpos in points:
         try:
             tile, u, v = tiling.find_tile(fpos, normal, force=create)
         except KeyError:
+            add_debug('info_null', origin=fpos, angles=normal_ang, targetname='point')
             continue
+        add_debug('info_target', origin=fpos, angles=normal_ang, targetname='point')
         tiles_to_uv[tile].add((u, v))
 
     if not tiles_to_uv:
@@ -1127,6 +1160,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             # Individually specifying offsets.
             for bevel_str in bevel_prop.as_array():
                 bevel_point = Vec.from_str(bevel_str) @ orient + origin
+                add_debug('info_target', origin=bevel_point, targetname='bevel')
                 bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
         elif srctools.conv_bool(bevel_prop.value):
             # Fill the bounding box.
@@ -1135,6 +1169,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             bbox_min -= off
             bbox_max += off
             for fpos in FrozenVec.iter_grid(bbox_min, bbox_max, 32):
+                add_debug('info_target', origin=fpos, targetname='bevel')
                 if fpos not in points:
                     bevel_world.add((int(fpos[uaxis]), int(fpos[vaxis])))
         # else: No bevels.
@@ -1159,28 +1194,27 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 ):
                     break
             else:
-                LOGGER.warning('No panel to modify found for "{}"!',inst['targetname'])
+                LOGGER.warning('No panel to modify found for "{}"!', inst['targetname'])
                 continue
         panels.append(panel)
 
         if 'type' in props:
             pan_type = props['type']
             try:
-                panel.pan_type = PANEL_TYPES[conditions.resolve_value(inst, pan_type).lower()]
+                panel.pan_type = PANEL_TYPES[inst.fixup.substitute(pan_type).casefold()]
             except (KeyError, ValueError):
                 raise ValueError(f'Unknown panel type "{pan_type}"!') from None
 
         if 'thickness' in props:
-            panel.thickness = srctools.conv_int(
-                conditions.resolve_value(inst, props['thickness'])
-            )
-            if panel.thickness not in (2, 4, 8):
+            thickness = srctools.conv_int(inst.fixup.substitute(props['thickness']))
+            if thickness not in (2, 4, 8):
                 raise ValueError(
                     '"{}": Invalid panel thickess {}!\n'
                     'Must be 2, 4 or 8.',
                     inst['targetname'],
-                    panel.thickness,
+                    thickness,
                 )
+            panel.thickness = thickness
 
         if bevel_world is not None:
             panel.bevels.clear()
@@ -1333,3 +1367,56 @@ def res_transfer_bullseye(inst: Entity, kv: Keyvalues) -> None:
         for plate in faithplate.PLATES.values():
             if not isinstance(plate, faithplate.StraightPlate) and plate.target is start_tile:
                 plate.target = end_tile
+
+
+@conditions.make_result("RotateToPanel")
+def res_rotate_to_panel(kv: Keyvalues) -> conditions.ResultCallable:
+    """Find a panel on the specified surface, then rotate the instance if required to match."""
+    conf_pos = LazyValue.parse(kv['pos', '0 0 0']).as_offset(zoff=-64)
+    conf_norm = LazyValue.parse(kv['normal', '0 0 1']).as_vec(0, 0, 1)
+    ignore_missing = LazyValue.parse(kv['ignoreMissing', '0']).as_bool()
+
+    def rotate_inst(inst: Entity) -> None:
+        """Rotate the item."""
+        orient = Matrix.from_angstr(inst['angles'])
+
+        tile_pos = conf_pos(inst)
+        tile_norm = conf_norm(inst) @ orient
+        try:
+            tile = tiling.TILES[(tile_pos - 64 * tile_norm).as_tuple(), tile_norm.as_tuple()]
+        except KeyError:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find tile at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        if len(tile.panels) == 0:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find panel at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        origin = Vec.from_str(inst['origin'])
+        panel = tile.panels[0]
+
+        if panel.pan_type.is_angled:
+            panel_orient = Matrix.from_angstr(panel.inst['angles'])
+            panel_pos = Vec.from_str(panel.inst['origin'])
+            rotation = Matrix.axis_angle(
+                -panel_orient.left(),
+                panel.pan_type.angle,
+            )
+
+            panel_anchor = panel_pos + Vec(-64, 0, -64) @ panel_orient
+
+            # Shift so the rotation anchor is 0 0 0, then shift back to rotate correctly.
+            origin -= panel_anchor
+            orient @= rotation
+            origin @= rotation
+            origin += panel_anchor
+            inst['angles'] = orient
+
+        origin += panel.offset
+        inst['origin'] = origin
+
+    return rotate_inst

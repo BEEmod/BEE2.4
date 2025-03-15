@@ -14,36 +14,31 @@ permissions:
 
 jobs:
   run-tests:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     name: "${{ matrix.os }} Python ${{ matrix.python-version }}-${{ matrix.arch }}"
     strategy:
       fail-fast: false
       matrix:
         include:
-          # We want 3.8 because it works on Windows 7.
-          - python-version: '3.8.10'
-            arch: 'x86'
-            os: 'windows-latest'
-            libs: 'lib-32'
-          - python-version: '3.11'
+          - python-version: '3.12'
             arch: 'x64'
             os: 'windows-latest'
             libs: 'lib-64'
-          - python-version: '3.12-dev'
+          - python-version: '3.13-dev'
             arch: 'x64'
             os: 'windows-latest'
             libs: 'lib-64'
-          - python-version: '3.11'
+          - python-version: '3.12'
             arch: 'x64'
             os: 'ubuntu-latest'
             libs: 'lib-64'  # TODO?
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: true
     - name: Set up Python ${{ matrix.python-version }}-${{ matrix.arch }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         architecture: ${{ matrix.arch }}

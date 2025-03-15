@@ -1,14 +1,16 @@
 """Adds various traits to instances, based on item classes."""
-from typing import List, MutableMapping, Optional, Dict, Set, Union
+from collections.abc import MutableMapping
 from weakref import WeakKeyDictionary
 
 import attrs
 from srctools import Entity, VMF
 import srctools.logger
 
+import utils
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
+from consts import DefaultItems
 from corridor import parse_filename as parse_corr_filename, CORR_TO_ID
 
 
@@ -16,35 +18,35 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Indicates the collision should only go on the main instance.
 SKIP_COLL = '_skip_coll'
 
-# Special case - specific attributes..
-ID_ATTRS: Dict[str, List[Set[str]]] = {
-    'ITEM_PLACEMENT_HELPER': [
+# Special case - specific attributes...
+ID_ATTRS: dict[utils.ObjectID, list[set[str]]] = {
+    DefaultItems.placement_helper.id: [
         {'placement_helper'},
     ],
-    'ITEM_INDICATOR_TOGGLE': [
+    DefaultItems.indicator_toggle.id: [
         {'antline', 'toggle', 'indicator_toggle'},
     ],
-    'ITEM_INDICATOR_PANEL': [
+    DefaultItems.indicator_check.id: [
         {'antline', 'checkmark', 'indicator_panel'},
     ],
-    'ITEM_INDICATOR_PANEL_TIMER': [
+    DefaultItems.indicator_timer.id: [
         {'antline', 'timer', 'indicator_panel'},
     ],
-    'ITEM_POINT_LIGHT': [
+    DefaultItems.ambient_light.id: [
         {'ambient_light'},
     ],
-    'ITEM_PANEL_ANGLED': [
+    DefaultItems.panel_angled.id: [
         {'panel_brush'},
     ],
-    'ITEM_PANEL_CLEAR': [
+    DefaultItems.panel_glass.id: [
         {'panel_glass'},
     ],
-    'ITEM_OBSERVATION_ROOM': [
+    DefaultItems.obs_room_large.id: [
         {'preplaced'},
     ]
 }
 
-CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
+CLASS_ATTRS: dict[ItemClass, list[set[str]]] = {
     ItemClass.FLOOR_BUTTON: [
         {'white', 'weighted', 'floor_button'},
         {'black', 'weighted', 'floor_button'},
@@ -143,14 +145,15 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
 class TraitInfo:
     """The info associated for each instance."""
     item_class: ItemClass = ItemClass.UNCLASSED
-    item_id: Optional[str] = None
-    traits: Set[str] = attrs.Factory(set)
+    item_id: utils.ObjectID | None = None
+    traits: set[str] = attrs.Factory(set)
+
 
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
 
 
-def get(inst: Entity) -> Set[str]:
+def get(inst: Entity) -> set[str]:
     """Return the traits for an instance.
 
     Modify to set values.
@@ -162,7 +165,7 @@ def get(inst: Entity) -> Set[str]:
         return info.traits
 
 
-def get_class(inst: Entity) -> Optional[ItemClass]:
+def get_class(inst: Entity) -> ItemClass | None:
     """If known, return the item class for this instance.
 
     It must be the original entity placed by the PeTI.
@@ -173,7 +176,7 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
         return None
 
 
-def get_item_id(inst: Entity) -> Optional[str]:
+def get_item_id(inst: Entity) -> utils.ObjectID | None:
     """If known, return the item ID for this instance.
 
     It must be the original entity placed by the PeTI.
@@ -184,19 +187,19 @@ def get_item_id(inst: Entity) -> Optional[str]:
         return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[str]:
+def set_traits(vmf: VMF, id_to_item: dict[utils.ObjectID, Item], coll: Collisions) -> set[str]:
     """Scan through the map, apply traits to instances, and set initial collisions.
 
     This returns a set of strings listing the used instances, for debugging purposes.
     """
-    used_inst: Set[str] = set()
+    used_inst: set[str] = set()
 
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
         if not inst_file:
             continue
 
-        item_ind: Union[str, int]
+        item_ind: str | int
         # Special case, corridors.
         corr_info = parse_corr_filename(inst_file)
         if corr_info is not None:
@@ -216,10 +219,11 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[s
             LOGGER.warning('<{}:bee2_{}> found in original map?', item_id, item_ind)
             continue
 
+        item: Item | None
         try:
-            item = id_to_item[item_id.casefold()]
-        except KeyError:  # dict fail
-            LOGGER.warning('Unknown item ID <{}>', item_id)
+            item = id_to_item[item_id]
+        except (KeyError, ValueError):
+            LOGGER.warning('Unknown item ID "{}"', item_id)
             item_class = ItemClass.UNCLASSED
             item = None
         else:
@@ -228,7 +232,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[s
         info = ENT_TO_TRAITS[inst] = TraitInfo(item_class, item_id)
 
         try:
-            info.traits |= ID_ATTRS[item_id.upper()][item_ind]
+            info.traits |= ID_ATTRS[item_id][item_ind]
         except (IndexError, KeyError):
             pass
         try:

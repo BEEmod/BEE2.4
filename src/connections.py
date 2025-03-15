@@ -3,8 +3,9 @@
 This controls how I/O is generated for each item.
 """
 from __future__ import annotations
-from typing import Dict, Final, Iterable
-from typing_extensions import Self
+
+from typing import Final
+from collections.abc import Collection, Iterable
 from enum import Enum
 import sys
 
@@ -24,8 +25,19 @@ class ConnType(Enum):
 
     BOTH = 'both'  # Trigger both simultaneously.
 
+    @classmethod
+    def parse(cls, value: str, item_type: str) -> ConnType:
+        """Parse from a string."""
+        try:
+            return CONN_TYPE_NAMES[value.casefold()]
+        except KeyError:
+            raise ValueError(
+                f'Invalid default type for "{item_type}": {value}\n'
+                f'Valid values: {VALID_CONN_TYPE_NAMES}'
+            ) from None
 
-CONN_TYPE_NAMES: Dict[str, ConnType] = {
+
+CONN_TYPE_NAMES: dict[str, ConnType] = {
     'none': ConnType.DEFAULT,
     'a': ConnType.PRIMARY,
     'prim': ConnType.PRIMARY,
@@ -37,10 +49,10 @@ CONN_TYPE_NAMES: Dict[str, ConnType] = {
     'a+b': ConnType.BOTH,
 }
 
-CONN_TYPE_NAMES.update(
-    (conn.value.casefold(), conn)
+CONN_TYPE_NAMES.update({
+    conn.value.casefold(): conn
     for conn in ConnType
-)
+})
 VALID_CONN_TYPE_NAMES = ', '.join([f'"{x}"' for x in sorted(CONN_TYPE_NAMES)])
 
 
@@ -98,8 +110,8 @@ class OutNames(Enum):
 
 
 # Item IDs used for the checkmark/timer panels.
-INDICATOR_CHECK_ID: Final = 'ITEM_INDICATOR_PANEL'
-INDICATOR_TIMER_ID: Final = 'ITEM_INDICATOR_PANEL_TIMER'
+INDICATOR_CHECK_ID: Final = utils.obj_id('ITEM_INDICATOR_PANEL')
+INDICATOR_TIMER_ID: Final = utils.obj_id('ITEM_INDICATOR_PANEL_TIMER')
 
 
 def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
@@ -132,6 +144,7 @@ def format_delay(offset: float, add_timer_delay: bool) -> str:
             return ''
         else:
             return str(offset)
+
 
 OUT_NAME_DESC = (
     'This should be either an instance output name like '
@@ -200,7 +213,7 @@ class TimerCommand:
     fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fade-time.
 
     @classmethod
-    def parse(cls, kv: Keyvalues, desc: str) -> Self:
+    def parse(cls, kv: Keyvalues, desc: str) -> TimerCommand:
         """Parse a command from keyvalues."""
         output = get_input('output', desc, kv['output', ''])
         if output is None:
@@ -236,34 +249,34 @@ class Config:
     def __init__(
         self,
         item_id: str,
-        default_dual: ConnType=ConnType.DEFAULT,
-        input_type: InputType=InputType.DEFAULT,
+        default_dual: ConnType = ConnType.DEFAULT,
+        input_type: InputType = InputType.DEFAULT,
 
-        spawn_fire: FeatureMode=FeatureMode.NEVER,
+        spawn_fire: FeatureMode = FeatureMode.NEVER,
         invert_var: str = '0',
-        enable_cmd: Iterable[Output]=(),
-        disable_cmd: Iterable[Output]=(),
+        enable_cmd: Iterable[Output] = (),
+        disable_cmd: Iterable[Output] = (),
 
-        sec_spawn_fire: FeatureMode=FeatureMode.NEVER,
-        sec_invert_var: str='0',
-        sec_enable_cmd: Iterable[Output]=(),
-        sec_disable_cmd: Iterable[Output]=(),
+        sec_spawn_fire: FeatureMode = FeatureMode.NEVER,
+        sec_invert_var: str = '0',
+        sec_enable_cmd: Iterable[Output] = (),
+        sec_disable_cmd: Iterable[Output] = (),
 
-        output_type: ConnType=ConnType.DEFAULT,
-        output_act: tuple[str | None, str] | None=None,
-        output_deact: tuple[str | None, str] | None=None,
+        output_type: ConnType = ConnType.DEFAULT,
+        output_act: tuple[str | None, str] | None = None,
+        output_deact: tuple[str | None, str] | None = None,
 
-        lock_cmd: Iterable[Output]=(),
-        unlock_cmd: Iterable[Output]=(),
-        output_lock: tuple[str | None, str] | None=None,
-        output_unlock: tuple[str | None, str] | None=None,
-        inf_lock_only: bool=False,
+        lock_cmd: Collection[Output] = (),
+        unlock_cmd: Collection[Output] = (),
+        output_lock: tuple[str | None, str] | None = None,
+        output_unlock: tuple[str | None, str] | None = None,
+        inf_lock_only: bool = False,
 
-        timer_sound_pos: Vec | None=None,
-        timer_done_cmd: Iterable[Output]=(),
-        force_timer_sound: bool=False,
-        timer_outputs: Iterable[TimerCommand]=(),
-    ):
+        timer_sound_pos: Vec | None = None,
+        timer_done_cmd: Iterable[Output] = (),
+        force_timer_sound: bool = False,
+        timer_outputs: Iterable[TimerCommand] = (),
+    ) -> None:
         self.id = item_id
 
         # How this item uses their inputs.
@@ -341,7 +354,7 @@ class Config:
         self.output_unlock = output_unlock
 
     @staticmethod
-    def parse(item_id: str, conf: Keyvalues) -> Config:
+    def parse(item_id: utils.SpecialID, conf: Keyvalues) -> Config:
         """Read the item type info from the given config."""
         desc = f'item "{item_id}"'
 
@@ -398,15 +411,7 @@ class Config:
             sec_enable_cmd = get_outputs(conf, desc, 'sec_enable_cmd')
             sec_disable_cmd = get_outputs(conf, desc, 'sec_disable_cmd')
 
-            try:
-                default_dual = CONN_TYPE_NAMES[
-                    conf['Default_Dual', 'primary'].casefold()
-                ]
-            except KeyError:
-                raise ValueError(
-                    f'Invalid default type for "{item_id}": {conf["Default_Dual"]}\n'
-                    f'Valid values: {VALID_CONN_TYPE_NAMES}'
-                ) from None
+            default_dual = ConnType.parse(conf['default_dual', 'primary'], item_id)
 
             # We need an affinity to use when nothing else specifies it.
             if default_dual is ConnType.DEFAULT:

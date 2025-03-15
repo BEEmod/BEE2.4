@@ -1,0 +1,96 @@
+x=0, y=0:
+  id: ITEM_BUTTON_PEDESTAL
+  subtype: 0
+x=0, y=1:
+  id: ITEM_CUBE
+  subtype: 0
+x=0, y=2:
+  id: ITEM_TBEAM
+  subtype: 0
+x=0, y=3:
+  id: ITEM_BARRIER_HAZARD
+  subtype: 0
+x=0, y=4:
+  id: ITEM_LASER_EMITTER_CENTER
+  subtype: 0
+x=0, y=5:
+  id: ITEM_PANEL_CLEAR
+  subtype: 0
+x=0, y=6:
+  id: ITEM_BARRIER_HAZARD
+  subtype: 1
+x=0, y=7:
+  id: ITEM_PAINT_SPLAT
+  subtype: 0
+x=1, y=0:
+  id: ITEM_BUTTON_FLOOR
+  subtype: 0
+x=1, y=1:
+  id: ITEM_CUBE
+  subtype: 1
+x=1, y=2:
+  id: ITEM_CATAPULT
+  subtype: 0
+x=1, y=3:
+  id: ITEM_BARRIER
+  subtype: 0
+x=1, y=4:
+  id: ITEM_LASER_CATCHER_CENTER
+  subtype: 0
+x=1, y=5:
+  id: ITEM_PANEL_ANGLED
+  subtype: 0
+x=1, y=6:
+  id: ITEM_TURRET
+  subtype: 0
+x=1, y=7:
+  id: ITEM_PAINT_SPLAT
+  subtype: 1
+x=2, y=0:
+  id: ITEM_BUTTON_FLOOR
+  subtype: 1
+x=2, y=1:
+  id: ITEM_CUBE
+  subtype: 3
+x=2, y=2:
+  id: ITEM_LIGHT_BRIDGE
+  subtype: 0
+x=2, y=3:
+  id: ITEM_PISTON_PLATFORM
+  subtype: 0
+x=2, y=4:
+  id: ITEM_LASER_RELAY_CENTER
+  subtype: 0
+x=2, y=5:
+  id: ITEM_PANEL_FLIP
+  subtype: 0
+x=2, y=6:
+  id: ITEM_GOO
+  subtype: 0
+x=2, y=7:
+  id: ITEM_PAINT_SPLAT
+  subtype: 2
+x=3, y=0:
+  id: ITEM_BUTTON_FLOOR
+  subtype: 2
+x=3, y=1:
+  id: ITEM_CUBE
+  subtype: 4
+x=3, y=2:
+  id: ITEM_PANEL_STAIRS
+  subtype: 0
+x=3, y=3:
+  id: ITEM_RAIL_PLATFORM
+  subtype: 0
+x=3, y=4:
+  id: ITEM_CUBE
+  subtype: 2
+x=3, y=5:
+  id: ITEM_SECONDARY_OBSERVATION_ROOM
+  subtype: 0
+x=3, y=6:
+  id: ITEM_LIGHT_PANEL
+  subtype: 0
+x=3, y=7:
+  id: ITEM_PAINT_SPLAT
+  subtype: 3

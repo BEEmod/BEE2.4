@@ -2,12 +2,16 @@
 
 """
 from __future__ import annotations
-from typing import Any, Union, Callable
+
+from typing import NewType
 import operator
 
 import srctools.logger
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
+
+from precomp.lazy_value import LazyValue
+
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
@@ -16,11 +20,12 @@ COND_MOD_NAME = 'Instances'
 @conditions.make_test('instance')
 def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     """Evaluates True if the instance matches the given file."""
-    inst_list = instanceLocs.resolve_filter(kv.value)
+    conf_inst_list = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
-        if conditions.ALL_INST.isdisjoint(inst_list):
+        inst_list = conf_inst_list(inst)
+        if conf_inst_list.is_constant() and conditions.ALL_INST.isdisjoint(inst_list):
             raise conditions.Unsatisfiable
         return inst['file'].casefold() in inst_list
     return check_inst
@@ -35,8 +40,9 @@ def check_file_cont(inst: Entity, kv: Keyvalues) -> bool:
 @conditions.make_test('hasInst')
 def check_has_inst(kv: Keyvalues) -> conditions.TestCallable:
     """Checks if the given instance is present anywhere in the map."""
-    inst_filter = instanceLocs.resolve_filter(kv.value)
-    return lambda inst: inst_filter.isdisjoint(conditions.ALL_INST)
+    inst_filter = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
+
+    return lambda inst: inst_filter(inst).isdisjoint(conditions.ALL_INST)
 
 
 @conditions.make_test('hasTrait')
@@ -101,24 +107,6 @@ def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     return kv.value.casefold() in instance_traits.get(inst)
 
 
-INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
-    '=': operator.eq,
-    '==': operator.eq,
-
-    '!=': operator.ne,
-    '<>': operator.ne,
-    '=/=': operator.ne,
-
-    '<': operator.lt,
-    '>': operator.gt,
-
-    '>=': operator.ge,
-    '=>': operator.ge,
-    '<=': operator.le,
-    '=<': operator.le,
-}
-
-
 @conditions.make_test('instVar')
 def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     """Checks if the $replace value matches the given value.
@@ -129,49 +117,17 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     If omitted, the operation is assumed to be `==`.
     If only a single value is present, it is tested as a boolean.
     """
-    values = kv.value.split(' ', 3)
-    if len(values) == 3:
-        val_a, op, val_b = values
-        op = inst.fixup.substitute(op)
-        comp_func = INSTVAR_COMP.get(op, operator.eq)
-    elif len(values) == 2:
-        val_a, val_b = values
-        if val_b in INSTVAR_COMP:
-            # User did "$var ==", treat as comparing against an empty string.
-            comp_func = INSTVAR_COMP[val_b]
-            op = val_b
-            val_b = ""
-        else:
-            # With just two vars, assume equality.
-            op = '=='
-            comp_func = operator.eq
-    else:
-        # For just a name.
-        return conv_bool(inst.fixup.substitute(values[0]))
-    if '$' not in val_a and '$' not in val_b:
-        # Handle pre-substitute behaviour, where val_a is always a var.
-        LOGGER.warning(
-            'Comparison "{}" has no $var, assuming first value. '
-            'Please use $ when referencing vars.',
-            kv.value,
-        )
-        val_a = '$' + val_a
-
-    val_a = inst.fixup.substitute(val_a, default='')
-    val_b = inst.fixup.substitute(val_b, default='')
-    comp_a: str | float
-    comp_b: str | float
-    try:
-        # Convert to floats if possible, otherwise handle both as strings.
-        # That ensures we normalise different number formats (1 vs 1.0)
-        comp_a, comp_b = float(val_a), float(val_b)
-    except ValueError:
-        comp_a, comp_b = val_a, val_b
-    try:
-        return bool(comp_func(comp_a, comp_b))
-    except (TypeError, ValueError) as e:
-        LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
-        return False
+    match kv.value.split(' ', 2):
+        case [val_a, op, val_b]:
+            return conditions.instvar_comp(inst, val_a, op, val_b)
+        case [val_a, val_b]:
+            # Might be omitted operand, or value is blank. instvar_comp will check.
+            return conditions.instvar_comp(inst, val_a, None, val_b)
+        case [var]:
+            # Single name, treat as boolean.
+            return conv_bool(inst.fixup.substitute(var, allow_invert=True))
+        case err:  # Only 1 - 3 values are possible.
+            raise AssertionError(err)
 
 
 @conditions.make_test('offsetDist')
@@ -194,11 +150,11 @@ def check_offset_distance(inst: Entity, kv: Keyvalues) -> bool:
         comp_val = kv.value
 
     try:
-        value = float(conditions.resolve_value(inst, comp_val))
+        value = float(inst.fixup.substitute(comp_val))
     except ValueError:
         return False
 
-    func = INSTVAR_COMP.get(op, operator.eq)
+    func = conditions.INSTVAR_COMP.get(op, operator.eq)
 
     try:
         return bool(func(offset, value))
@@ -278,17 +234,17 @@ def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
 
     The first value is the in -> out var, and all following are values to map.
     """
-    table: dict[str, str] = {}
+    table: dict[str, LazyValue] = {}
     res_iter = iter(res)
     first_prop = next(res_iter)
     in_name, out_name = first_prop.name, first_prop.value
     for prop in res_iter:
-        table[prop.real_name] = prop.value
+        table[prop.real_name] = LazyValue.parse(prop.value)
 
     def modify_inst(inst: Entity) -> None:
         """Map the variables on an instance."""
         try:
-            inst.fixup[out_name] = table[inst.fixup[in_name]]
+            inst.fixup[out_name] = table[inst.fixup[in_name]](inst)
         except KeyError:
             pass
     return modify_inst
@@ -355,8 +311,9 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     new_ent['targetname'] = inst['targetname']
 
 
-GLOBAL_INPUT_ENTS: dict[Union[str, None, object], Entity] = {}
-ON_LOAD = object()
+OnLoad = NewType('OnLoad', object)
+GLOBAL_INPUT_ENTS: dict[str | OnLoad | None, Entity] = {}
+ON_LOAD = OnLoad(object())
 
 
 @conditions.make_result('GlobalInput')
@@ -424,7 +381,7 @@ def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             except KeyError:
                 ent = GLOBAL_INPUT_ENTS[ON_LOAD] = vmf.create_ent(
                     'logic_auto',
-                    origin=options.get(Vec, 'global_ents_loc'),
+                    origin=options.GLOBAL_ENTS_LOC(),
                     spawnflags='0',  # Don't remove on fire.
                 )
             load_out = output.copy()
@@ -439,9 +396,9 @@ def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
 def global_input(
     vmf: VMF,
-    pos: Union[Vec, str],
+    pos: Vec | str,
     output: Output,
-    relay_name: str=None,
+    relay_name: str | None = None,
 ) -> None:
     """Create a global input, either from a relay or logic_auto.
 
@@ -455,7 +412,7 @@ def global_input(
             glob_ent = GLOBAL_INPUT_ENTS[''] = vmf.create_ent(
                 classname='logic_auto',
                 spawnflags='1',  # Remove on fire
-                origin=options.get(Vec, 'global_ents_loc'),
+                origin=options.GLOBAL_ENTS_LOC()
             )
         else:
             glob_ent = GLOBAL_INPUT_ENTS[relay_name] = vmf.create_ent(

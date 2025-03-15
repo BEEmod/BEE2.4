@@ -1,20 +1,16 @@
 """Results for customising the behaviour of certain items - antlines, faith plates,
 
 """
-from __future__ import annotations
-from typing import Callable
+from collections.abc import Callable
 from srctools import Keyvalues, Entity
-import srctools.logger
 
 from precomp import connections, antlines, conditions
 
 
 COND_MOD_NAME = 'Custom Items'
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
-
-@conditions.make_result('custAntline')
+@conditions.make_result('custAntline', valid_before=conditions.MetaCond.Connections)
 def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     """Customise the output antlines.
 
@@ -32,7 +28,6 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     make_style = antlines.IndicatorStyle.parser(res, 'custAntline block')
 
     remove_signs = res.bool('remove_signs')
-    toggle_var = res['toggle_var', '']
 
     def change_antlines(inst: Entity) -> None:
         """Change the antlines of an item."""
@@ -43,21 +38,4 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
             for sign in item.ind_panels:
                 sign.remove()
             item.ind_panels.clear()
-
-        if toggle_var:
-            item.ant_toggle_var = toggle_var
     return change_antlines
-
-
-@conditions.make_result('changeOutputs')
-def res_change_outputs() -> object:
-    """Deprecated, use ChangeIOType."""
-    LOGGER.warning('ChangeOutputs is deprecated. Use ChangeIOType.')
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('changeInputs')
-def res_change_inputs() -> object:
-    """Deprecated, use ChangeIOType."""
-    LOGGER.warning('ChangeInputs is deprecated. Use ChangeIOType.')
-    return conditions.RES_EXHAUSTED

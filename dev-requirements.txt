@@ -1,10 +1,13 @@
-mypy>=1.5.0
-mypy-extensions>=1.0.0
-pytest>=7.3.2
-pytest-trio>=0.8.0
-pytest-datadir>=1.4.1
-pytest-regressions>=2.4.2
-types-Pillow>=9.4.0.5
-types-atomicwrites>=1.4.0
-trio-typing[mypy]>=0.7.0
-types-babel>=2.10.0
+# Testing
+pytest >= 8.2.1
+pytest-trio >= 0.8.0
+pytest-datadir >= 1.5.0
+pytest-regressions >= 2.5.0
+dirty_equals >= 0.7.1
+# Type checking
+mypy>=1.9.0
+types-Pillow >= 9.4.0.5
+types-babel >= 2.10.0
+types-psutil >= 5.9.0
+# Linting
+flake8_async >= 24.9.2

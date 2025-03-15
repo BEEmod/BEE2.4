@@ -8,6 +8,7 @@ import pytest
 
 from BEE2_config import GEN_OPTS
 from config.gen_opts import AfterExport, GenOptions, gen_opts_bool
+from config import UnknownVersion
 
 from . import isolate_conf
 
@@ -29,6 +30,15 @@ def parse_from_legacy() -> GenOptions:
     conf = GenOptions.parse_legacy(cast(Keyvalues, Landmine()))  # Arg is unused.
     assert list(conf.keys()) == ['']
     return conf['']
+
+
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        GenOptions.parse_kv1(Keyvalues.root(), 3)
+
+    with pytest.raises(UnknownVersion):
+        GenOptions.parse_dmx(Element('GenOptions', 'DMConfig'), 3)
 
 
 @pytest.mark.parametrize('name', BOOL_OPTIONS)

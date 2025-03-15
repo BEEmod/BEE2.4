@@ -1,16 +1,17 @@
 """Test the collisions module."""
 from __future__ import annotations
-from typing import Iterable, Tuple
+from collections.abc import Iterable
 from pathlib import Path
 import math
 
-from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
+from pytest_regressions.file_regression import FileRegressionFixture
+from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from collisions import BBox, CollideType
+from collisions import BBox, CollideType, NonBBoxError, Volume
 
 
-tuple3 = Tuple[int, int, int]
+type Tuple3 = tuple[int, int, int]
 
 
 def assert_bbox(
@@ -97,13 +98,13 @@ def test_bbox_construction() -> None:
 
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 2, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(10, 2, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 20, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 2, 30))
 
 
@@ -167,9 +168,9 @@ def test_bbox_hash() -> None:
     assert hash(bb) != hash(BBox(40, 60, 80, 120, 450, 732, contents=CollideType.PHYSICS, tags={'tag1', 'tag3'}))
 
 
-def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> Vec:
+def reorder(coord: Tuple3, order: str, x: int, y: int, z: int) -> Vec:
     """Reorder the coords by these axes."""
-    assoc = dict(zip('xyz', coord))
+    assoc = dict(zip('xyz', coord, strict=True))
     return Vec(x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]])
 
 
@@ -182,12 +183,12 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tuple3] | None]]:
+def get_intersect_testcases() -> Iterable[tuple[Tuple3, Tuple3, tuple[Tuple3, Tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
-    with Path(__file__, '../bbox_samples.vmf').open() as f:
+    with Path(__file__, '..', 'bbox_samples.vmf').resolve().open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
-    def process(brush: Solid) -> tuple[tuple3, tuple3]:
+    def process(brush: Solid) -> tuple[Tuple3, Tuple3]:
         """Extract the bounding box from the brush."""
         bb_min, bb_max = brush.get_bbox()
         for vec in [bb_min, bb_max]:
@@ -224,15 +225,15 @@ def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tu
 @pytest.mark.parametrize('y', [-128, 0, 129])
 @pytest.mark.parametrize('z', [-128, 0, 129])
 def test_bbox_intersection(
-    mins: tuple3, maxs: tuple3,
+    mins: Tuple3, maxs: Tuple3,
     x: int, y: int, z: int,
-    success: tuple[tuple3, tuple3] | None, axes: str,
+    success: tuple[Tuple3, Tuple3] | None, axes: str,
 ) -> None:
     """Test intersection founction for bounding boxes.
 
     We parameterise by swapping all the axes, and offsetting so that it's in all the quadrants.
     """
-    bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
+    bbox1 = BBox(x - 64, y - 64, z - 64, x + 64, y + 64, z + 64, contents=CollideType.EVERYTHING)
     bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)
     result = bbox1.intersect(bbox2)
     # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
@@ -240,7 +241,11 @@ def test_bbox_intersection(
         assert result is None
     else:
         exp_a, exp_b = success
-        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), contents=CollideType.EVERYTHING)
+        expected = BBox(
+            reorder(exp_a, axes, x, y, z),
+            reorder(exp_b, axes, x, y, z),
+            contents=CollideType.EVERYTHING,
+        )
         assert result == expected
 
 
@@ -307,7 +312,7 @@ def test_bbox_parse_block() -> None:
     )
     ent.solids.append(vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70)).solid)
     ent.solids.append(vmf.make_prism(Vec(-30, 45, 80), Vec(-20, 60, 120)).solid)
-    bb2, bb1 =  BBox.from_ent(ent)
+    bb2, bb1 = BBox.from_ent(ent)
     # Allow it to produce in either order.
     if bb1.min_x == -30:
         bb1, bb2 = bb2, bb1
@@ -326,14 +331,14 @@ def test_bbox_parse_block() -> None:
 
 
 @pytest.mark.parametrize('axis, mins, maxes', [
-    ('west',   (80, 10, 40),  (80, 220, 70)),   # -X
-    ('east',   (150, 10, 40), (150, 220, 70)),  # +X
-    ('south',  (80, 10, 40),  (150, 10, 70)),   # -Y
-    ('north',  (80, 220, 40), (150, 220, 70)),  # +Y
-    ('bottom', (80, 10, 40),  (150, 220, 40)),  # -Z
-    ('top',    (80, 10, 70),  (150, 220, 70)),  # +Z
+    ('west',   ( 80, 10,  40), ( 80, 220, 70)),   # -X
+    ('east',   (150, 10,  40), (150, 220, 70)),  # +X
+    ('south',  ( 80, 10,  40), (150,  10, 70)),   # -Y
+    ('north',  ( 80, 220, 40), (150, 220, 70)),  # +Y
+    ('bottom', ( 80, 10,  40), (150, 220, 40)),  # -Z
+    ('top',    ( 80, 10,  70), (150, 220, 70)),  # +Z
 ], ids=['-x', '+x', '-y', '+y', '-z', '+z'])
-def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
+def test_bbox_parse_plane(axis: str, mins: Tuple3, maxes: Tuple3) -> None:
     """Test parsing planar bboxes from a VMF.
 
     With 5 skip sides, the brush is flattened into the remaining plane.
@@ -345,3 +350,40 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     ent.solids.append(prism.solid)
     [bbox] = BBox.from_ent(ent)
     assert_bbox(bbox, mins, maxes, CollideType.SOLID, set())
+
+
+def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
+    """Test rotating bboxes."""
+    with Path(__file__, '..', 'volume_sample.vmf').resolve().open() as f:
+        vmf = VMF.parse(Keyvalues.parse(f))
+
+    volumes = [
+        volume
+        for ent in vmf.entities
+        for volume in Volume.from_ent(ent)
+    ]
+    for yaw in range(30, 360, 30):
+        orient = Matrix.from_angle(15.0 if (yaw % 60) == 0 else -15.0, yaw, 0.0)
+        for volume in volumes:
+            vmf.add_ent((volume @ orient).as_ent(vmf))
+
+    # Go through and round everything so we ignore slight inaccuracies.
+    for ent in vmf.entities:
+        for side in ent.sides():
+            side.planes = [round(vec + 0.0, 6) for vec in side.planes]
+            side.uaxis = UVAxis(
+                round(side.uaxis.x + 0.0, 6),
+                round(side.uaxis.y + 0.0, 6),
+                round(side.uaxis.z + 0.0, 6),
+                round(side.uaxis.offset),
+                side.uaxis.scale,
+            )
+            side.vaxis = UVAxis(
+                round(side.vaxis.x + 0.0, 6),
+                round(side.vaxis.y + 0.0, 6),
+                round(side.vaxis.z + 0.0, 6),
+                round(side.vaxis.offset),
+                side.vaxis.scale,
+            )
+
+    file_regression.check(vmf.export(), extension='.vmf', binary=False)

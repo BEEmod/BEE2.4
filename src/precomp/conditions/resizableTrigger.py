@@ -1,6 +1,7 @@
 """Logic for trigger items, allowing them to be resized."""
+from __future__ import annotations
+
 from contextlib import suppress
-from typing import Optional
 
 from srctools import Keyvalues, Vec, Output, VMF
 import srctools.logger
@@ -9,12 +10,11 @@ from precomp import instanceLocs, connections, options, conditions
 import consts
 
 
-COND_MOD_NAME = None
-
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
-@conditions.make_result('ResizeableTrigger')
+@conditions.make_result('ResizeableTrigger', valid_before=conditions.MetaCond.Connections)
 def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> object:
     """Replace two markers with a trigger brush.
 
@@ -71,6 +71,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
 
     # For Coop, we add a logic_coop_manager in the mix so both players can
     # be handled.
+    coop_var: str | None
     try:
         coop_var = res['coopVar']
     except LookupError:
@@ -85,8 +86,8 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         )
 
     # Display preview overlays if it's preview mode, and the config is true
-    pre_act: Optional[Output] = None
-    pre_deact: Optional[Output] = None
+    pre_act: Output | None = None
+    pre_deact: Output | None = None
     if not info.is_publishing and options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
@@ -148,7 +149,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         out_ent = trig_ent = vmf.create_ent(
             classname='trigger_multiple',  # Default
             targetname=targ,
-            origin=options.get(Vec, "global_ents_loc"),
+            origin=options.GLOBAL_ENTS_LOC(),
             angles='0 0 0',
         )
         trig_ent.solids = [

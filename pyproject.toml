@@ -4,13 +4,14 @@ include = [
 	"hammeraddons/src/",
 	]
 exclude = [
-	"**/__pycache__"
+	"**/__pycache__",
+	"src/postcomp/_ha_transforms/",
 	]
-venv = "BEE2_39"
+venv = "BEE2-12"
 stubPath = "src/"   # Use our module for stubs.
 # We want to do conversions when setting.
 reportPropertyTypeMismatch = false
-pythonVersion = "3.8"
+pythonVersion = "3.12"
 strictParameterNoneValue = false
 
 [tool.isort]
@@ -18,8 +19,8 @@ sections=["FUTURE", "TYPING", "FRAMEWORK", "STDLIB", "THIRDPARTY", "FIRSTPARTY",
 known_framework = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
 extra_standard_library = ["importlib_resources", "exceptiongroup"]
 known_typing = ["typing", "typing_extensions"]
-no_lines_before = ["TYPING", "FRAMEWORK", "STDLIB"]
-known_third_party = ["hammeraddons"]
+no_lines_before = ["TYPING", "STDLIB"]
+known_third_party = ["hammeraddons", "srctools", "trio_util", "aioresult"]
 multi_line_output = 5 # hanging grid grouped
 line_length = 80
 lines_after_imports = 2
@@ -30,72 +31,96 @@ from_first = true
 combine_as_imports = true
 src_paths = ["src"]
 
-
 [tool.ruff]
 line-length = 127
-target-version = "py38"
-select = [
-	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
-	"PLC", "PLE", "PLW",  # Pylint.
+target-version = "py312"
 
-	"TCH005",  # Empty type-checking block.
+exclude = [
+	"src/perlin.py",
+	"src/precomp/conditions/cutoutTile.py",
+	"src/postcomp/_ha_transforms/",
+]
+
+[tool.ruff.lint]
+select = [
+	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI",
+	"PLC", "PLE", "PLW",  # Pylint.
+	"YTT",
+
+	"TC005",  # Empty type-checking block.
+	"TC008",  # Remove type alias quotes
+	"TC010",  # String in union.
 ]
 allowed-confusables = [
 	"×",  # Multiplication sign
 ]
 extend-ignore = [
+	"E201", "E202", "E203", "E221", "E222", "E241", # Allow extra whitespace.
+	"E226",  # Allow 4*6 + 8
 	"E402",  # Allow module level import later in the file.
-	"E721",  # Allow using type(x) is Class
+	"E731",  # Lambda assignment used intentionally for callbacks.
 	"F403",  # Allow *-imports,
 	"F405",  # name may be undefined, or defined from star imports: module
+	"F841",  # Unused local triggers on partial unpacks.
 
 	# Flake8-annotations.
-	# Type annotations for self & cls are not important.
-	"ANN101",
-	"ANN102",
 	"ANN401",  # Allow typing.Any
 
 	# Ruff:
-	"RUF100",  # Sometimes use # noqa for other linters
 	"RUF005",  # Unpack instead of concat triggers on Vec.
+	"RUF022",  # Sorting __all__
+	"RUF023",  # Sorting __slots__
+	"RUF027",  # Catches TransToken using {}-formatting without an f-string.
+	"RUF052",  # _var is sometimes a parameter, not dummy.
+	"RUF100",  # Sometimes use # noqa for other linters
 
 	# PyLint:
 	"PLW0603",  # Allow use of global statement.
 	"PLC0414",  # import x as x is used for type checking.
 	"PLE1205",  # Too many arguments for logging, doesn't handle our format
+	"PLC0415",  # Imports not at top level are used for specific reasons
 	"PLW2901",  # Allow redefining loop var inside the loop.
+	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
+	"PLC1901",  # Allow comparison to empty string etc.
+	"PLW0108",  # Need lambdas for deliberate late binding sometimes.
+	"PLW1641",  # Explicitly setting __hash__ = None is problematic for type checkers
 
-	# Pyupgrade:
-	# Keep using typing types even with __future__.annotations.
-	"UP006", "UP007", "UP035",
+	# Flake8-pyi:
+	"PYI041",  # Use int | float
 
 	# Flake8-bugbear:
 	# Loop control var not used, triggers on unpackings.
 	"B007",
-	# Stacklevel parameter required for warnings.warn() - doesn't detect positional args.
-	"B028",
+	# Modification to loop var during iteration, do it on purpose often.
+	"B909",
 
 	# Flake8-pie:
 	# Prefer to use pass in empty functions, even if docstring is present
 	"PIE790",
 	# Allow aliases for enum values, used often.
 	"PIE796",
+	# Start arg for range is sometimes clearer
+	"PIE808",
 	]
 
-exclude = [
-	"src/perlin.py",
-]
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
 
-[tool.ruff.flake8-bugbear]
+[tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
 	# Objects which are immutable, or close enough that it's fine to be in func defaults.
 	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
+	"srctools.FrozenVec", "srctools.FrozenAngle", "srctools.FrozenMatrix",
 	# Image handle variants, all publically frozen.
 	"app.img.Handle.background", "app.img.Handle.blank", "app.img.Handle.builtin",
 	"app.img.Handle.color", "app.img.Handle.composite", "app.img.Handle.crop",
 	"app.img.Handle.error", "app.img.Handle.file", "app.img.Handle.ico_loading",
 	"app.img.Handle.ico_none", "app.img.Handle.overlay_text", "app.img.Handle.parse",
 	"app.img.Handle.parse_uri", "app.img.Handle.resize", "app.img.Handle.sprite", "app.img.Handle.with_alpha_stripped",
+
+	# These are strings.
+	"utils.obj_id", "utils.special_id", "utils.ObjectID", "utils.SpecialID",
+	"utils.special_id_optional", "utils.obj_id_optional",
 
 	# Translation token variants.
 	"transtoken.TransToken.parse", "transtoken.TransToken.ui", "transtoken.TransToken.ui_plural",
@@ -106,5 +131,71 @@ extend-immutable-calls = [
 	"tkMarkdown.MarkdownData.text",
 	# Cast is not really a function call, just returns the arg.
 	"typing.cast",
-	"srctools.logger.get_logger",
 ]
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
+allow_redefinition = true
+check_untyped_defs = true
+extra_checks = true
+strict_equality = true
+strict_optional = true
+local_partial_types = true
+implicit_reexport = false
+# strict = true  # Only when overrides is gone.
+
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_no_return = true
+# warn_unreachable = true  # TODO: Bunch of errors still
+
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_calls = true
+disallow_any_generics = false
+
+enable_error_code = [
+	'comparison-overlap',
+	'mutable-override',
+	'narrowed-type-not-subtype',
+	'no-untyped-call',
+	'no-untyped-def',
+	'redundant-cast',
+	'redundant-expr',
+	'redundant-self',
+	'truthy-bool',
+	'truthy-iterable',
+	'unimported-reveal',
+	'unreachable',
+	'unused-awaitable',
+#	'explicit-override',
+]
+
+[[tool.mypy.overrides]]
+# TODO: make these pass strict checks.
+module = [
+	'app.backup',
+	'precomp.conditions._scaffold_compat',
+	'precomp.bottomlessPit',
+	'precomp.fizzler',
+	'ui_tk.check_table',
+]
+strict_optional = false
+
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# No stubs yet.
+module = ['pyglet.*', 'mistletoe.*', 'wx.lib.inspection']
+ignore_missing_imports = true
+
+# cutoutTile is dead code, needs to be rewritten.
+# _ha_transforms is copied from HA, should be checked with settings from there.
+[[tool.mypy.overrides]]
+module = ['precomp.conditions.cutoutTile', 'postcomp._ha_transforms.*']
+ignore_errors = true

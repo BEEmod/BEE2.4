@@ -1,26 +1,32 @@
 """Modify and analyse corridors in the map."""
 from __future__ import annotations
 from collections import Counter
-from typing import Dict
+from collections.abc import Iterator
 
+from srctools import Vec, Matrix, logger
+from srctools.vmf import EntityFixup, VMF, Entity
 import attrs
-from srctools import Vec, Matrix
-from srctools.vmf import VMF, Entity
-import srctools.logger
 
-import consts
-import precomp.options
-import utils
-from . import instanceLocs, rand
-from corridor import (  # noqa
-    GameMode, Direction, Orient,
+from config.corridors import Options as CorrOptions
+from . import instanceLocs, options, rand
+from corridor import (
+    ATTACH_TO_ORIENT, Attachment, GameMode, Direction,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
+import config
+import utils
 import user_errors
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+__all__ = [
+    'Info', 'analyse_and_modify',
+    # Re-exports:
+    'GameMode', 'Direction', 'Attachment',
+    'CORRIDOR_COUNTS', 'CORR_TO_ID', 'ID_TO_CORR',
+    'Corridor', 'ExportedConf', 'parse_filename',
+]
+LOGGER = logger.get_logger(__name__)
 
 
 @attrs.define
@@ -29,7 +35,7 @@ class Info:
     is_publishing: bool
     start_at_elevator: bool
     game_mode: GameMode
-    _attrs: Dict[str, bool]
+    _attrs: set[str] = attrs.field(init=False, factory=set)
     # The used corridor instances.
     corr_entry: Corridor
     corr_exit: Corridor
@@ -60,19 +66,83 @@ class Info:
 
     def has_attr(self, name: str) -> bool:
         """Check if this attribute is present in the map."""
-        return self._attrs[name.casefold()]
+        return name.casefold() in self._attrs
 
     def set_attr(self, *names: str) -> None:
         """Set these attributes to true."""
         for name in names:
-            self._attrs[name.casefold()] = True
+            self._attrs.add(name.casefold())
+
+    def unset_attr(self, name: str) -> None:
+        """Unset a specific attribute. Avoid using."""
+        folded = name.casefold()
+        if folded in self._attrs:
+            LOGGER.warning('Unsetting already-set voice attribute "{}"!', name)
+            self._attrs.discard(folded)
+
+    def iter_attrs(self) -> Iterator[str]:
+        """Iterate over defined voice attributes."""
+        yield from self._attrs
+
+
+def select_corridor(
+    conf: ExportedConf,
+    direction: Direction, mode: GameMode, attach: Attachment,
+    ind: int, file: str,
+) -> Corridor:
+    """Select the corridor to use, from an existing file."""
+    max_count = CORRIDOR_COUNTS[mode, direction]
+    poss_corr = conf.corridors[mode, direction, attach]
+    if not poss_corr:
+        raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
+            orient=attach.value.title(),
+            mode=mode.value.title(),
+            dir=direction.value.title(),
+        ))
+    elif len(poss_corr) > max_count:
+        # More than the entropy we have, use our randomisation.
+        chosen = rand.seed(b'corridor', file).choice(poss_corr)
+        LOGGER.info(
+            '{}_{}_{} corridor randomised to {}',
+            mode.value, direction.value, attach.value, chosen,
+        )
+    else:
+        # Enough entropy, use editor index.
+        chosen = poss_corr[ind % len(poss_corr)]
+        LOGGER.info(
+            '{}_{}_{} corridor selected {} -> {}',
+            mode.value, direction.value, attach.value, ind, chosen,
+        )
+    return chosen
+
+
+def apply_options(
+    selected: ExportedConf, fixup: EntityFixup,
+    direction: Direction, mode: GameMode,
+    corridor: Corridor,
+) -> None:
+    """Apply options exposed by the group to the user."""
+    settings = config.COMPILER.get_cur_conf(CorrOptions, CorrOptions.get_id(
+        options.STYLE_ID(), mode, direction,
+    ))
+    LOGGER.info('Corridor options for {}_{}: {}', mode.value, direction.value, settings)
+    for opt_id in (selected.global_opt_ids[mode, direction] | corridor.option_ids):
+        try:
+            option = selected.options[opt_id]
+        except KeyError:
+            LOGGER.warning('Unknown corridor option "{}"!', opt_id)
+            continue
+        value = settings.value_for(option)
+        if value == utils.ID_RANDOM:
+            rng = rand.seed(b'corr_opt', opt_id, mode.value, direction.value)
+            value = rng.choice(option.values).id
+        fixup[option.fixup] = value
 
 
 def analyse_and_modify(
     vmf: VMF,
     conf: ExportedConf,
     elev_override: bool,
-    voice_attrs: Dict[str, bool],
 ) -> Info:
     """Modify corridors to match configuration, and report map settings gleaned from them.
 
@@ -99,6 +169,8 @@ def analyse_and_modify(
 
     chosen_entry: Corridor | None = None
     chosen_exit: Corridor | None = None
+    entry_fixups = EntityFixup()
+    exit_fixups = EntityFixup()
 
     filenames: Counter[str] = Counter()
     # Use sets, so we can detect contradictory instances.
@@ -128,69 +200,52 @@ def analyse_and_modify(
             corr_mode, corr_dir, corr_ind = corr_info
             seen_game_modes.add(corr_mode)
             if 'no_player_start' in item.fixup:
-                seen_no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
+                seen_no_player_start.add(item.fixup.bool('no_player_start'))
             orient = Matrix.from_angstr(item['angles'])
             origin = Vec.from_str(item['origin'])
             norm = orient.up()
             if norm.z > 0.5:
-                corr_orient = Orient.DN
+                corr_attach = Attachment.FLOOR
+                # The old fixup used when Orient was used directly.
+                item.fixup['$attach'] = 'down'
             elif norm.z < -0.5:
-                corr_orient = Orient.UP
+                corr_attach = Attachment.CEILING
+                item.fixup['$attach'] = 'up'
             else:
-                corr_orient = Orient.HORIZONTAL
-            corr_attach = corr_orient
-            # entry_up is on the floor, so you go *up*.
-            if corr_dir is Direction.ENTRY:
-                corr_orient = corr_orient.flipped
+                corr_attach = Attachment.HORIZONTAL
+                item.fixup['$attach'] = 'horizontal'
+            corr_orient = ATTACH_TO_ORIENT[corr_dir, corr_attach]
 
-            max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
-            poss_corr = conf[corr_mode, corr_dir, corr_orient]
-            if not poss_corr:
-                raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
-                    orient=corr_orient.value.title(),
-                    mode=corr_mode.value.title(),
-                    dir=corr_dir.value.title(),
-                ))
-            elif len(poss_corr) > max_count:
-                # More than the entropy we have, use our randomisation.
-                chosen = rand.seed(b'corridor', file).choice(poss_corr)
-                LOGGER.info(
-                    '{}_{}_{} corridor randomised to {}',
-                    corr_mode.value, corr_dir.value, corr_orient.value, chosen,
-                )
-            else:
-                # Enough entropy, use editor index.
-                chosen = poss_corr[corr_ind % len(poss_corr)]
-                LOGGER.info(
-                    '{}_{}_{} corridor selected {} -> {}',
-                    corr_mode.value, corr_dir.value, corr_orient.value, corr_ind, chosen,
-                )
+            chosen = select_corridor(conf, corr_dir, corr_mode, corr_attach, corr_ind, file)
             item['file'] = chosen.instance
             file = chosen.instance.casefold()
 
             if corr_dir is Direction.ENTRY:
                 chosen_entry = chosen
-                inst_entry_door = item
+                fixup = entry_fixups
             else:
                 chosen_exit = chosen
-                inst_exit_door = item
+                fixup = exit_fixups
 
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value
-            item.fixup['$attach'] = corr_attach.value
-            # Do after so it overwrites these automatic ones.
-            item.fixup.update(chosen.fixups)
+            item.fixup['$attachment'] = corr_attach.value
+            # Accumulate options into this so that it can be assigned to the elevator too.
+            # Assign it to the instance after the above fixups are computed
+            # so that they can be overridden if desired.
+
+            fixup.update(chosen.fixups)
+            apply_options(conf, fixup, corr_dir, corr_mode, chosen)
+            item.fixup.update(fixup)
 
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
                 item['origin'] = origin - (0, 0, 64)
-                # And write the index.
-                item.fixup[consts.FixupVars.BEE_CORR_INDEX] = chosen.orig_index
             # Otherwise, give more useful orientations for building instances.
             # Keep it upright, with x pointing in the door direction for horizontal.
             else:
                 orient = Matrix.from_basis(
-                    x=norm if corr_orient is Orient.HORIZONTAL else orient.forward(),
+                    x=norm if corr_attach is Attachment.HORIZONTAL else orient.forward(),
                     z=Vec(0, 0, 1.0),
                 )
                 item['angles'] = orient.to_angle()
@@ -255,14 +310,9 @@ def analyse_and_modify(
 
     # Apply selected fixups to the elevator also.
     if inst_elev_entry is not None:
-        inst_elev_entry.fixup.update(chosen_entry.fixups)
-        inst_elev_entry['origin'] = precomp.options.get(Vec, 'entrance_elevator_loc')
+        inst_elev_entry.fixup.update(entry_fixups)
     if inst_elev_exit is not None:
-        inst_elev_exit.fixup.update(chosen_exit.fixups)
-        inst_elev_exit['origin'] = precomp.options.get(Vec, 'exit_elevator_loc')
-
-    if inst_transition is not None:
-        inst_transition['origin'] = precomp.options.get(Vec, "arrival_departure_ents_loc")
+        inst_elev_exit.fixup.update(exit_fixups)
 
     [is_publishing] = seen_no_player_start
     [game_mode] = seen_game_modes
@@ -270,7 +320,6 @@ def analyse_and_modify(
         is_publishing=is_publishing,
         start_at_elevator=elev_override or is_publishing,
         game_mode=game_mode,
-        attrs=voice_attrs,  # Todo: remove from settings.
         corr_entry=chosen_entry,
         corr_exit=chosen_exit,
         inst_entry=inst_entry_door,

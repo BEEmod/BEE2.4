@@ -1,10 +1,10 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
-from __future__ import annotations
+from typing import NoReturn
 
+from collections.abc import Collection
 import re
-from typing import Collection, NoReturn
 
-from srctools import Vec, Keyvalues, Entity, conv_bool, VMF
+from srctools import Keyvalues, Entity, conv_bool, VMF
 import srctools.logger
 
 from precomp import options, conditions
@@ -74,7 +74,7 @@ def check_game(kv: Keyvalues) -> bool:
     - `DEST_AP`
     - `Destroyed Aperture`
     """
-    return global_bool(options.get(str, 'game_id') == utils.STEAM_IDS.get(
+    return global_bool(options.GAME_ID() == utils.STEAM_IDS.get(
         kv.value.upper(),
         kv.value,
     ))
@@ -90,8 +90,8 @@ def check_voice_char(kv: Keyvalues) -> bool:
     """
     targ_char = kv.value.casefold()
     if targ_char == '<none>':
-        return options.get(str, 'voice_id') == '<NONE>'
-    for char in options.get(str, 'voice_char').split(','):
+        return options.VOICE_ID() == '<NONE>'
+    for char in options.VOICE_CHAR().split(','):
         if targ_char in char.casefold():
             return True
     raise conditions.Unsatisfiable
@@ -101,7 +101,7 @@ def check_voice_char(kv: Keyvalues) -> bool:
 def check_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
-    return global_bool(options.get(int, 'cave_port_skin') is not None)
+    return global_bool(options.CAVE_PORT_SKIN() is not None)
 
 
 @conditions.make_test('entryCorridor')
@@ -177,7 +177,7 @@ def res_set_style_var(res: Keyvalues) -> object:
     return conditions.RES_EXHAUSTED
 
 
-@conditions.make_result('has')
+@conditions.make_result('has', valid_before=conditions.MetaCond.VoiceLine)
 def res_set_voice_attr(info: conditions.MapInfo, res: Keyvalues) -> object:
     """Sets a number of Voice Attributes.
 
@@ -211,7 +211,7 @@ def res_pre_cache_model(vmf: VMF, res: Keyvalues) -> None:
     precache_model(vmf, model, skins)
 
 
-def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None:
+def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int] = ()) -> None:
     """Precache the given model for switching.
 
     This places it as a `comp_precache_model`.
@@ -229,7 +229,7 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
     except KeyError:
         ent = vmf.create_ent(
             classname='comp_precache_model',
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             model=mdl_name,
         )
         skins = set(skinset)
@@ -246,12 +246,18 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
         ent['skinset'] = ''
 
 
-def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
-    """Implement ItemConfig and GetItemConfig shared logic."""
+def get_itemconf(inst: Entity, res: Keyvalues) -> tuple[bool, str | None]:
+    """Implement ItemConfig and GetItemConfig shared logic.
+
+    This returns the value, plus whether a fixup value was used in computing it.
+    """
+    uses_fixup = False
     timer_delay: int | None
 
     group_id = res['ID']
-    wid_name = inst.fixup.substitute(res['Name']).casefold()
+    wid_name = res['Name']
+    uses_fixup |= '$' in wid_name
+    wid_name = inst.fixup.substitute(wid_name).casefold()
 
     match = BRACE_RE.match(wid_name)
     if match is not None:  # Match name[timer], after $fixup substitution.
@@ -264,10 +270,11 @@ def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
             wid_name,
         )
         timer_delay = inst.fixup.int('$timer_delay')
+        uses_fixup = True
     else:
         timer_delay = None
 
-    return options.get_itemconf((group_id, wid_name), None, timer_delay)
+    return uses_fixup, options.get_itemconf((group_id, wid_name), None, timer_delay)
 
 
 @conditions.make_test('ItemConfig')
@@ -277,15 +284,23 @@ def res_match_item_config(inst: Entity, res: Keyvalues) -> bool:
     * `ID` is the ID of the group.
     * `Name` is the name of the widget, or "name[timer]" to pick the value for
       timer multi-widgets.
-    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * The deprecated option `UseTimer` uses `$timer_delay` for the timer value.
+      Instead, use `name[$timer_delay]`.
     * `Value` is the value to compare to.
+    * If the value does not exist, this always fails.
     """
-    conf = get_itemconf(inst, res)
+    uses_fixup, conf = get_itemconf(inst, res)
     desired_value = res['Value']
-    if conf is None:  # Doesn't exist
-        return False
 
-    return global_bool(conf == desired_value)
+    # Always false if it doesn't exist.
+    if conf is not None and conf == desired_value:
+        return True
+    elif uses_fixup:
+        # We cannot raise Unsatisfiable here, it could be true with a different ent.
+        return False
+    else:
+        # No fixups used, this will always be false.
+        raise conditions.Unsatisfiable
 
 
 @conditions.make_result('GetItemConfig')
@@ -295,10 +310,11 @@ def res_item_config_to_fixup(inst: Entity, res: Keyvalues) -> None:
     * `ID` is the ID of the group.
     * `Name` is the name of the widget, or "name[timer]" to pick the value for
       timer multi-widgets.
-    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * The deprecated option `UseTimer` uses `$timer_delay` for the timer value.
+      Instead, use `name[$timer_delay]`.
     * `resultVar` is the location to store the value into.
     * `Default` is the default value, if the config isn't found.
     """
     default = res['default']
-    conf = get_itemconf(inst, res)
+    uses_fixup, conf = get_itemconf(inst, res)
     inst.fixup[res['ResultVar']] = conf if conf is not None else default

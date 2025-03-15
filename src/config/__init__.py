@@ -3,21 +3,23 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
-from typing import (
-    Awaitable, Callable, ClassVar, Dict, Iterator, NewType, Optional, Set,
-    Tuple, Type, TypeVar, Union, cast,
-)
-from typing_extensions import Self
+from __future__ import annotations
+
+from typing import ClassVar, Self, cast, override
+from collections.abc import Generator, ItemsView, Iterator, KeysView, Mapping
 from pathlib import Path
+import datetime
 import abc
+import contextlib
 import os
 
-from srctools import AtomicWriter, KeyValError, Keyvalues, logger
-from srctools.dmx import Element
+from srctools import AtomicWriter, EmptyMapping, KeyValError, Keyvalues, logger
+from srctools.dmx import Element, ValueType as DMXTypes
 import attrs
 import trio
 
 import utils
+from transtoken import TransToken
 
 
 LOGGER = logger.get_logger(__name__)
@@ -25,16 +27,101 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
     LOGGER.setLevel('INFO')
 
 
-DataT = TypeVar('DataT', bound='Data')
+# Name and version to use for DMX files.
+DMX_NAME = 'BEEConfig'
+DMX_VERSION = 1
+# For tests or other reasons, allow globally disabling saving.
+DISABLE_WRITE: bool = False
+
+
+@attrs.define
+class UnknownVersion(Exception):
+    """Raised for unknown versions during parsing."""
+    version: int
+    allowed: str
+
+    def __str__(self) -> str:
+        """Format nicely."""
+        return f'Invalid version {self.version}! Valid versions: {self.allowed}'
 
 
 @attrs.define(eq=False)
-class ConfInfo:
+class ConfInfo[DataT: 'Data']:
     """Holds information about a type of configuration data."""
     name: str
     version: int
-    palette_stores: bool  # If this is saved/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
+    default: DataT | None  # If non-None, the class can be called with no args, so a default is present.
+
+
+# List of mismatched sections produced when parsing.
+type VersionMismatchList = list[tuple[ConfInfo | str, int]]
+TRANS_MISMATCH_TITLE = TransToken.ui('Version Mismatch')
+TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
+    'The palette "{name}" has unknown config versions for the following sections:'
+)
+TRANS_MISMATCH_CONF_MESSAGE = TransToken.ui(
+    'The primary config has unknown versions for the following sections:'
+)
+TRANS_MISMATCH_PAL_SKIP_PROMPT = TransToken.ui(
+    'Either discard this data to load the rest of the palette, skip it tempoarily, '
+    'or quit the app to leave it unchanged.'
+)
+TRANS_MISMATCH_PAL_PROMPT = TransToken.ui(
+    'Either discard this data to load the rest of the palette, '
+    'or quit the app to leave it unchanged.'
+)
+TRANS_MISMATCH_CONF_PROMPT = TransToken.ui(
+    'Continue (discarding these sections), or quit and leave it unchanged?'
+)
+
+
+def build_version_mismatch_prompt(
+    sections: VersionMismatchList,
+    can_skip: bool,
+    pal_name: str | None,
+) -> TransToken:
+    """Build the text to describe a version mismatch."""
+    section_ver = TransToken.untranslated('- {name}: {found} > {max}')
+    section_unknown = TransToken.untranslated('- {name}')
+    sections = [
+        section_ver.format(name=info.name, found=version, max=info.version) if
+        isinstance(info, ConfInfo)
+        else section_unknown.format(name=info)
+        for info, version in sections
+    ]
+    if pal_name is not None:
+        msg = TRANS_MISMATCH_PAL_MESSAGE.format(name=pal_name)
+        prompt = TRANS_MISMATCH_PAL_SKIP_PROMPT if can_skip else TRANS_MISMATCH_PAL_PROMPT
+    else:
+        msg = TRANS_MISMATCH_CONF_MESSAGE
+        prompt = TRANS_MISMATCH_CONF_PROMPT
+        assert not can_skip, "Primary config can't be skipped?"
+    return TransToken.untranslated('\n').join([msg, *sections, prompt])
+
+
+def backup_conf(path: Path, suffix: str) -> None:
+    """Backup the current version of a file, before upgrading or discarding data.
+
+    This is synchronous so we can do it when loading the main config, before the event loop.
+    """
+    folder = path.parent
+    date = datetime.date.today().strftime('%d_%b_%y')
+    ext = path.suffix + suffix
+    name = f'{path.stem}_{date.lower()}'
+    try:
+        dest = (folder / f'{name}{ext}').open('xb')
+    except FileExistsError:
+        i = 1
+        while True:
+            try:
+                dest = (folder / f'{name}_{i}{ext}').open('xb')
+                break
+            except FileExistsError:
+                i += 1
+    with dest, path.open('rb') as src:
+        dest.write(src.read())
+        LOGGER.info('Backup created: {}', dest.name)
 
 
 class Data(abc.ABC):
@@ -42,77 +129,184 @@ class Data(abc.ABC):
     __info: ClassVar[ConfInfo]
     __slots__ = ()  # No members itself.
 
+    @override
     def __init_subclass__(
         cls, *,
         conf_name: str = '',
         version: int = 1,
-        palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
         **kwargs: object,
     ) -> None:
         super().__init_subclass__(**kwargs)
+        if hasattr(cls, '_Data__info'):
+            # Attrs __slots__ classes remakes the class, but it'll already have the info included.
+            # Just keep the existing info, no kwargs are given here.
+            return
+
         if not conf_name:
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(conf_name, version, palette_stores, uses_id)
+        # Default must be created during the register call, after attrs decorator runs.
+        cls.__info = ConfInfo(conf_name, version, uses_id, None)
 
     @classmethod
-    def get_conf_info(cls) -> ConfInfo:
+    def get_conf_info(cls) -> ConfInfo[Self]:
         """Return the ConfInfo for this class."""
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, Self]:
-        """Parse from the old legacy config. The user has to handle the uses_id style."""
+    def parse_legacy(cls, conf: Keyvalues, /) -> dict[str, Self]:
+        """Parse from the old legacy config.
+
+        This is parsed the entire config, the user is in charge of parsing each ID individually.
+        """
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
+    def parse_kv1(cls, data: Keyvalues, /, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def export_kv1(self) -> Keyvalues:
+    def export_kv1(self, /) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> Self:
+    def parse_dmx(cls, data: Element, /, version: int) -> Self:
         """Parse DMX config values."""
         return cls.parse_kv1(data.to_kv1(), version)
 
-    def export_dmx(self) -> Element:
+    def export_dmx(self, /) -> Element:
         """Generate DMX for saving the configuration."""
         return Element.from_kv1(self.export_kv1())
 
 
-# The current data loaded from the config file. This maps an ID to each value, or
-# is {'': data} if no key is used.
-Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
+@attrs.frozen(repr=False)
+class Config:
+    """The current data loaded from the config file.
+
+    This maps an ID to each value, or is {'': data} if no key is used.
+    """
+    _data: Mapping[type[Data], Mapping[str, Data]] = attrs.Factory(dict)
+
+    def __repr__(self) -> str:
+        vals = ', '.join([
+            f'{len(data_map)}x {cls.get_conf_info().name}'
+            for cls, data_map in self._data.items()
+        ])
+        return f'<Config: {vals}>'
+
+    def copy(self) -> Config:
+        """Copy the config, assuming values are immutable."""
+        return Config({
+            cls: dict(data_map)
+            for cls, data_map in self._data.items()
+        })
+
+    def is_blank(self) -> bool:
+        """Check if we have any values assigned."""
+        return not any(self._data.values())
+
+    def get[D: Data](
+        self,
+        cls: type[D],
+        data_id: str = '',
+    ) -> D:
+        """Fetch the value defined for a specific ID.
+
+        :raises KeyError: if not present.
+        """
+        info = cls.get_conf_info()
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        data_map = cast('dict[str, D]', self._data[cls])
+        return data_map[data_id]
+
+    def with_value(self, data: Data, data_id: str = '') -> Config:
+        """Return a copy of the config with the data stored under the specified ID."""
+        cls = type(data)
+        info = cls.get_conf_info()
+
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
+        try:
+            data_map = dict(self._data[cls])
+        except KeyError:
+            data_map = {data_id: data}
+        else:
+            data_map[data_id] = data
+        return Config({
+            **self._data,
+            cls: data_map,
+        })
+
+    def with_cls_map[D: Data](self, cls: type[D], data_map: Mapping[str, D]) -> Config:
+        """Return a copy with an entire class replaced."""
+        return Config({
+            **self._data,
+            cls: data_map,
+        })
+
+    def discard[D: Data](self, cls: type[D], data_id: str) -> tuple[Config, D | None]:
+        """Remove the specified data ID, returning the value or None if not present."""
+        try:
+            # If cls or data_id is not present, raises.
+            data_map = dict(self._data[cls])
+            popped = cast(D, data_map.pop(data_id))
+        except KeyError:
+            return self, None
+
+        copy = dict(self._data)
+        if data_map:
+            # This data map is missing just the specified ID.
+            copy[cls] = data_map
+        else:
+            # Last ID for this class, remove entirely.
+            del copy[cls]
+        return Config(copy), popped
+
+    def classes(self) -> KeysView[type[Data]]:
+        """Return a view over the types present in the config."""
+        return self._data.keys()
+
+    def items(self) -> ItemsView[type[Data], Mapping[str, Data]]:
+        """Return a view over the types and associated items."""
+        return self._data.items()
+
+    def items_cls[D: Data](self, cls: type[D]) -> ItemsView[str, D]:
+        """Return a view over the items for a specific class."""
+        data_map = cast('dict[str, D]', self._data[cls])
+        return data_map.items()
 
 
 @attrs.define(eq=False)
 class ConfigSpec:
     """A config spec represents the set of data types in a particlar config file."""
-    filename: Optional[Path]
-    _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
-    _registered: Set[Type[Data]] = attrs.Factory(set)
+    _name_to_type: dict[str, type[Data]] = attrs.field(init=False, factory=dict)
+    _registered: set[type[Data]] = attrs.field(init=False, factory=set)
 
-    # After the relevant UI is initialised, this is set to an async func which
+    # After the relevant UI is initialised, this is set to a channel which
     # applies the data to the UI. This way we know it can be done safely now.
-    # If data was loaded from the config, the callback is immediately awaited.
+    # If data was loaded from the config, it gets sent into the channel.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[Tuple[Type[Data], str], Callable[[Data], Awaitable]] = attrs.field(factory=dict, repr=False)
+    _apply_channel: dict[
+        tuple[type[Data], str],
+        list[trio.MemorySendChannel[Data]],
+    ] = attrs.field(init=False, factory=dict, repr=False)
 
-    _current: Config = attrs.Factory(lambda: Config({}))
+    _current: Config = attrs.field(init=False, factory=lambda: Config({}))
+    # When parsing, stash any too-new section names here, for later printing.
+    extra_sections: VersionMismatchList = attrs.field(init=False, factory=list)
 
-    def datatype_for_name(self, name: str) -> Type[Data]:
+    def datatype_for_name(self, name: str) -> type[Data]:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
 
-    def register(self, cls: Type[DataT]) -> Type[DataT]:
+    def register[DataT: Data](self, cls: type[DataT]) -> type[DataT]:
         """Register a config data type. The name must be unique."""
         info = cls.get_conf_info()
         folded_name = info.name.casefold()
@@ -120,32 +314,58 @@ class ConfigSpec:
             raise ValueError(f'"{info.name}" is already registered!')
         self._name_to_type[info.name.casefold()] = cls
         self._registered.add(cls)
+
+        if info.default is None:
+            try:
+                info.default = cls()
+            except TypeError:
+                pass
         return cls
 
-    async def set_and_run_ui_callback(
+    @contextlib.contextmanager
+    def get_ui_channel[DataT: Data](
         self,
-        typ: Type[DataT],
-        func: Callable[[DataT], Awaitable],
-        data_id: str='',
-    ) -> None:
-        """Set the callback used to apply this config type to the UI.
+        typ: type[DataT],
+        data_id: str = '',
+    ) -> Generator[trio.MemoryReceiveChannel[DataT], None, None]:
+        """Associate a channel which will be sent the config value whenever it changes.
 
-        If the configs have been loaded, it will immediately be called. Whenever new configs
+        If the configs have been loaded, it will immediately be set. Whenever new configs
         are loaded, it will be re-applied regardless.
+
+        This is a context manager, which closes and removes the channel when exited.
         """
         if typ not in self._registered:
             raise ValueError(f'Unregistered data type {typ!r}')
         info = typ.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        if (typ, data_id) in self.callback:
-            raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
-        self.callback[typ, data_id] = func  # type: ignore
-        data_map = self._current.setdefault(typ, {})
-        if data_id in data_map:
-            await func(cast(DataT, data_map[data_id]))
 
-    async def apply_conf(self, typ: Type[Data], *, data_id: str= '') -> None:
+        # Invalid to drop DataT -> Data.
+        chan_list = cast(
+            list[trio.MemorySendChannel[DataT]],
+            self._apply_channel.setdefault((typ, data_id), [])
+        )
+
+        send: trio.MemorySendChannel[DataT]
+        rec: trio.MemoryReceiveChannel[DataT]
+        send, rec = trio.open_memory_channel(1)
+
+        try:
+            current = self._current.get(typ, data_id)
+        except KeyError:
+            pass
+        else:
+            # Can't possibly block, we just created this.
+            send.send_nowait(current)
+        chan_list.append(send)
+        try:
+            yield rec
+        finally:
+            rec.close()
+            chan_list.remove(send)
+
+    async def apply_conf[D: Data](self, typ: type[D], *, data_id: str = '') -> None:
         """Apply the current settings for this config type and ID.
 
         If the data_id is not passed, all settings will be applied.
@@ -158,27 +378,41 @@ class ConfigSpec:
             if not info.uses_id:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
-                data = self._current[typ][data_id]
-                cb = self.callback[typ, data_id]
+                data = self._current.get(typ, data_id)
+                channel_list = self._apply_channel[typ, data_id]
             except KeyError:
-                LOGGER.warning('{}[{!r}] has no UI callback!', info.name, data_id)
+                LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
             else:
                 assert isinstance(data, typ), info
-                await cb(data)
+                async with trio.open_nursery() as nursery:
+                    for channel in channel_list:
+                        nursery.start_soon(channel.send, data)
         else:
             try:
-                data_map = self._current[typ]
+                data_map = self._current.items_cls(typ)
             except KeyError:
-                LOGGER.warning('{}[:] has no UI callback!', info.name)
+                LOGGER.warning('{}[:] has no UI channel!', info.name)
                 return
             async with trio.open_nursery() as nursery:
-                for dat_id, data in data_map.items():
+                for dat_id, data in data_map:
                     try:
-                        cb = self.callback[typ, dat_id]
+                        channel_list = self._apply_channel[typ, dat_id]
                     except KeyError:
-                        LOGGER.warning('{}[{!r}] has no UI callback!', info.name, dat_id)
+                        LOGGER.warning('{}[{!r}] has no UI channel!', info.name, dat_id)
                     else:
-                        nursery.start_soon(cb, data)
+                        for channel in channel_list:
+                            nursery.start_soon(channel.send, data)
+
+    def get_full_conf(self, filter_to: ConfigSpec | None = None) -> Config:
+        """Get the config stored by this spec, filtering to another if requested."""
+        if filter_to is None:
+            filter_to = self
+
+        return Config({
+            cls: conf_map
+            for cls, conf_map in self._current.items()
+            if cls in filter_to._registered
+        })
 
     def merge_conf(self, config: Config) -> None:
         """Re-store values in the specified config.
@@ -189,7 +423,7 @@ class ConfigSpec:
         for cls, opt_map in config.items():
             if cls not in self._registered:
                 continue
-            self._current[cls] = opt_map.copy()
+            self._current = self._current.with_cls_map(cls, opt_map)
 
     async def apply_multi(self, config: Config) -> None:
         """Merge the values into our config, then apply the changed types.
@@ -199,97 +433,125 @@ class ConfigSpec:
         """
         self.merge_conf(config)
         async with trio.open_nursery() as nursery:
-            for cls in config:
+            for cls in config.classes():
                 if cls in self._registered:
                     nursery.start_soon(self.apply_conf, cls)
 
-    def get_cur_conf(
+    def get_cur_conf[DataT: Data](
         self,
-        cls: Type[DataT],
-        data_id: str='',
-        default: Union[DataT, None] = None,
-        legacy_id: str='',
+        cls: type[DataT],
+        data_id: str = '',
+        default: DataT | type[Exception] | None = None,
+        legacy_id: str = '',
     ) -> DataT:
         """Fetch the currently active config for this ID.
 
         If legacy_id is defined, this will be checked if the original does not exist, and if so
         moved to the actual ID.
+        Default can be set to an exception type to force an exception. Otherwise, if the class can
+        be constructed without args that will be returned by default.
         """
         if cls not in self._registered:
             raise ValueError(f'Unregistered data type {cls!r}')
-        info = cls.get_conf_info()
-        if data_id and not info.uses_id:
-            raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        data: object = None
+        data: DataT | None = None
         try:
-            data = self._current[cls][data_id]
+            return self._current.get(cls, data_id)
         except KeyError:
             if legacy_id:
                 try:
-                    conf_map = self._current[cls]
-                    data = conf_map[data_id] = conf_map.pop(legacy_id)
+                    conf, data = self._current.discard(cls, legacy_id)
+                    if data is not None:
+                        self._current = conf.with_value(data, data_id)
                 except KeyError:
                     pass
+
+        info = cls.get_conf_info()
         if data is None:
             # Return a default value.
-            if default is not None:
+            if isinstance(default, type) and issubclass(default, Exception):
+                raise default(data_id)
+            elif default is not None:
                 return default
+            elif info.default is not None:
+                return info.default
             else:
                 raise KeyError(data_id)
 
         assert isinstance(data, cls), info
         return data
 
-    def store_conf(self, data: DataT, data_id: str='') -> None:
+    def get_cur_conf_type[DataT: Data](self, cls: type[DataT]) -> ItemsView[str, DataT]:
+        """Get a view over the values set for the specified data type.
+
+        May not be called for data with no ID (just use get_cur_conf for that).
+        """
+        if cls not in self._registered:
+            raise ValueError(f'Unregistered data type {cls!r}')
+        info = cls.get_conf_info()
+        if not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        try:
+            return self._current.items_cls(cls)
+        except KeyError:
+            return EmptyMapping.items()
+
+    def store_conf(self, data: Data, data_id: str = '') -> None:
         """Update the current data for this ID. """
         if type(data) not in self._registered:
             raise ValueError(f'Unregistered data type {type(data)!r}')
-        cls = type(data)
+        self._current = self._current.with_value(data, data_id)
+
+    def discard_conf(self, cls: type[Data], data_id: str = '') -> None:
+        """Remove the specified ID."""
+        if cls not in self._registered:
+            raise ValueError(f'Unregistered data type {cls!r}')
         info = cls.get_conf_info()
 
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-        try:
-            self._current[cls][data_id] = data
-        except KeyError:
-            self._current[cls] = {data_id: data}
+        new_conf, popped = self._current.discard(cls, data_id)
+        if self._current.discard(cls, data_id) is not None:
+            LOGGER.debug('Discarding conf {}[{}]', info.name, data_id)
+            self._current = new_conf
 
-    def parse_kv1(self, kv: Keyvalues) -> Tuple[Config, bool]:
+    def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool, VersionMismatchList]:
         """Parse a configuration file into individual data.
 
-        The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
-        and so should be resaved.
+        * The new config is returned, alongside a bool indicating if it was upgraded
+        and so should be resaved, and a list of any unknown/new sections.
         """
         if 'version' not in kv:  # New conf format
-            return self._parse_legacy(kv), True
+            return self._parse_legacy(kv), True, []
 
         version = kv.int('version')
         if version != 1:
             raise ValueError(f'Unknown config version {version}!')
 
-        conf = Config({})
+        conf = Config()
         upgraded = False
+        unknown: VersionMismatchList = []
         for child in kv:
             if child.name == 'version':
                 continue
+            version = child.int('_version', 1)
             try:
                 cls = self._name_to_type[child.name]
             except KeyError:
-                LOGGER.warning('Unknown config option "{}"!', child.real_name)
+                LOGGER.warning('Unknown config section type "{}"!', child.real_name)
+                unknown.append((child.name, version))
                 continue
             info = cls.get_conf_info()
-            version = child.int('_version', 1)
             try:
                 del child['_version']
             except LookupError:
                 pass
             if version > info.version:
                 LOGGER.warning(
-                    'Config option "{}" has version {}, '
+                    'Config section "{}" has version {}, '
                     'which is higher than the supported version ({})!',
                     info.name, version, info.version
                 )
+                unknown.append((info, version))
                 # Don't try to parse, it'll be invalid.
                 continue
             elif version != info.version:
@@ -298,9 +560,11 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map: Dict[str, Data] = {}
-            conf[cls] = data_map
             if info.uses_id:
+                try:
+                    data_map = dict(conf.items_cls(cls))
+                except KeyError:
+                    data_map = {}
                 for data_prop in child:
                     try:
                         data_map[data_prop.real_name] = cls.parse_kv1(data_prop, version)
@@ -310,16 +574,20 @@ class ConfigSpec:
                             info.name, data_prop.real_name,
                             exc_info=True,
                         )
+                conf = conf.with_cls_map(cls, data_map)
             else:
                 try:
-                    data_map[''] = cls.parse_kv1(child, version)
+                    data = cls.parse_kv1(child, version)
                 except Exception:
                     LOGGER.warning(
                         'Failed to parse config {}:',
                         info.name,
                         exc_info=True,
                     )
-        return conf, upgraded
+                else:
+                    conf = conf.with_value(data)
+
+        return conf, upgraded, unknown
 
     def _parse_legacy(self, kv: Keyvalues) -> Config:
         """Parse the old config format."""
@@ -328,12 +596,97 @@ class ConfigSpec:
         for cls in self._name_to_type.values():
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
-                conf[cls] = new = cls.parse_legacy(kv)
+                new = cls.parse_legacy(kv)
+                conf = conf.with_cls_map(cls, new)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
-                conf[cls] = {}
+                conf = conf.with_cls_map(cls, {})
         return conf
+
+    def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool, VersionMismatchList]:
+        """Parse a configuration file in the DMX format into individual data.
+
+        * The format name and version parsed from the DMX file should also be supplied.
+        * The new config is returned, alongside a bool indicating if it was upgraded
+        and so should be resaved, and a list of any unknown/new sections.
+        """
+        if fmt_name != DMX_NAME or fmt_version not in [1]:
+            raise ValueError(f'Unknown config {fmt_name} v{fmt_version}!')
+
+        conf = Config()
+        upgraded = False
+        unknown: VersionMismatchList = []
+        for attr in dmx.values():
+            if attr.name == 'name' or attr.type is not DMXTypes.ELEMENT:
+                continue
+            child = attr.val_elem
+            try:
+                if not child.type.startswith('Conf_v'):
+                    raise ValueError
+                version = int(child.type.removeprefix('Conf_v'))
+            except ValueError:
+                LOGGER.warning('Invalid config section version "{}"', child.type)
+                unknown.append((attr.name, 0))
+                continue
+            try:
+                cls = self._name_to_type[attr.name.casefold()]
+            except KeyError:
+                LOGGER.warning('Unknown config section type "{}"!', attr.name)
+                unknown.append((attr.name, version))
+                continue
+            info = cls.get_conf_info()
+            if version > info.version:
+                LOGGER.warning(
+                    'Config section "{}" has version {}, '
+                    'which is higher than the supported version ({})!',
+                    info.name, version, info.version
+                )
+                unknown.append((info, version))
+                # Don't try to parse, it'll be invalid.
+                continue
+            elif version != info.version:
+                LOGGER.warning(
+                    'Upgrading config section "{}" from {} -> {}',
+                    info.name, version, info.version,
+                )
+                upgraded = True
+            if info.uses_id:
+                try:
+                    data_map = dict(conf.items_cls(cls))
+                except KeyError:
+                    data_map = {}
+                for data_attr in child.values():
+                    if data_attr.name == 'name' or data_attr.type is not DMXTypes.ELEMENT:
+                        continue
+                    data = data_attr.val_elem
+                    if data.type != 'SubConf':
+                        LOGGER.warning(
+                            'Invalid sub-config type "{}" for section {}',
+                            data.type, info.name,
+                        )
+                        continue
+                    try:
+                        data_map[data_attr.name] = cls.parse_dmx(data, version)
+                    except Exception:
+                        LOGGER.warning(
+                            'Failed to parse config {}[{}]:',
+                            info.name, data.name,
+                            exc_info=True,
+                        )
+                conf = conf.with_cls_map(cls, data_map)
+            else:
+                try:
+                    parsed = cls.parse_dmx(child, version)
+                except Exception:
+                    LOGGER.warning(
+                        'Failed to parse config {}:',
+                        info.name,
+                        exc_info=True,
+                    )
+                else:
+                    conf = conf.with_value(parsed)
+        return conf, upgraded, unknown
 
     def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
         """Build out a configuration file from some data.
@@ -371,7 +724,7 @@ class ConfigSpec:
         The data is in the form {conf_type: {id: data}}.
         """
         root = Element('BEE2Config', 'DMElement')
-        cls: Type[Data]
+        cls: type[Data]
         for cls, data_map in conf.items():
             if cls not in self._registered:
                 continue
@@ -396,77 +749,54 @@ class ConfigSpec:
             root[info.name] = elem
         return root
 
-    def read_file(self) -> None:
-        """Read and apply the settings from disk."""
-        if self.filename is None:
-            raise ValueError('No filename specified for this ConfigSpec!')
+    def read_file(self, filename: Path) -> None:
+        """Read and apply the settings from disk.
 
+        After calling, `extra_sections` needs to be checked to display the appropriate message.
+        """
         try:
-            file = self.filename.open(encoding='utf8')
+            file = filename.open(encoding='utf8')
         except FileNotFoundError:
             return
         try:
             with file:
                 kv = Keyvalues.parse(file)
         except KeyValError:
-            LOGGER.warning('Cannot parse {}!', self.filename.name, exc_info=True)
-            # Try and move to a backup name, if not don't worry about it.
-            try:
-                self.filename.replace(self.filename.with_suffix('.err.vdf'))
-            except OSError:
-                pass
+            LOGGER.warning('Cannot parse {}!', filename.name, exc_info=True)
+            backup_conf(filename, ".err")
+            return
 
-        conf, _ = self.parse_kv1(kv)
-        self._current.clear()
-        self._current.update(conf)
+        self._current, upgraded, self.extra_sections = self.parse_kv1(kv)
+        if self.extra_sections:
+            LOGGER.warning('Config {} has unknown sections: {}', filename.name, self.extra_sections)
+            backup_conf(filename, ".bak")
+        if upgraded:
+            LOGGER.info('Upgraded config {}', filename.name)
+            if not self.extra_sections:  # Only do once if this somehow occurs.
+                backup_conf(filename, ".bak")
 
-    def write_file(self) -> None:
+    def write_file(self, filename: Path) -> None:
         """Write the settings to disk."""
-        if self.filename is None:
-            raise ValueError('No filename specified for this ConfigSpec!')
-
-        if not any(self._current.values()):
+        if self._current.is_blank() or DISABLE_WRITE:
             # We don't have any data saved, abort!
             # This could happen while parsing, for example.
             return
 
         kv = Keyvalues.root()
         kv.extend(self.build_kv1(self._current))
-        with AtomicWriter(self.filename) as file:
-            for prop in kv:
-                for line in prop.export():
-                    file.write(line)
+        with AtomicWriter(filename) as file:
+            kv.serialise(file)
 
 
-def get_pal_conf() -> Config:
-    """Return a copy of the current settings for the palette."""
-    return Config({
-        cls: opt_map.copy()
-        for cls, opt_map in APP._current.items()
-        if cls.get_conf_info().palette_stores
-    })
-
-
-async def apply_pal_conf(conf: Config) -> None:
-    """Apply a config provided from the palette."""
-    # First replace all the configs to be atomic, then apply.
-    for cls, opt_map in conf.items():
-        if cls.get_conf_info().palette_stores:  # Double-check, in case it's added to the file.
-            APP._current[cls] = opt_map.copy()
-    async with trio.open_nursery() as nursery:
-        for cls in conf:
-            if cls.get_conf_info().palette_stores:
-                nursery.start_soon(APP.apply_conf, cls)
-
-
-# Main application configs.
-APP: ConfigSpec = ConfigSpec(utils.conf_location('config/config.vdf'))
-PALETTE: ConfigSpec = ConfigSpec(None)
+# The configuration files we use.
+APP_LOC = utils.conf_location('config/config.vdf')
+APP: ConfigSpec = ConfigSpec()
+PALETTE: ConfigSpec = ConfigSpec()
+COMPILER: ConfigSpec = ConfigSpec()
 
 
 # Import submodules, so they're registered.
-from config import (
-    compile_pane, corridors, gen_opts, item_defaults,  # noqa: F401
-    last_sel, palette, signage,  # noqa: F401
-    stylevar, widgets, windows,  # noqa: F401
+from config import (  # noqa: E402
+    compile_pane, corridors, filters, gen_opts, item_defaults,  last_sel, palette,   # noqa: F401
+    signage,  stylevar, widgets, windows, player,  # noqa: F401
 )

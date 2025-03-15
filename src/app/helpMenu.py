@@ -4,33 +4,26 @@ All the URLs we have available here are not directly listed. Instead, we downloa
 GitHub repo, which ensures we're able to change them retroactively if the old URL becomes dead for
 whatever reason.
 """
-import io
-import urllib.request
-import urllib.error
+from __future__ import annotations
+
+import abc
 from enum import Enum
-from typing import Any, Callable, Dict, cast
-from tkinter import ttk
-import tkinter as tk
+import io
+import urllib.error
+import urllib.request
 import webbrowser
-import functools
 
 from srctools.dmx import Element, NULL
 import attrs
 import srctools.logger
 import trio.to_thread
 
-from app.richTextBox import tkRichText
-from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
-from ui_tk.img import TKImages
+from app import sound, img
+from async_util import EdgeTrigger
+from app.dialogs import Dialogs
+from app.mdown import MarkdownData
 from transtoken import TransToken
 import utils
-
-# For version info
-import PIL
-import platform
-import mistletoe
-import pygtrie
-
 
 
 class ResIcon(Enum):
@@ -41,7 +34,7 @@ class ResIcon(Enum):
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
-    MUSIC_CHANGER = 'menu_music_changer'
+    MUSIC_CREATOR = 'menu_music_package_creator'
     PORTAL2 = 'menu_p2'
 
 
@@ -53,6 +46,13 @@ class WebResource:
     icon: ResIcon
 
 
+ICONS: dict[ResIcon, img.Handle] = {
+    icon: img.Handle.sprite(f'icons/{icon.value}', 16, 16)
+    for icon in ResIcon
+    if icon is not ResIcon.NONE
+}
+ICONS[ResIcon.NONE] = img.Handle.blank(16, 16)
+
 LOGGER = srctools.logger.get_logger(__name__)
 DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.dmx'
 url_data: Element = NULL
@@ -60,24 +60,26 @@ url_data: Element = NULL
 # This produces a '-------' instead.
 SEPERATOR = WebResource(TransToken.BLANK, '', ResIcon.NONE)
 
-Res: Callable[[TransToken, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [
-    Res(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
-    Res(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
+    WebResource(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
+    WebResource(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
-    Res(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
-    Res(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
-    Res(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
+    WebResource(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
+    WebResource(TransToken.ui("aerond's Music Package Creator..."), "aerond_music_creator", ResIcon.MUSIC_CREATOR),
+    WebResource(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
-    Res(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
-    Res(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
-    Res(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
     SEPERATOR,
-    Res(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
-    Res(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
-    Res(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
-del Res
+
+TRANS_CREDITS_TITLE = TransToken.ui('BEE2 Credits')
+TRANS_CREDITS_BUTTON = TransToken.ui('Credits...')
+TRANS_CLOSE_BUTTON = TransToken.ui('Close')
 
 # language=Markdown
 CREDITS_TEXT = '''\
@@ -88,11 +90,11 @@ Used software / libraries in the BEE2.4:
 * [pyglet][pyglet] `{pyglet_ver}` by Alex Holkner and Contributors
 * [Pillow][pillow] `{pil_ver}` by Alex Clark and Contributors
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
-* [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
+* [mistletoe][mistletoe] `{mistletoe_ver}` by Mi Yu and Contributors
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
 * [Tcl][tcl] `{tk_ver}` / [TK][tcl]` {tcl_ver}`
 * [Python][python] `{py_ver}`
-* [FFmpeg][ffmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][ffmpeg-bin].
+* [FFmpeg][FFmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][FFmpeg-bin].
 
 [LGPL]: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 [pyglet]: https://pyglet.org/
@@ -105,7 +107,7 @@ Used software / libraries in the BEE2.4:
 [tcl]: https://tcl.tk/
 [python]: https://www.python.org/
 [FFmpeg]: https://ffmpeg.org/
-[ffmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
+[FFmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
 [srctools]: https://github.com/TeamSpen210/srctools
 [hammeraddons]: https://github.com/TeamSpen210/HammerAddons
 
@@ -383,7 +385,7 @@ SOFTWARE.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright [yyyy] [name of copyright owner]
+   Copyright \\[yyyy] \\[name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -422,73 +424,80 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-'''.format(
-    # Inject the running Python version.
-    py_ver=platform.python_version(),
-    tcl_ver=TK_ROOT.getvar('tk_patchLevel'),
-    tk_ver=TK_ROOT.tk.call('info', 'patchlevel'),
-    pyglet_ver=sound.pyglet_version,
-    mstle_ver=mistletoe.__version__,
-    pygtrie_ver=pygtrie.__version__,
-    pil_ver=PIL.__version__,
-    srctools_ver=srctools.__version__,
-    ha_ver=utils.HA_VERSION,
-).replace('\n', '  \n')  # Add two spaces to keep line breaks
+'''
 
 
-class Dialog(tk.Toplevel):
-    """Show a dialog with a message."""
-    def __init__(self, name: str, title: TransToken, text: str):
-        super().__init__(TK_ROOT, name=name)
-        self.withdraw()
-        localisation.set_win_title(self, title)
-        self.transient(master=TK_ROOT)
-        self.resizable(width=True, height=True)
-        self.text = text
-        tk_tools.set_window_icon(self)
+def get_versions() -> dict[str, str]:
+    """Format the credits text with versions for the libraries used."""
+    # Only for version info, remove if we no longer use these.
+    import PIL
+    import platform
+    import mistletoe
+    import pygtrie
+    from ui_tk import TK_ROOT
 
-        # Hide when the exit button is pressed, or Escape
-        # on the keyboard.
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", f"wm withdraw {self}")
+    return {
+        'py_ver': platform.python_version(),
+        'tcl_ver': TK_ROOT.getvar('tk_patchLevel'),
+        'tk_ver': TK_ROOT.tk.call('info', 'patchlevel'),
+        'pyglet_ver': sound.pyglet_version,
+        'mistletoe_ver': mistletoe.__version__,
+        'pygtrie_ver': pygtrie.__version__,
+        'pil_ver': PIL.__version__,
+        'srctools_ver': srctools.__version__,
+        'ha_ver': utils.HA_VERSION,
+    }
 
-        frame = tk.Frame(self, background='white')
-        frame.grid(row=0, column=0, sticky='nsew')
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
 
-        self.textbox = tkRichText(frame, width=80, height=24)
-        self.textbox.configure(background='white', relief='flat')
-        self.textbox.grid(row=0, column=0, sticky='nsew')
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
+class CreditsWindowBase:
+    """The window showing credits information."""
+    open: EdgeTrigger[()]
+    _close_event: trio.Event
 
-        scrollbox = tk_tools.HidingScroll(
-            frame,
-            orient='vertical',
-            command=self.textbox.yview,
-        )
-        scrollbox.grid(row=0, column=1, sticky='ns')
-        self.textbox['yscrollcommand'] = scrollbox.set
+    def __init__(self) -> None:
+        # Controls opening/closing the window.
+        self.open = EdgeTrigger()
+        self._close_event = trio.Event()
 
-        localisation.set_text(
-            ttk.Button(frame, command=self.withdraw),
-            TransToken.ui('Close'),
-        ).grid(row=1, column=0)
+    def _close(self) -> None:
+        """Called to close the window."""
+        self._close_event.set()
 
-    async def show(self) -> None:
+    async def display_task(self) -> None:
         """Display the help dialog."""
+        await self.open.wait()
+
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
-        # Don't translate this, it's all legal text - not really our business to change.
-        if self.text is not None:
-            parsed_text = tkMarkdown.convert(TransToken.untranslated(self.text), package=None)
-            self.textbox.set_text(parsed_text)
-            self.text = None
+        text = CREDITS_TEXT.format_map(get_versions())
+        text = text.replace('\n', '  \n')  # Add two spaces to keep line breaks
 
-        self.deiconify()
-        await tk_tools.wait_eventloop()
-        tk_tools.center_win(self, TK_ROOT)
+        # Don't translate this, it's all legal text - not really our business to change.
+        await self._ui_apply_text(MarkdownData(TransToken.untranslated(text), None))
+
+        # Then alternate between showing/hiding. We don't need to reparse ever again.
+        while True:
+            await self._ui_show_window()
+            await self._close_event.wait()
+
+            self._close_event = trio.Event()
+            await self._ui_hide_window()
+            await self.open.wait()
+
+    @abc.abstractmethod
+    async def _ui_apply_text(self, text: MarkdownData) -> None:
+        """Apply the credits text to the window."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def _ui_show_window(self) -> None:
+        """Show the window, and center it."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def _ui_hide_window(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
 
 
 def load_database() -> Element:
@@ -503,7 +512,7 @@ def load_database() -> Element:
     return elem
 
 
-async def open_url(url_key: str) -> None:
+async def open_url(dialogs: Dialogs, url_key: str) -> None:
     """Load the URL file if required, then open that URL."""
     global url_data
     if url_data is NULL:
@@ -511,16 +520,18 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await dialogs.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
+                icon=dialogs.ERROR,
             )
             return
         except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await dialogs.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
+                icon=dialogs.ERROR,
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([
@@ -533,41 +544,9 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if tk_tools.askyesno(
-            TransToken.ui('BEEMOD 2 - Open URL'),
-            TransToken.ui('Do you wish to open the following URL?\n{url}').format(url=url),
+        if await dialogs.ask_yes_no(
+            title=TransToken.ui('BEEMOD 2 - Open URL'),
+            message=TransToken.ui('Do you wish to open the following URL?'),
+            detail=f'"{url}"',
         ):
             webbrowser.open(url)
-
-
-def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
-    """Create the application 'Help' menu."""
-    # Using this name displays this correctly in OS X
-    help_menu = tk.Menu(parent, name='help')
-
-    parent.add_cascade(menu=help_menu)
-    localisation.set_menu_text(parent, TransToken.ui('Help'))
-
-    icons: Dict[ResIcon, img.Handle] = {
-        icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
-        for icon in ResIcon
-        if icon is not ResIcon.NONE
-    }
-    icons[ResIcon.NONE] = img.Handle.blank(16, 16)
-
-    credit_window = Dialog(name='credits', title=TransToken.ui('BEE2 Credits'), text=CREDITS_TEXT)
-
-    for res in WEB_RESOURCES:
-        if res is SEPERATOR:
-            help_menu.add_separator()
-        else:
-            help_menu.add_command(
-                command=functools.partial(background_run, open_url, res.url_key),
-                compound='left',
-                image=tk_img.sync_load(icons[res.icon]),
-            )
-            localisation.set_menu_text(help_menu, res.name)
-
-    help_menu.add_separator()
-    help_menu.add_command(command=functools.partial(background_run, credit_window.show))
-    localisation.set_menu_text(help_menu, TransToken.ui('Credits...'))

@@ -1,505 +1,575 @@
 """Implements UI for selecting corridors."""
-from tkinter import ttk
-import tkinter as tk
-from typing import Any, Optional, List, Sequence
-from typing_extensions import TypeAlias, Final
+from __future__ import annotations
+from typing import Final,  override
 
+from abc import abstractmethod
+from collections.abc import Sequence
+from contextlib import aclosing
+import itertools
+import random
+
+from trio_util import AsyncValue, RepeatedEvent
+import attrs
 import srctools.logger
 import trio
+import trio_util
 
-from app import (
-    TK_ROOT, DEV_MODE,
-    img, localisation, sound, tk_tools,
-    tkMarkdown,
-)
-from app.richTextBox import tkRichText
-from packages import corridor
-from corridor import GameMode, Direction, Orient
-from config.last_sel import LastSelected
-from config.corridors import UIState, Config
+from async_util import EdgeTrigger, iterval_cancelling
+from config.corridors import Config, Options, UIState
+from corridor import Attachment, Direction, GameMode, Option
+from packages import CorridorGroup, PackagesSet, PakRef, Style, corridor
 from transtoken import TransToken
 import config
 import packages
-from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase
-from ui_tk.img import TKImages
+import utils
+
+from . import DEV_MODE, ReflowWindow, WidgetCache, img
+from .mdown import MarkdownData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
-Slot: TypeAlias = SlotBase[corridor.CorridorUI]
 
-IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
+IMG_CORR_BLANK: Final = img.Handle.background(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
-IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
-SELECTED_COLOR: Final = '#14B0FF'
+IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.transform(transpose=img.FLIP_LEFT_RIGHT)
 
-GRP_SELECTED: Final = 'selected'
-GRP_UNSELECTED: Final = 'unselected'
-HEADER_HEIGHT: Final = 20
-HEADER_PAD: Final = 10
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
-    '<Fallback>',
-    {
-        (mode, direction, orient): []
+    id='<Fallback>',
+    corridors={
+        (mode, direction, attach): []
         for mode in GameMode
         for direction in Direction
-        for orient in Orient
-    }
+        for attach in Attachment
+    },
 )
-FALLBACK.pak_id = '<fallback>'
+FALLBACK.pak_id = utils.special_id('<FALLBACK>')
 FALLBACK.pak_name = '???'
 
+TRANS_TITLE = TransToken.ui('BEEmod - Select Corridor')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
+TRANS_HELP = TransToken.ui(
+    "Check the boxes to specify which corridors may be used. Ingame, a random corridor will "
+    "be picked for each map."
+)
+TRANS_OPT_TITLE = {
+    (GameMode.SP, Direction.ENTRY): TransToken.ui('Singleplayer Entry Options:'),
+    (GameMode.SP, Direction.EXIT): TransToken.ui('Singleplayer Exit Options:'),
+    (GameMode.COOP, Direction.ENTRY): TransToken.ui('Cooperative Entry Options:'),
+    (GameMode.COOP, Direction.EXIT): TransToken.ui('Cooperative Exit Options:'),
+}
+TRANS_NO_OPTIONS = TransToken.ui('No options!')
+TRANS_RAND_OPTION = TransToken.ui('Randomise')
+TRANS_ONLY_THIS = TransToken.ui('Use Only This')
+TRANS_GROUP_MODE = TransToken.ui('Game Mode')
+TRANS_GROUP_DIR = TransToken.ui('Corridor Type')
+TRANS_GROUP_ATTACH = TransToken.ui('Attachment Surface')
+
+OPTS_MODE = [
+    (GameMode.SP, TransToken.ui('SP')),
+    (GameMode.COOP, TransToken.ui('Coop')),
+]
+OPTS_DIR = [
+    (Direction.ENTRY, TransToken.ui('Entry')),
+    (Direction.EXIT, TransToken.ui('Exit')),
+]
+OPTS_ATTACH = [
+    (Attachment.FLAT, TransToken.ui('Flat')),
+    (Attachment.FLOOR, TransToken.ui('Floor')),
+    (Attachment.CEILING, TransToken.ui('Ceiling')),
+]
 
 
-def get_drag_info(corr: corridor.CorridorUI) -> DragInfo:
-    """Information for displaying this corridor."""
-    return DragInfo(corr.icon)
+class Icon:
+    """API for corridor icons."""
+
+    @abstractmethod
+    def set_image(self, handle: img.Handle | None) -> None:
+        """Set the image for this icon."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def selected(self) -> bool:
+        """If the icon is currently selected."""
+        raise NotImplementedError
+
+    @selected.setter
+    @abstractmethod
+    def selected(self, value: bool) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_readonly(self, enabled: bool) -> None:
+        """Set the checkbox to be readonly."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_highlight(self, enabled: bool) -> None:
+        """Set whether a highlight background is enabled."""
+        raise NotImplementedError
 
 
-class Selector:
+class OptionRow:
+    """API for a row used for corridor options."""
+    # The current value for the row.
+    current: AsyncValue[utils.SpecialID]
+    _value_order: Sequence[utils.SpecialID]
+
+    def __init__(self) -> None:
+        self.current = AsyncValue(utils.ID_RANDOM)
+
+    @abstractmethod
+    async def display(
+        self,
+        row: int, option: Option, remove_event: trio.Event,
+        *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+    ) -> None:
+        """Reconfigure this row to display the specified option, then show it.
+
+        Once the event triggers, remove the row.
+        """
+        raise NotImplementedError
+
+
+class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     """Corridor selection UI."""
-    win: tk.Toplevel
-    drag_man: DragDrop[corridor.CorridorUI]
-
-    # Widgets to display info about the corridor on the right side.
-    wid_image: ttk.Label
-    wid_title: ttk.Label
-    wid_authors: ttk.Label
-    wid_desc: tkRichText
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
-    sticky_corr: Optional[corridor.CorridorUI]
+    sticky_corr: corridor.CorridorUI | None
+    # This is the corridor actually displayed right now.
+    displayed_corr: AsyncValue[corridor.CorridorUI | None]
     # The currently selected images.
-    cur_images: Optional[Sequence[img.Handle]]
+    cur_images: Sequence[img.Handle] | None
     img_ind: int
 
-    # The slots items are on.
-    slots: List[Slot]
-    sel_count: int  # Number which are being used.
+    # Event which is triggered to show and hide the UI.
+    show_trigger: EdgeTrigger[()]
+    close_event: RepeatedEvent
+    # Triggered by the UI to indicate a corridor was (de)selected
+    select_trigger: EdgeTrigger[()]
+    # Triggered when we need to refresh the corridor list.
+    corridors_dirty: trio.Event
+
+    # The widgets for each corridor.
+    icons: WidgetCache[IconT]
+    # The corresponding items for each slot.
+    corr_list: list[corridor.CorridorUI]
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
     corr_group: corridor.CorridorGroup
     conf_id: str
 
-    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
+    # Currently loaded packages/style.
+    packset: PackagesSet
+    cur_style: AsyncValue[PakRef[Style]]
+
+    # The rows created for options. These are hidden if no longer used.
+    option_rows: list[OptionRowT]
+
+    # The current state of the three main selector buttons.
+    state_attach: AsyncValue[Attachment]
+    state_dir: AsyncValue[Direction]
+    state_mode: AsyncValue[GameMode]
+
+    def __init__(self, conf: UIState, cur_style: AsyncValue[PakRef[Style]]) -> None:
+        super().__init__()
         self.sticky_corr = None
+        self.displayed_corr = AsyncValue(None)
+        self.packset = PackagesSet.blank()
+        self.cur_style = cur_style
+        self.state_attach = AsyncValue(conf.last_attach)
+        self.state_dir = AsyncValue(conf.last_direction)
+        self.state_mode = AsyncValue(conf.last_mode)
+        self.show_trigger = EdgeTrigger()
+        self.select_trigger = EdgeTrigger()
+        self.close_event = RepeatedEvent()
+        self.corridors_dirty = trio.Event()
+        # Dummy values used until we fully load.
         self.img_ind = 0
         self.cur_images = None
-        self.slots = []
-        self.sel_count = 0
-        self.sel_handle_moving = False
+        self.corr_group = FALLBACK
+        self.conf_id = ''
+        self.corr_list = []
+        self.option_rows = []
 
-        self.win = tk.Toplevel(TK_ROOT, name='corridor')
-        self.win.withdraw()
-        self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
-        localisation.set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
+    async def task(self) -> None:
+        """Main task handling interaction with the corridor."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._window_task)
+            nursery.start_soon(self._display_task)
+            nursery.start_soon(self._packages_changed_task)
+            nursery.start_soon(self.reposition_items_task)
+            nursery.start_soon(self._save_config_task)
+            nursery.start_soon(self._mode_switch_task)
+            nursery.start_soon(self._reload_task)
+            nursery.start_soon(self.ui_task)
 
-        self.win.rowconfigure(0, weight=1)
-        self.win.columnconfigure(0, weight=1)
+    async def _window_task(self) -> None:
+        """Run to allow opening/closing the window."""
+        while True:
+            await self.show_trigger.wait()
+            self.corridors_dirty.set()
+            self.ui_win_show()
 
-        frm_left = ttk.Frame(self.win, name='frm_left')
-        frm_left.grid(row=0, column=0, sticky='nsew')
+            await self.close_event.wait()
 
-        frm_right = ttk.Frame(self.win, name='frm_right')
-        frm_right.columnconfigure(0, weight=1)
-        frm_right.grid(row=0, column=1, sticky='ns')
-        frm_img = ttk.Frame(frm_right, relief='raised', width=2)
-        frm_img.grid(row=0, column=0, sticky='ew')
+            self.store_conf()
+            self.ui_win_hide()
+            self.icons.hide_all()
 
-        sel_img = self._sel_img
-        self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))
-        self.wid_image = ttk.Label(frm_img, name='img')
-        self.wid_image_right = ttk.Button(frm_img, name='imgRight', command=lambda: sel_img(1))
+    async def _save_config_task(self) -> None:
+        """When a checkmark is changed, store the new config."""
+        while True:
+            await self.select_trigger.wait()
+            self.prevent_deselection()
+            self.store_conf()
 
-        self.wid_image_left.grid(row=0, column=0, sticky='ns')
-        self.wid_image.grid(row=0, column=1, sticky='nsew')
-        self.wid_image_right.grid(row=0, column=2, sticky='ns')
+    async def _mode_switch_task(self) -> None:
+        """React to a mode being switched by reloading the corridor."""
+        while True:
+            await trio_util.wait_any(
+                self.state_attach.wait_transition,
+                self.state_mode.wait_transition,
+                self.state_dir.wait_transition,
+            )
+            self.store_conf()
+            self.corridors_dirty.set()
 
-        tk_tools.bind_mousewheel(self.wid_image, sel_img)
+    async def _packages_changed_task(self) -> None:
+        """When packages or styles change, reload."""
+        packset: PackagesSet
+        async with iterval_cancelling(packages.LOADED) as aiterator:
+            async for scope in aiterator:
+                # This scope is cancelled if new packages load.
+                async with scope as packset:
+                    # Only use the packages once styles and corridors are ready for
+                    # us.
+                    await packset.ready(Style).wait()
+                    await packset.ready(CorridorGroup).wait()
+                    self.packset = packset
+                    async with aclosing(self.cur_style.eventual_values()) as agen:
+                        async for style in agen:
+                            self.load_corridors(style)
+                            self.corridors_dirty.set()
 
-        tk_img.apply(self.wid_image_left, IMG_ARROW_LEFT)
-        tk_img.apply(self.wid_image, IMG_CORR_BLANK)
-        tk_img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
-        self.tk_img = tk_img
+    def prevent_deselection(self) -> None:
+        """Ensure at least one widget is selected."""
+        icons = self.icons.placed
+        if not icons:
+            return  # No icons, nothing to do.
+        count = sum(icon.selected for icon in icons)
+        if count == 0:
+            # If all are deselected, select a random one.
+            random.choice(icons).selected = True
+            count = 1
 
-        self.wid_title = ttk.Label(
-            frm_right,
-            name='title',
-            justify='center',
-            anchor='center',
-            font=("Helvetica", 12, "bold"),
-            text='',
-        )
-        self.wid_title.grid(row=1, column=0, columnspan=2, sticky='ew')
-        self.wid_authors = ttk.Label(
-            frm_right,
-            name='authors',
-            justify='center',
-            anchor='center',
-            text='',
-        )
-        self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
-
-        self.wid_desc = tkRichText(frm_right)
-        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical', command=self.wid_desc.yview)
-        self.wid_desc['yscrollcommand'] = desc_scroll.set
-        self.wid_desc.grid(row=3, column=0, sticky='nsew')
-        desc_scroll.grid(row=3, column=1, sticky='ns')
-        frm_right.rowconfigure(3, weight=1)
-
-        localisation.set_text(
-            ttk.Button(frm_right, name='closer', command=self.hide),
-            TransToken.ui('Close'),
-        ).grid(row=4, column=0, columnspan=2)
-
-        conf = config.APP.get_cur_conf(UIState, default=UIState())
-        if conf.width > 0 and conf.height > 0:
-            self.win.geometry(f'{conf.width}x{conf.height}')
-
-        button_frm = ttk.Frame(frm_left)
-        button_frm.grid(row=0, column=0, columnspan=3)
-        self.btn_mode = tk_tools.EnumButton(
-            button_frm, conf.last_mode,
-            (GameMode.SP, TransToken.ui('SP')),
-            (GameMode.COOP, TransToken.ui('Coop')),
-        )
-        self.btn_direction = tk_tools.EnumButton(
-            button_frm, conf.last_direction,
-            (Direction.ENTRY, TransToken.ui('Entry')),
-            (Direction.EXIT, TransToken.ui('Exit')),
-        )
-        self.btn_orient = tk_tools.EnumButton(
-            button_frm, conf.last_orient,
-            (Orient.FLAT, TransToken.ui('Flat')),
-            (Orient.UP, TransToken.ui('Upward')),
-            (Orient.DN, TransToken.ui('Downward')),
-        )
-        self.btn_mode.frame.grid(row=0, column=0, padx=8)
-        self.btn_direction.frame.grid(row=0, column=1, padx=8)
-        self.btn_orient.frame.grid(row=0, column=2, padx=8)
-
-        refresh = self.refresh
-        self.btn_mode.on_changed.register(refresh)
-        self.btn_direction.on_changed.register(refresh)
-        self.btn_orient.on_changed.register(refresh)
-
-        canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
-        canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
-        canv_frame.rowconfigure(0, weight=1)
-        canv_frame.columnconfigure(0, weight=1)
-        frm_left.columnconfigure(0, weight=1)
-        frm_left.rowconfigure(1, weight=1)
-
-        self.canvas = tk.Canvas(canv_frame)
-        self.canvas.grid(row=0, column=0, sticky='nsew')
-        scrollbar = ttk.Scrollbar(canv_frame, orient='vertical', command=self.canvas.yview)
-        scrollbar.grid(row=0, column=1, sticky='ns')
-        self.canvas['yscrollcommand'] = scrollbar.set
-        self.unsel_div = self.canvas.create_line(
-            0, 0, 1024, 0,
-            width=2,
-            fill='black',
-        )
-
-        # Avoid making self a cell var.
-        self.canvas.bind('<Configure>', tk_tools.make_handler(self.evt_resized))
-
-        self.help_lbl = ttk.Label(self.canvas)
-        localisation.set_text(self.help_lbl, TransToken.ui(
-            "Drag corridors to the 'selected' and 'unused' areas to specify which are used. "
-            "Ingame, a random corridor from the 'selected' group will be picked for each map."
-        ))
-        self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
-
-        self.header_sel = tk_tools.LineHeader(self.canvas, TransToken.ui('Selected:'))
-        self.header_unsel = tk_tools.LineHeader(self.canvas, TransToken.ui('Unused:'))
-        self.header_sel_win = self.canvas.create_window(
-            0, 128,
-            anchor='nw',
-            window=self.header_sel,
-        )
-        self.header_unsel_win = self.canvas.create_window(
-            0, 384,
-            anchor='nw',
-            window=self.header_unsel,
-        )
-
-        drop: DragDrop[corridor.CorridorUI] = DragDrop(
-            self.win,
-            info_cb=get_drag_info,
-            size=(WIDTH, HEIGHT),
-            pick_flexi_group=self._get_flexi_group,
-        )
-        self.drag_man = drop
-        tk_tools.add_mousewheel(self.canvas, self.win)
-        drop.on_hover_enter.register(self.evt_hover_enter)
-        drop.on_hover_exit.register(self.evt_hover_exit)
-        drop.on_redropped.register(self.evt_redropped)
-        drop.on_flexi_flow.register(self.reflow)
-        drop.on_modified.register(self._on_changed)
-        self.load_corridors(packset)
-
-    def show(self) -> None:
-        """Display the window."""
-        self.drag_man.load_icons()
-        self.win.deiconify()
-        tk_tools.center_win(self.win, TK_ROOT)
-
-    def hide(self) -> None:
-        """Hide the window."""
-        self.win.withdraw()
-        self.drag_man.unload_icons()
-
-    async def _on_changed(self) -> None:
-        """Store configuration when changed."""
-        self.store_conf()
+        if count == 1:
+            # If only one is selected, don't allow deselecting that one.
+            for icon in icons:
+                icon.set_readonly(icon.selected)
+        else:
+            # Multiple, allow deselection.
+            for icon in icons:
+                icon.set_readonly(False)
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
-        selected: List[str] = []
-        unselected: List[str] = []
+        cur_conf = config.APP.get_cur_conf(Config, self.conf_id)
+        # Start with the existing config, so we preserve unknown instances.
+        enabled = dict(cur_conf.enabled)
 
-        for slot in self.slots:
-            if slot.contents is not None:
-                (selected if slot.flexi_group == GRP_SELECTED
-                 else unselected).append(slot.contents.instance.casefold())
+        for icon, corr in itertools.zip_longest(self.icons.placed, self.corr_list):
+            if icon is not None and corr is not None:
+                enabled[corr.instance.casefold()] = icon.selected
 
-        config.APP.store_conf(Config(selected=selected, unselected=unselected), self.conf_id)
+        config.APP.store_conf(Config(enabled), self.conf_id)
 
-        # Fix up the highlight, if it was moved.
-        for slot in self.drag_man.all_slots():
-            slot.highlight = slot.contents is not None and slot.contents is self.sticky_corr
-
-    def load_corridors(self, packset: packages.PackagesSet) -> None:
+    def load_corridors(self, cur_style: PakRef[Style]) -> None:
         """Fetch the current set of corridors from this style."""
-        style_id = config.APP.get_cur_conf(
-            LastSelected, 'styles',
-            LastSelected('BEE2_CLEAN'),
-        ).id or 'BEE2_CLEAN'
         try:
-            self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)
+            self.corr_group = self.packset.obj_by_id(corridor.CorridorGroup, cur_style.id)
         except KeyError:
-            LOGGER.warning('No corridors defined for style "{}"', style_id)
+            LOGGER.warning('No corridors defined for style "{}"', cur_style)
             self.corr_group = FALLBACK
         self.conf_id = Config.get_id(
-            style_id,
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
+            cur_style.id,
+            self.state_mode.value, self.state_dir.value, self.state_attach.value,
         )
 
-    async def refresh(self, _: object = None) -> None:
-        """Called to update the slots with new items if the corridor set changes."""
-        mode = self.btn_mode.current
-        direction = self.btn_direction.current
-        orient = self.btn_orient.current
-        self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
-        conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
+    async def _reload_task(self) -> None:
+        """Manages calls to _refresh()."""
+        while True:
+            await self._refresh()
+            await self.corridors_dirty.wait()
+            self.corridors_dirty = trio.Event()
 
-        config.APP.store_conf(UIState(
-            mode, direction, orient,
-            self.win.winfo_width(),
-            self.win.winfo_height(),
-        ))
+    async def _refresh(self) -> None:
+        """Called to update the slots with new items if the corridor set changes.
+
+        Should only be called by _reload_task.
+        """
+        mode = self.state_mode.value
+        direction = self.state_dir.value
+        attach = self.state_attach.value
+        self.conf_id = Config.get_id(self.corr_group.id, mode, direction, attach)
+        conf = config.APP.get_cur_conf(Config, self.conf_id)
+
+        await trio.lowlevel.checkpoint()
+        config.APP.store_conf(UIState(mode, direction, attach, *self.ui_win_getsize()))
 
         try:
-            corr_list = self.corr_group.corridors[mode, direction, orient]
+            self.corr_list = self.corr_group.corridors[mode, direction, attach]
         except KeyError:
             # Up/down can have missing ones.
-            if orient is Orient.HORIZONTAL:
+            if attach is Attachment.HORIZONTAL:
                 LOGGER.warning(
                     'No flat corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,
                 )
-            corr_list = []
+            self.corr_list = []
 
-        # Ensure enough slots exist to hold all of them, and clear em all.
-        for slot in self.slots:
-            slot.highlight = False
-            slot.contents = None
-            slot.flexi_group = GRP_UNSELECTED
-        for _ in range(len(corr_list) + 1 - len(self.slots)):
-            self.slots.append(self.drag_man.slot_flexi(self.canvas))
-
-        inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
-        next_slot = 0
-        if conf.selected:
-            for sel_id in conf.selected:
+        inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
+        await trio.lowlevel.checkpoint()
+        if conf.enabled:
+            for sel_id, enabled in conf.enabled.items():
                 try:
-                    self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
-                    self.slots[next_slot].flexi_group = GRP_SELECTED
+                    inst_enabled[sel_id.casefold()] = enabled
                 except KeyError:
-                    LOGGER.warning('Unknown corridor instance "{}" in config!')
-                else:
-                    next_slot += 1
+                    LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
         else:
             # No configuration, populate with the defaults.
-            defaults = self.corr_group.defaults(mode, direction, orient)
-            for slot, corr in zip(self.slots, defaults):
-                slot.contents = corr
-                slot.flexi_group = GRP_SELECTED
-                del inst_to_corr[corr.instance.casefold()]
-            next_slot = len(defaults)
+            for corr in self.corr_group.defaults(mode, direction, attach):
+                inst_enabled[corr.instance.casefold()] = True
 
-        for sel_id in conf.unselected:
-            try:
-                self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
-                self.slots[next_slot].flexi_group = GRP_UNSELECTED
-            except KeyError:
-                LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
-            else:
-                next_slot += 1
+        self.icons.reset()
+        for corr in self.corr_list:
+            await trio.lowlevel.checkpoint()
+            icon = self.icons.fetch()
+            icon.set_highlight(False)
+            icon.set_image(corr.icon)
+            icon.selected = inst_enabled[corr.instance.casefold()]
+        self.icons.hide_unused()
 
-        # Put all remaining in a spare slot.
-        for slot, corr in zip(
-            self.slots[next_slot:],
-            sorted(inst_to_corr.values(), key=lambda corr: corr.name.token),
-        ):
-            slot.contents = corr
-            slot.flexi_group = GRP_UNSELECTED
-
-        self.drag_man.load_icons()
+        await trio.lowlevel.checkpoint()
+        self.prevent_deselection()
 
         # Reset item display, it's invalid.
         self.sticky_corr = None
-        self.disp_corr(None)
-        # Reposition everything.
-        await self.reflow()
+        self.displayed_corr.value = None
+        # Items must be repositioned.
+        self.item_pos_dirty.set()
 
-    async def reflow(self) -> None:
-        """Called to reposition the corridors."""
-        # Move empties to the end, if not dragging.
-        if not self.drag_man.cur_slot:
-            self.slots.sort(key=lambda slt: 1 if slt.contents is not None else 2)
-        corr_order = [
-            slot for slot in self.slots
-            # Even though empty, include the slot we're dragging off of.
-            if slot.contents is not None or slot is self.drag_man.cur_slot
-        ]
-        self.canvas.delete('slots')
-        self.canvas.delete('sel_bg')
-        pos = CanvasPositioner(self.drag_man, self.canvas, WIDTH, HEIGHT)
-
-        self.canvas.itemconfigure(self.help_lbl_win, width=pos.width)
-        self.help_lbl['wraplength'] = pos.width
-        self.canvas.itemconfigure(self.header_sel_win, width=pos.width - 2 * HEADER_PAD)
-        self.canvas.itemconfigure(self.header_unsel_win, width=pos.width - 2 * HEADER_PAD)
-
-        await tk_tools.wait_eventloop()
-        (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
-        pos.yoff += y2 - y1
-
-        self.canvas.coords(self.header_sel_win, HEADER_PAD, pos.yoff)
-        pos.yoff += HEADER_HEIGHT + 10
-        pos.place_slots((
-            slot for slot in corr_order
-            if slot.flexi_group == GRP_SELECTED
-        ), 'slots')
-        if pos.current:
-            pos.advance_row()
-
-        self.canvas.coords(self.header_unsel_win, HEADER_PAD, pos.yoff)
-        pos.yoff += HEADER_HEIGHT + 10
-
-        pos.place_slots((
-            slot for slot in corr_order
-            if slot.flexi_group != GRP_SELECTED
-        ), 'slots')
-        pos.resize_canvas()
-
-    async def evt_resized(self) -> None:
+    @override
+    def evt_window_resized(self, event: object) -> None:
         """When the window is resized, save configuration."""
+        super().evt_window_resized(event)
+        width, height = self.ui_win_getsize()
         config.APP.store_conf(UIState(
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
-            self.win.winfo_width(),
-            self.win.winfo_height(),
+            self.state_mode.value,
+            self.state_dir.value,
+            self.state_attach.value,
+            width, height,
         ))
-        await self.reflow()
 
-    async def evt_hover_enter(self, slot: Slot) -> None:
+    def evt_hover_enter(self, icon: IconT) -> None:
         """Display the specified corridor temporarily on hover."""
-        if slot.contents is not None:
-            self.disp_corr(slot.contents)
+        try:
+            corr = self.corr_list[self.icons.placed.index(icon)]
+        except IndexError:
+            LOGGER.warning("Icon has no matching corridor!")
+            return
+        self.displayed_corr.value = corr
 
-    async def evt_hover_exit(self, slot: Slot) -> None:
+    def evt_hover_exit(self) -> None:
         """When leaving, reset to the sticky corridor."""
-        if self.sticky_corr is not None:
-            self.disp_corr(self.sticky_corr)
-        else:
-            self.disp_corr(None)
+        self.displayed_corr.value = self.sticky_corr
 
-    async def evt_redropped(self, slot: Slot) -> None:
-        """Fires when a slot is dropped back on itself. This is effectively a left-click."""
-        if slot.contents is not None and self.sticky_corr is not slot.contents:
+    def evt_selected(self, icon: IconT) -> None:
+        """Fires when a corridor icon is clicked."""
+        try:
+            corr = self.corr_list[self.icons.placed.index(icon)]
+        except IndexError:
+            LOGGER.warning("Icon has no matching corridor!")
+            return
+        if self.sticky_corr is corr:
+            # Already selected, toggle the checkbox. But only deselect if another is selected.
+            if icon.selected:
+                for other_icon in self.icons.placed:
+                    if other_icon is not icon and other_icon.selected:
+                        icon.selected = False
+                        break
+            else:
+                icon.selected = True
+            self.prevent_deselection()
+        else:
             if self.sticky_corr is not None:
                 # Clear the old one.
-                for old_slot in self.drag_man.all_slots():
-                    old_slot.highlight = False
-            slot.highlight = True
-            self.sticky_corr = slot.contents
-            self.disp_corr(self.sticky_corr)
+                for other_icon in self.icons.placed:
+                    other_icon.set_highlight(False)
+            icon.set_highlight(True)
+            self.sticky_corr = corr
+            self.displayed_corr.value = corr
 
-    def _get_flexi_group(self, x: float, y: float) -> Optional[str]:
-        """Return the group to drop an item into, from a mouse position."""
-        # pos, slots, row, col = self._mouse_to_pos(x, y)
-        header_y = self.header_unsel.winfo_rooty()
-        if y > header_y + HEADER_HEIGHT / 2:
-            return GRP_UNSELECTED
-        else:
-            return GRP_SELECTED
+    def evt_select_one(self) -> None:
+        """Select just the sticky corridor."""
+        if self.sticky_corr is not None:
+            for icon, corr in zip(self.icons.placed, self.corr_list, strict=True):
+                icon.selected = corr is self.sticky_corr
+            self.ui_enable_just_this(False)
+            self.prevent_deselection()
 
-    def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
-        """Display the specified corridor, or reset if None."""
-        if corr is not None:
-            self.img_ind = 0
-            self.cur_images = corr.images
-            self._sel_img(0)  # Updates the buttons.
-            localisation.set_text(self.wid_title, corr.name)
+    async def _display_task(self) -> None:
+        """This runs continually, updating which corridor is shown."""
+        corr: corridor.CorridorUI | None = None
 
-            if len(corr.authors) == 0:
-                localisation.set_text(self.wid_authors, TRANS_NO_AUTHORS)
-            else:
-                localisation.set_text(self.wid_authors, TRANS_AUTHORS.format(
-                    authors=TransToken.list_and(corr.authors),
-                    n=len(corr.authors),
-                ))
+        def corr_changed(new: corridor.CorridorUI | None) -> bool:
+            """Value predicate."""
+            return new is not corr
 
-            if DEV_MODE.get():
-                # Show the instance in the description, plus fixups that are assigned.
-                self.wid_desc.set_text(tkMarkdown.join(
-                    tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
-                    corr.desc,
-                    tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                    tkMarkdown.convert(TransToken.untranslated('\n'.join([
-                        f'* `{var}`: `{value}`'
+        while True:
+            if corr is not None and self.corr_group is not FALLBACK:
+                self.img_ind = 0
+                self.cur_images = corr.images
+                self._sel_img(0)  # Updates the buttons.
+
+                if len(corr.authors) == 0:
+                    author = TRANS_NO_AUTHORS
+                else:
+                    author = TRANS_AUTHORS.format(
+                        authors=TransToken.list_and(corr.authors),
+                        n=len(corr.authors),
+                    )
+
+                # Figure out which options to show.
+                mode = self.state_mode.value
+                direction = self.state_dir.value
+                options = list(self.corr_group.get_options(mode, direction, corr))
+
+                option_conf_id = Options.get_id(self.corr_group.id, mode, direction)
+                option_conf = config.APP.get_cur_conf(Options, option_conf_id)
+
+                if DEV_MODE.value:
+                    # Show the instance in the description, plus fixups that are assigned.
+                    fixup_corr = '\n'.join([
+                        f'* `{var}` = `{value}`'
                         for var, value in corr.fixups.items()
-                    ])), None)
+                    ])
+                    fixup_opt = '\n'.join([
+                        f'* `{opt.fixup}` = {option_conf.value_for(opt)}'
+                        for opt in options
+                    ])
+                    description = (
+                        MarkdownData(TransToken.untranslated(f'`{corr.instance}`\n'), None)
+                        + corr.desc
+                        + MarkdownData(TransToken.untranslated(
+                            f'\n**Fixups:**\n{fixup_corr}\n{fixup_opt}'
+                        ), None)
+                    )
+                else:
+                    description = corr.desc
+
+                # "Enable Just This" can be clicked if this icon is deselected or any other
+                # icon is selected.
+                self.ui_enable_just_this(any(
+                    icon.selected != (ico_corr is corr)
+                    for icon, ico_corr in zip(self.icons.placed, self.corr_list, strict=True)
                 ))
-            else:
-                self.wid_desc.set_text(corr.desc)
-        else:  # Reset.
-            self.cur_images = None
-            localisation.set_text(self.wid_title, TransToken.BLANK)
-            self.wid_desc.set_text(tkMarkdown.MarkdownData.BLANK)
-            localisation.set_text(self.wid_authors, TransToken.BLANK)
-            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
-            self.wid_image_left.state(('disabled', ))
-            self.wid_image_right.state(('disabled', ))
+
+                # Display our information.
+                self.ui_desc_display(
+                    title=corr.name,
+                    authors=author,
+                    desc=description,
+                    options_title=TRANS_OPT_TITLE[mode, direction],
+                    show_no_options=not options,
+                )
+
+                # Place all options in the UI.
+                while len(options) > len(self.option_rows):
+                    self.option_rows.append(self.ui_option_create())
+
+                option_async_vals = []
+                async with trio.open_nursery() as nursery:
+                    done_event = trio.Event()
+                    opt: Option
+                    row: OptionRowT
+                    # This nursery exits only once all the option tasks has fully initialised.
+                    async with trio.open_nursery() as start_nursery:
+                        for ind, (opt, row) in enumerate(
+                            zip(options, self.option_rows, strict=False)
+                        ):
+                            row.current.value = option_conf.value_for(opt)
+                            start_nursery.start_soon(
+                                nursery.start,
+                                row.display, ind, opt, done_event,
+                            )
+                            option_async_vals.append((opt.id, row.current))
+
+                    # This task stores results when a config is changed. Not required
+                    # if we don't actually have any options.
+                    if option_async_vals:
+                        nursery.start_soon(
+                            self._store_options_task,
+                            option_async_vals,
+                            option_conf_id,
+                            done_event,
+                        )
+                    self.ui_option_refreshed()
+
+                    # Wait for a new corridor to be switched to, then cancel the event to remove
+                    # them all.
+                    corr = await self.displayed_corr.wait_value(corr_changed)
+                    done_event.set()
+            else:  # Reset.
+                self.cur_images = None
+                self._sel_img(0)  # Update buttons.
+                # Clear the display entirely.
+                self.ui_desc_display(
+                    title=TransToken.BLANK,
+                    authors=TransToken.BLANK,
+                    options_title=TransToken.BLANK,
+                    desc=MarkdownData.BLANK,
+                    show_no_options=False,
+                )
+                self.ui_enable_just_this(False)
+                self.ui_option_refreshed()
+                corr = await self.displayed_corr.wait_value(corr_changed)
+
+    @staticmethod
+    async def _store_options_task(
+        async_vals: list[tuple[utils.ObjectID, AsyncValue[utils.SpecialID]]],
+        conf_id: str,
+        done_event: trio.Event,
+    ) -> None:
+        """Run while options are visible. This stores them when changed."""
+        assert async_vals, "No options?"
+        wait_funcs = [val.wait_transition for opt_id, val in async_vals]
+        async with trio_util.move_on_when(done_event.wait) as scope:
+            while not scope.cancel_called:
+                await trio.lowlevel.checkpoint()
+                await trio_util.wait_any(*wait_funcs)
+                conf = config.APP.get_cur_conf(Options, conf_id)
+                config.APP.store_conf(attrs.evolve(conf, options={
+                    # Preserve any existing, unknown IDs.
+                    **conf.options,
+                    **{
+                        opt_id: val.value
+                        for opt_id, val in async_vals
+                    },
+                }), conf_id)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
         if self.cur_images is None:
             # Not selected, hide entirely.
             self.img_ind = 0
-            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
+            self.ui_desc_set_img_state(IMG_CORR_BLANK, False, False)
             return
 
         direction = min(1, max(-1, direction))  # Clamp
@@ -513,23 +583,62 @@ class Selector:
             self.img_ind = 0
 
         if self.cur_images:
-            self.tk_img.apply(self.wid_image, self.cur_images[self.img_ind])
+            icon = self.cur_images[self.img_ind]
         else:  # No icons, use a generic one.
-            self.tk_img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
-        self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
-        self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
+            icon = corridor.ICON_GENERIC_LRG
+        self.ui_desc_set_img_state(
+            icon,
+            self.img_ind > 0,
+            self.img_ind < max_ind,
+        )
 
+    @abstractmethod
+    async def ui_task(self) -> None:
+        """Task which is run to update the UI."""
+        raise NotImplementedError
 
-async def test() -> None:
-    from app import background_run
-    from typing import Dict
-    from ui_tk.img import TK_IMG
-    background_run(img.init, Dict[str, srctools.FileSystem[Any]](), TK_IMG)
-    background_run(sound.sound_task)
+    @abstractmethod
+    def ui_win_hide(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
 
-    test_sel = Selector(packages.get_loaded_packages(), TK_IMG)
-    config.APP.read_file()
-    test_sel.show()
-    with trio.CancelScope() as scope:
-        test_sel.win.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
-        await trio.sleep_forever()
+    @abstractmethod
+    def ui_win_show(self) -> None:
+        """Show the window."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def ui_win_getsize(self) -> tuple[int, int]:
+        """Fetch the current dimensions, for saving."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def ui_enable_just_this(self, enable: bool) -> None:
+        """Set whether the just this button is pressable."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def ui_desc_display(
+        self, *,
+        title: TransToken,
+        authors: TransToken,
+        desc: MarkdownData,
+        options_title: TransToken,
+        show_no_options: bool,
+    ) -> None:
+        """Display information for a corridor."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def ui_desc_set_img_state(self, handle: img.Handle | None, left: bool, right: bool) -> None:
+        """Set the widget state for the large preview image in the description sidebar."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def ui_option_create(self) -> OptionRowT:
+        """Create a new option row."""
+        raise NotImplementedError
+
+    def ui_option_refreshed(self) -> None:
+        """Called when the options have changed, so they can re re-layouted."""
+        # If not defined, do nothing.

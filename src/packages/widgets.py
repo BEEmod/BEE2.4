@@ -1,35 +1,39 @@
 """Customizable configuration for specific items or groups of them."""
-from typing import (
-    Any, Awaitable, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
-    Tuple, Type, TypeVar,
-)
-from typing_extensions import Self, TypeAlias
+from __future__ import annotations
+
+from typing import Any, Final, Protocol, Self, override
+from collections.abc import Iterable, Iterator
+from contextlib import AbstractContextManager, aclosing
 import itertools
 
+from srctools import EmptyMapping, Keyvalues, Vec, bool_as_int, conv_bool, logger
+from trio_util import AsyncValue, wait_any
 import attrs
 import trio
-from srctools import EmptyMapping, Keyvalues, Vec, logger
 
-import BEE2_config
-import config
-import packages
-from app import tkMarkdown
-
+from app.mdown import MarkdownData
 from config.widgets import (
     TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
     TimerNum as TimerNum, WidgetConfig,
 )
+from config.stylevar import State as StyleVarState
 from transtoken import TransToken, TransTokenSource
+import BEE2_config
+import config
+import packages
+import utils
 
 
 class ConfigProto(Protocol):
     """Protocol widget configuration classes must match."""
     @classmethod
-    def parse(cls, conf: Keyvalues, /) -> Self: ...
+    def parse(cls, data: packages.ParseData, conf: Keyvalues, /) -> Self:
+        """Parse keyvalues into a widget config."""
 
 
-ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
-OptConfT = TypeVar('OptConfT', bound=Optional[ConfigProto])
+# This has to reload items when changed.
+UNLOCK_DEFAULT_ID: Final = 'VALVE_MANDATORY:unlockdefault'
+LEGACY_CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg', legacy=True)
 LOGGER = logger.get_logger(__name__)
 
 
@@ -41,20 +45,23 @@ class WidgetType:
 
 
 @attrs.frozen
-class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
+class WidgetTypeWithConf[ConfT: ConfigProto](WidgetType):
     """Information about a type of widget, that requires configuration."""
-    conf_type: Type[ConfT]
+    conf_type: type[ConfT]
 
 
 # Maps widget type names to the type info.
-WIDGET_KINDS: Dict[str, WidgetType] = {}
-CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
-UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
-
-CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
+WIDGET_KINDS: dict[str, WidgetType] = {}
+CLS_TO_KIND: dict[type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 
 
-def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[ConfT]]:
+class RegisterDeco(Protocol):
+    """Return type for register()."""
+    def __call__[ConfT: ConfigProto](self, cls: type[ConfT], /) -> type[ConfT]:
+        ...
+
+
+def register(*names: str, wide: bool = False) -> RegisterDeco:
     """Register a widget type that takes config.
 
     If wide is set, the widget is put into a labelframe, instead of having a label to the side.
@@ -62,7 +69,7 @@ def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[Conf
     if not names:
         raise TypeError('No name defined!')
 
-    def deco(cls: Type[ConfT]) -> Type[ConfT]:
+    def deco[ConfT: ConfigProto](cls: type[ConfT], /) -> type[ConfT]:
         """Do the registration."""
         kind = WidgetTypeWithConf(names[0], wide, cls)
         assert cls not in CLS_TO_KIND, cls
@@ -75,7 +82,7 @@ def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[Conf
     return deco
 
 
-def register_no_conf(*names: str, wide: bool=False) -> WidgetType:
+def register_no_conf(*names: str, wide: bool = False) -> WidgetType:
     """Register a widget type which does not need additional configuration.
 
     Many only need the default values.
@@ -88,8 +95,13 @@ def register_no_conf(*names: str, wide: bool=False) -> WidgetType:
     return kind
 
 
-async def nop_update(__value: str) -> None:
-    """Placeholder callback which does nothing."""
+def mandatory_unlocked() -> bool:
+    """Check if mandatory items should be shown."""
+    option = config.APP.get_cur_conf(WidgetConfig, UNLOCK_DEFAULT_ID).values
+    if not isinstance(option, str):
+        LOGGER.warning('Unlock Default option is a timer?')
+        return False
+    return conv_bool(option)
 
 
 @attrs.define
@@ -107,68 +119,93 @@ class Widget:
         """Item variant widgets don't have configuration, all others do."""
         return self.kind is not KIND_ITEM_VARIANT
 
+    def conf_id(self) -> str:
+        """Return the config key used for this widget."""
+        return f'{self.group_id}:{self.id}'
+
+    def create_conf(self) -> WidgetConfig:
+        """Create a copy of the current configuration."""
+        raise NotImplementedError
+
 
 @attrs.define
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
-    value: str
-    ui_cback: UpdateFunc = nop_update
+    holder: AsyncValue[str]
+    # Used for some configs ported from stylevars.
+    stylevar_id: str
 
-    async def apply_conf(self, data: WidgetConfig) -> None:
+    def create_conf(self) -> WidgetConfig:
+        return WidgetConfig(self.holder.value)
+
+    async def load_conf_task(
+        self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
+    ) -> None:
         """Apply the configuration to the UI."""
-        if isinstance(data.values, str):
-            if data.values != self.value:
-                self.on_changed(data.values)
-                # Don't bother scheduling a no-op task.
-                if self.ui_cback is not nop_update:
-                    await self.ui_cback(self.value)
-        else:
-            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
+        data: WidgetConfig
+        with cm as channel:
+            async for data in channel:
+                if isinstance(data.values, str):
+                    self.holder.value = data.values
+                else:
+                    LOGGER.warning(
+                        '{}:{}: Saved config is timer-based, but widget is singular.',
+                        self.group_id, self.id,
+                    )
 
-    def on_changed(self, value: str) -> None:
-        """Recompute state and UI when changed."""
-        self.value = value
-        config.APP.store_conf(WidgetConfig(value), f'{self.group_id}:{self.id}')
+    async def state_store_task(self) -> None:
+        """Async task which stores the state in configs whenever it changes."""
+        data_id = self.conf_id()
+        async with aclosing(self.holder.eventual_values()) as agen:
+            async for value in agen:
+                # Don't use create_conf(), we already have the current value.
+                config.APP.store_conf(WidgetConfig(value), data_id)
+                # Make sure the old ID is no longer present whenever saving.
+                if self.stylevar_id:
+                    config.APP.discard_conf(StyleVarState, self.stylevar_id)
 
 
 @attrs.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     use_inf: bool  # For timer, is infinite valid?
-    values: Dict[TimerNum, str]
-    ui_cbacks: Dict[TimerNum, UpdateFunc] = attrs.Factory(dict)
+    holders: dict[TimerNum, AsyncValue[str]]
 
-    async def apply_conf(self, data: WidgetConfig) -> None:
+    def create_conf(self) -> WidgetConfig:
+        return WidgetConfig({
+            num: holder.value
+            for num, holder in self.holders.items()
+        })
+
+    async def load_conf_task(
+        self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
+    ) -> None:
         """Apply the configuration to the UI."""
-        old = self.values.copy()
-        if isinstance(data.values, str):
-            # Single in conf, apply to all.
-            self.values = dict.fromkeys(self.values.keys(), data.values)
-        else:
-            for tim_val in self.values:
-                try:
-                    self.values[tim_val] = data.values[tim_val]
-                except KeyError:
-                    continue
-        if self.values != old:
-            async with trio.open_nursery() as nursery:
-                for tim_val, cback in self.ui_cbacks.items():
-                    nursery.start_soon(cback, self.values[tim_val])
-            config.APP.store_conf(
-                WidgetConfig(self.values.copy()),
-                f'{self.group_id}:{self.id}',
-            )
+        data: WidgetConfig
+        with cm as channel:
+            async for data in channel:
+                if isinstance(data.values, str):
+                    # Single in conf, apply to all.
+                    for holder in self.holders.values():
+                        holder.value = data.values
+                else:
+                    for num, holder in self.holders.items():
+                        try:
+                            holder.value = data.values[num]
+                        except KeyError:
+                            continue
 
-    def get_on_changed(self, num: TimerNum) -> Callable[[str], object]:
-        """Returns a function to recompute state and UI when changed."""
-        def on_changed(value: str) -> None:
-            """Should be called when this timer has changed."""
-            self.values[num] = value
-            config.APP.store_conf(
-                WidgetConfig(self.values.copy()),
-                f'{self.group_id}:{self.id}',
-            )
-        return on_changed
+    async def state_store_task(self) -> None:
+        """Async task which stores the state in configs whenever it changes."""
+        data_id = self.conf_id()
+        while True:
+            # Wait for any to change, then store. We don't do them individually, since
+            # we don't want a store spam if they get changed all at once.
+            await wait_any(*[
+                holder.wait_transition
+                for holder in self.holders.values()
+            ])
+            config.APP.store_conf(self.create_conf(), data_id)
 
 
 class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
@@ -177,9 +214,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self,
         conf_id: str,
         group_name: TransToken,
-        desc: tkMarkdown.MarkdownData,
-        widgets: List[SingleWidget],
-        multi_widgets: List[MultiWidget],
+        desc: MarkdownData,
+        widgets: list[SingleWidget],
+        multi_widgets: list[MultiWidget],
     ) -> None:
         self.id = conf_id
         self.name = group_name
@@ -188,8 +225,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    async def parse(cls, data: packages.ParseData) -> 'ConfigGroup':
+    @override
+    async def parse(cls, data: packages.ParseData) -> ConfigGroup:
         """Parse the config group from info.txt."""
+        await trio.lowlevel.checkpoint()
         props = data.info
 
         if data.is_override:
@@ -200,11 +239,11 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
-        widgets: List[SingleWidget] = []
-        multi_widgets: List[MultiWidget] = []
+        widgets: list[SingleWidget] = []
+        multi_widgets: list[MultiWidget] = []
 
         for wid in props.find_all('Widget'):
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
             try:
                 kind = WIDGET_KINDS[wid['type'].casefold()]
             except KeyError:
@@ -229,7 +268,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             prev_conf = config.APP.get_cur_conf(
                 WidgetConfig,
                 f'{data.id}:{wid_id}',
-                default=WidgetConfig(),
             ).values
 
             # Special case - can't be timer, and no values.
@@ -239,9 +277,26 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     is_timer = use_inf = False
 
             if isinstance(kind, WidgetTypeWithConf):
-                wid_conf: object = kind.conf_type.parse(wid)
+                wid_conf: object = kind.conf_type.parse(data, wid)
             else:
                 wid_conf = None
+
+            if stylevar_id := wid['legacy_stylevar_id', '']:
+                if kind is not KIND_CHECKMARK:
+                    raise ValueError(
+                        f'"{data.id}.{wid_id}": '
+                        f'Legacy Stylevars can only be checkmark kinds, not {kind}!'
+                    )
+                if is_timer:
+                    raise ValueError(
+                        f'"{data.id}.{wid_id}": Legacy Stylevars can only be singular!'
+                    )
+                if prev_conf is EmptyMapping:
+                    prev_conf = bool_as_int(config.APP.get_cur_conf(
+                        StyleVarState, stylevar_id,
+                        StyleVarState(conv_bool(default_prop.value)),
+                    ).value)
+                    LOGGER.debug('Converted legacy stylevar "{}"', stylevar_id)
 
             if is_timer:
                 if default_prop.has_children():
@@ -253,16 +308,16 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values: Dict[TimerNum, str] = {}
+                holders: dict[TimerNum, AsyncValue[str]] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
-                        cur_value = CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
+                        cur_value = LEGACY_CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
                     elif isinstance(prev_conf, str):
                         cur_value = prev_conf
                     else:
                         cur_value = prev_conf[num]
-                    values[num] = cur_value
+                    holders[num] = AsyncValue(cur_value)
 
                 multi_widgets.append(MultiWidget(
                     group_id=data.id,
@@ -271,7 +326,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     tooltip=tooltip,
                     config=wid_conf,
                     kind=kind,
-                    values=values,
+                    holders=holders,
                     use_inf=use_inf,
                 ))
             else:
@@ -285,11 +340,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     cur_value = ''  # Not used.
                 elif prev_conf is EmptyMapping:
                     # No new conf, check the old conf.
-                    cur_value = CONFIG.get_val(data.id, wid_id, default_prop.value)
+                    cur_value = LEGACY_CONFIG.get_val(data.id, wid_id, default_prop.value)
                 elif isinstance(prev_conf, str):
                     cur_value = prev_conf
                 else:
-                    LOGGER.warning('Widget {}:{} had timer defaults, but widget is singular!', data.id, wid_id)
+                    LOGGER.warning(
+                        'Widget {}:{} had timer defaults, but widget is singular!',
+                        data.id, wid_id,
+                    )
                     cur_value = default_prop.value
 
                 widgets.append(SingleWidget(
@@ -299,10 +357,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     tooltip=tooltip,
                     kind=kind,
                     config=wid_conf,
-                    value=cur_value,
+                    holder=AsyncValue(cur_value),
+                    stylevar_id=stylevar_id,
                 ))
-        # If we are new, write our defaults to config.
-        CONFIG.save_check()
 
         return cls(
             data.id,
@@ -312,15 +369,18 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             multi_widgets,
         )
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens for this config group."""
         source = f'configgroup/{self.id}'
-        yield self.name, source + '.name'
+        yield self.name, f'{source}.name'
+        yield from self.desc.iter_tokens(f'{source}.desc')
         for widget in itertools.chain(self.widgets, self.multi_widgets):
             yield widget.name, f'{source}/{widget.id}.name'
             yield widget.tooltip, f'{source}/{widget.id}.tooltip'
 
-    def add_over(self, override: 'ConfigGroup') -> None:
+    @override
+    def add_over(self, override: ConfigGroup) -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()
@@ -332,30 +392,44 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         self.widgets.extend(override.widgets)
         self.multi_widgets.extend(override.multi_widgets)
-        self.desc = tkMarkdown.join(self.desc, override.desc)
+        self.desc += override.desc
 
-    def widget_ids(self) -> Set[str]:
+    @classmethod
+    @override
+    async def migrate_config(cls, packset: packages.PackagesSet, conf: config.Config) -> config.Config:
+        """Update configs to migrate stylevars."""
+        await packset.ready(cls).wait()
+
+        for group in packset.all_obj(cls):
+            for wid in group.widgets:
+                await trio.lowlevel.checkpoint()
+                if not wid.stylevar_id:
+                    continue
+                wid_id = wid.conf_id()
+                try:
+                    conf.get(WidgetConfig, wid_id)
+                    continue  # Already present.
+                except KeyError:
+                    pass
+                conf, stylevar = conf.discard(StyleVarState, wid.stylevar_id)
+                if stylevar is not None:
+                    conf = conf.with_value(
+                        WidgetConfig(bool_as_int(stylevar.value)),
+                        wid_id,
+                    )
+                    LOGGER.info(
+                        'Migrate stylevar {} -> widget {}',
+                        wid.stylevar_id, wid_id,
+                    )
+        return conf
+
+    def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
-        widgets: List[Iterable[Widget]] = [self.widgets, self.multi_widgets]
+        widgets: list[Iterable[Widget]] = [self.widgets, self.multi_widgets]
         return {wid.id for wid_list in widgets for wid in wid_list}
 
-    @staticmethod
-    async def export(exp_data: packages.ExportData) -> None:
-        """Write all our values to the config."""
-        for conf in exp_data.packset.all_obj(ConfigGroup):
-            config_section = CONFIG[conf.id]
-            for s_wid in conf.widgets:
-                if s_wid.has_values:
-                    config_section[s_wid.id] = s_wid.value
-            for m_wid in conf.multi_widgets:
-                for num, value in m_wid.values.items():
-                    config_section[f'{m_wid.id}_{num}'] = value
-            if not config_section:
-                del CONFIG[conf.id]
-        CONFIG.save_check()
 
-
-def parse_color(color: str) -> Tuple[int, int, int]:
+def parse_color(color: str) -> tuple[int, int, int]:
     """Parse a string into a color."""
     if color.startswith('#'):
         try:
@@ -374,31 +448,27 @@ def parse_color(color: str) -> Tuple[int, int, int]:
 @attrs.frozen
 class ItemVariantConf:
     """Configuration for the special widget."""
-    item_id: str
+    item_ref: packages.PakRef[packages.Item]
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from configs."""
-        return cls(conf['ItemID'])
+        return cls(packages.PakRef(packages.Item, utils.obj_id(conf['ItemID'])))
 
 
 @register('dropdown')
 @attrs.define
 class DropdownOptions:
     """Options defined for a widget."""
-    options: List[str]
-    display: List[str]
-    key_to_index: Dict[str, int]
+    options: list[tuple[str, TransToken]]
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse configuration."""
-        result = cls([], [], {})
-        for ind, prop in enumerate(conf.find_children('Options')):
-            result.options.append(prop.real_name)
-            result.display.append(prop.value)
-            result.key_to_index[prop.name] = ind
-        return result
+        return cls([
+            (kv.real_name, TransToken.parse(data.pak_id, kv.value))
+            for kv in conf.find_children('Options')
+        ])
 
 
 @register('range', 'slider', wide=True)
@@ -408,14 +478,16 @@ class SliderOptions:
     min: float
     max: float
     step: float
+    zero_off: bool
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from keyvalues options."""
         return cls(
             min=conf.float('min', 0),
             max=conf.float('max', 100),
             step=conf.float('step', 1),
+            zero_off=conf.bool('zeroOff', False),
         )
 
 
@@ -427,7 +499,7 @@ class TimerOptions:
     max: int
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from config options."""
         max_value = conf.int('max', 60)
         min_value = conf.int('min', 0)

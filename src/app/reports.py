@@ -1,7 +1,6 @@
 """Various reports that can be triggered from the options menu."""
-from collections import defaultdict
-from pathlib import Path, PurePosixPath
-from typing import Dict, Set, Counter
+from collections import defaultdict, Counter
+from pathlib import PurePosixPath
 
 import srctools.logger
 import trio
@@ -126,44 +125,45 @@ VALVE_EDITOR_MODELS = {
 }
 
 
-def get_report_file(filename: str) -> Path:
+def get_report_file(filename: str) -> trio.Path:
     """The folder where reports are dumped to."""
     reports = utils.install_path('reports')
     reports.mkdir(parents=True, exist_ok=True)
-    file = (reports / filename).resolve()
+    file = trio.Path(reports / filename)
     LOGGER.info('Producing {}...', file)
     return file
 
 
-def report_all_obj() -> None:
+async def report_all_obj() -> None:
     """Print a list of every object type and ID."""
     packset = get_loaded_packages()
     for type_name, obj_type in OBJ_TYPES.items():
-        with get_report_file(f'obj_{type_name}.txt').open('w') as f:
+        async with await get_report_file(f'obj_{type_name}.txt').open('w') as f:
             obj_ids = [obj.id for obj in packset.all_obj(obj_type)]
             obj_ids.sort()
-            f.write(f'{len(obj_ids)} {obj_type.__name__} objects:\n')
+            await f.write(f'{len(obj_ids)} {obj_type.__name__} objects:\n')
             for obj_id in obj_ids:
-                f.write(f'- {obj_id}\n')
+                await f.write(f'- {obj_id}\n')
 
 
-def report_items() -> None:
+async def report_items() -> None:
     """Print out all the item IDs used, with subtypes."""
+    await trio.lowlevel.checkpoint()
     packset = get_loaded_packages()
-    with get_report_file('items.txt').open('w') as f:
+    async with await get_report_file('items.txt').open('w') as f:
         for item in sorted(packset.all_obj(Item), key=lambda it: it.id):
             for vers_name, version in item.versions.items():
                 if len(item.versions) == 1:
-                    f.write(f'- `<{item.id}>`\n')
+                    await f.write(f'- `<{item.id}>`\n')
                 else:
-                    f.write(f'- `<{item.id}:{vers_name}>`\n')
+                    await f.write(f'- `<{item.id}:{vers_name}>`\n')
 
                 variant_to_id = defaultdict(list)
                 for sty_id, variant in version.styles.items():
                     variant_to_id[variant].append(sty_id)
 
                 for variant, style_ids in variant_to_id.items():
-                    f.write(
+                    await f.write(
                         f'\t- [ ] {", ".join(sorted(style_ids))}:\n'
                         f'\t  `{variant.source}`\n'
                     )
@@ -174,7 +174,7 @@ async def report_editor_models() -> None:
     from packages import Item, get_loaded_packages
     packset = get_loaded_packages()
     fsys = FileSystemChain()
-    mat_to_usage: Dict[str, Set[str]] = defaultdict(set)
+    mat_to_usage: dict[str, set[str]] = defaultdict(set)
     usage_counts = Counter[str]()
 
     LOGGER.info('Checking existing packages...')
@@ -235,12 +235,12 @@ async def report_editor_models() -> None:
                 await send.send(mdl)
 
     LOGGER.info('Anaylsed, writing info:')
-    with get_report_file('editor_models.txt').open('w') as f:
-        f.write('Models:\n')
+    async with await get_report_file('editor_models.txt').open('w') as f:
+        await f.write('Models:\n')
         for filename, count in usage_counts.most_common():
-            f.write(f'- [{count}]: {filename}\n')
-        f.write('\nMaterials:\n')
+            await f.write(f'- [{count}]: {filename}\n')
+        await f.write('\nMaterials:\n')
         # Sort by count, then mat name.
         for mat, mdls in sorted(mat_to_usage.items(), key=lambda t: (len(t[1]), t[0])):
-            f.write(f'- {len(mdls)}x {mat} = [{", ".join(mdls)}]\n')
+            await f.write(f'- {len(mdls)}x {mat} = [{", ".join(mdls)}]\n')
     LOGGER.info('Editor model report complete!')

@@ -1,6 +1,5 @@
 """Implements a condition which allows linking items into a sequence."""
 from __future__ import annotations
-from typing import Optional, Callable
 from enum import Enum
 import itertools
 import math
@@ -28,10 +27,10 @@ class AntlineHandling(Enum):
 class Config:
     """Configuration for linked items."""
     group: str  # For reporting.
-    logic_start: Optional[str]
-    logic_mid: Optional[str]
-    logic_end: Optional[str]
-    logic_loop: Optional[str]
+    logic_start: str | None
+    logic_mid: str | None
+    logic_end: str | None
+    logic_loop: str | None
 
     antline: AntlineHandling
     transfer_io: bool
@@ -43,7 +42,7 @@ class Config:
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
-    scaff_endcap: Optional[str]
+    scaff_endcap: str | None
     # If it's allowed to point any direction, not just 90 degrees.
     scaff_endcap_free_rot: bool
 
@@ -56,15 +55,19 @@ def resolve_optional(prop: Keyvalues, key: str) -> str:
         return ''
     return instanceLocs.resolve_one(file, error=False) or ''
 
+
 # Store the nodes for items so we can join them up later.
 ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
 
 
-@conditions.make_result('LinkedItem')
-def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
+@conditions.make_result(
+    'LinkedItem',
+    valid_before=conditions.MetaCond.LinkedItems,
+)
+def res_linked_item(res: Keyvalues) -> conditions.ResultCallable:
     """Marks the current instance for linkage together into a chain.
 
-    At priority level -300, the sequence of similarly-marked items this links
+    At priority level <PRIORITY>, the sequence of similarly-marked items this links
     to is grouped together, and given fixup values to allow linking them.
 
     Every instance has `$type` set to `loop`, `start`, `mid` or `end` depending on its role.
@@ -142,7 +145,13 @@ def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
     return applier
 
 
-@conditions.meta_cond(-300)
+assert res_linked_item.__doc__ is not None
+res_linked_item.__doc__ = res_linked_item.__doc__.replace(
+    '<PRIORITY>', str(conditions.MetaCond.LinkedItems.value),
+)
+
+
+@conditions.MetaCond.LinkedItems.register
 def link_items(vmf: VMF) -> None:
     """Take the defined linked items, and actually link them together."""
     for name, group in ITEMS_TO_LINK.items():
@@ -166,7 +175,10 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     points=[node.pos for node in node_list],
                     lines=[
                         (a.pos, b.pos) for a, b in
-                        zip(node_list, [*node_list[1:], node_list[0]])
+                        # Add the first to the end so that we get a full loop of pairs.
+                        itertools.pairwise(itertools.chain(
+                            node_list, [node_list[0]],
+                        ))
                     ]
                 )
             else:
@@ -185,7 +197,7 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                 ],
                 lines=[
                     (a.pos, b.pos) for a, b in
-                    zip(node_list, node_list[1:])
+                    itertools.pairwise(node_list)
                 ],
             )
 
@@ -217,7 +229,7 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     conn.to_item = node_list[0].item
 
             # If start/end, the other node.
-            other_node: Optional[item_chain.Node[Config]] = None
+            other_node: item_chain.Node[Config] | None = None
             if is_looped:
                 node.inst.fixup['$type'] = 'loop'
                 logic_fname = conf.logic_loop

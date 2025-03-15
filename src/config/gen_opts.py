@@ -1,8 +1,8 @@
 """
 General app configuration options, controlled by the options window.
 """
-from typing import Any, Dict, List
-from typing_extensions import TypeGuard
+from __future__ import annotations
+from typing import Any, TypeGuard, override
 from enum import Enum
 
 from srctools import Keyvalues
@@ -11,6 +11,7 @@ import attrs
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config
+from utils import not_none
 
 
 class AfterExport(Enum):
@@ -21,8 +22,8 @@ class AfterExport(Enum):
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
-class GenOptions(config.Data, conf_name='Options', palette_stores=False, version=2):
+@attrs.frozen
+class GenOptions(config.Data, conf_name='Options', version=2):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.
@@ -56,19 +57,21 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     language: str = ''
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
+    @override
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, GenOptions]:
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF.get(
             'Debug', 'window_log_level',
-            fallback=attrs.fields(GenOptions).log_win_level.default,
+            fallback=not_none(attrs.fields(GenOptions).log_win_level.default),
         )
         try:
             after_export = AfterExport(LEGACY_CONF.get_int('General', 'after_export_action', -1))
         except ValueError:
             after_export = AfterExport.NORMAL
 
-        res: Dict[str, bool] = {}
+        res: dict[str, bool] = {}
         for field in gen_opts_bool:
+            assert field.default is not None, field
             try:
                 section: str = field.metadata['legacy']
             except KeyError:
@@ -90,15 +93,16 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         )}
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'GenOptions':
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> GenOptions:
         """Parse KV1 values."""
-        if version > 2:
-            raise AssertionError('Unknown version!')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1 or 2')
         preserve_fgd = data.bool('preserve_fgd' if version > 1 else 'preserve_resources')
         try:
             after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
-            after_export = attrs.fields(GenOptions).after_export.default
+            after_export = not_none(attrs.fields(GenOptions).after_export.default)
 
         return GenOptions(
             after_export=after_export,
@@ -106,11 +110,12 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
             language=data['language', ''],
             preserve_fgd=preserve_fgd,
             **{
-                field.name: data.bool(field.name, field.default)
+                field.name: data.bool(field.name, not_none(field.default))
                 for field in gen_opts_bool
             },
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Produce KV1 values."""
         kv = Keyvalues('', [
@@ -124,12 +129,13 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         return kv
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> GenOptions:
         """Parse DMX configuration."""
-        if version > 2:
-            raise AssertionError('Unknown version!')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1 or 2')
 
-        res: Dict[str, Any] = {}
+        res: dict[str, Any] = {}
         try:
             res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
         except KeyError:
@@ -154,6 +160,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
                 res[field.name] = field.default
         return GenOptions(**res)
 
+    @override
     def export_dmx(self) -> Element:
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')
@@ -167,12 +174,12 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
 
 
 # Todo: For full type safety, make field = attrs.Attribute[Any], once mypy infers a union for iter(tuple).
-def _is_bool_attr(field: object) -> TypeGuard['attrs.Attribute[bool]']:
+def _is_bool_attr(field: object) -> TypeGuard[attrs.Attribute[bool]]:
     """Check if this is a boolean-type attribute."""
     return isinstance(field, attrs.Attribute) and (field.type is bool or str(field.type) == 'bool')
 
 
-gen_opts_bool: List['attrs.Attribute[bool]'] = [
+gen_opts_bool: list[attrs.Attribute[bool]] = [
     field
     for field in attrs.fields(GenOptions)
     if _is_bool_attr(field)

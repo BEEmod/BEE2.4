@@ -8,7 +8,7 @@
 	"discord_bee2" "string" "https://discord.gg/hnGFJrz"
 	"store_portal2" "string" "https://store.steampowered.com/app/620/Portal_2/"
 
-	"addon_music_changer" "string" "https://beemmc.boards.net/"
+	"aerond_music_creator" "string" "https://github.com/BEEmod/BEE2-items/wiki/BEEmod-Music-Package-Creator-(BMPC)/"
 
 	"wiki_bee2" "string" "https://github.com/BEEmod/BEE2-items/wiki/"
 	"wiki_peti" "string" "https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker"
@@ -20,4 +20,8 @@
 	"issues_app" "string" "https://github.com/BEEmod/BEE2.4/issues/new/choose"
 	"issues_items" "string" "https://github.com/BEEmod/BEE2-items/issues/new/choose"
 	"issues_music" "string" "https://github.com/BEEmod/BEE2-music/issues/new/choose"
+
+	// Old keys, to support earlier versions.
+	"music_changer" "string" "https://github.com/BEEmod/BEE2-items/wiki/BEEmod-Music-Package-Creator-(BMPC)/"
+	"repo_bee2" "string" "https://github.com/BEEmod/BEE2.4/"
 }

@@ -1,15 +1,17 @@
 """Results for generating additional instances.
 
 """
-from typing import Dict, FrozenSet, Iterable, List, Optional, Callable, Tuple
-from srctools import Vec, Entity, Keyvalues, VMF, Angle
+from __future__ import annotations
+from collections.abc import Iterable, Callable
+from srctools import Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
-from precomp import instanceLocs, options, collisions, conditions, rand, corridor
+from precomp import instanceLocs, options, collisions, conditions, connections, rand, corridor
+from quote_pack import QuoteInfo
+import utils
 
 
 COND_MOD_NAME = 'Instance Generation'
-
 LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
@@ -49,8 +51,8 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
         )
         try:
             new_inst['origin'] = inst.fixup.substitute(res['position'])
-        except IndexError:
-            new_inst['origin'] = options.get(Vec, 'global_ents_loc')
+        except LookupError:
+            new_inst['origin'] = options.GLOBAL_ENTS_LOC()
 
         conditions.GLOBAL_INSTANCES.add(file.casefold())
         conditions.ALL_INST.add(file.casefold())
@@ -61,7 +63,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
 
 
 @conditions.make_result('addOverlay', 'overlayinst')
-def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Entity]:
+def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Entity | None:
     """Add another instance on top of this one.
 
     If a single value, this sets only the filename.
@@ -106,7 +108,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
 
     if not filename:
         # Don't show an error if it's being read from a fixup, or if the original name is blank.
-        if not res.bool('silentLookup') and not orig_name.startswith('$') and orig_name != '':
+        if not res.bool('silentLookup') and not orig_name.startswith(('$', '<')) and orig_name != '':
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
         # Don't bother making an overlay instance which will be deleted.
         return None
@@ -119,7 +121,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
         origin=inst['origin'],
         fixup_style=res.int('fixup_style'),
     )
-    # Don't run if the fixup block exists..
+    # Don't run if the fixup block exists...
     if srctools.conv_bool(inst.fixup.substitute(res['copy_fixup', '1'])):
         if 'fixup' not in res and 'localfixup' not in res:
             # Copy the fixup values across from the original instance
@@ -138,9 +140,56 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
     return overlay_inst
 
 
+@conditions.make_result('AttachInputOverlay', valid_before=conditions.MetaCond.Connections)
+def res_attach_input(vmf: VMF, kv: Keyvalues) -> Callable[[Entity], None]:
+    """Add an overlaid instance, which connects to this item as an additional input.
+
+    In addition to all options available to `AddOverlay`, this supports the following options:
+        - `input_dual`: If this item is a dual input type, specifies which to use: `"A"`, `"B"` or `"A+B"`.
+        - `input_conf`: The configuration to use for the new item.
+    """
+    conf = connections.Config.parse(
+        utils.special_id(f'<AttachInputOverlay: {id(kv):X}>'),
+        kv.find_key('input_conf'),
+    )
+    conn_type = connections.ConnType.parse(kv['input_dual', 'default'], conf.id)
+
+    def add_overlay(inst: Entity) -> None:
+        """Add the instance."""
+        overlay = res_add_overlay_inst(vmf, inst, kv)
+        if overlay is None:
+            return
+        try:
+            parent_item = connections.ITEMS[inst['targetname']]
+        except KeyError:
+            LOGGER.warning(
+                'Cannot attach instance overlay: no item for instance:\n{!s}',
+                inst,
+            )
+            return
+
+        item = connections.Item(overlay, conf, ind_style=parent_item.ind_style)
+        if item.name in connections.ITEMS:
+            LOGGER.warning(
+                'AttachInputOverlay is trying to produce a duplicate item: "{}"!',
+                item.name,
+            )
+        # We need to give the overlay a unique name compared to the parent so that they
+        # don't overlap in the dict.
+        connections.ITEMS[f"{item.name}_{id(kv):X}"] = item
+        connections.Connection(
+            from_item=item,
+            to_item=parent_item,
+            conn_type=conn_type,
+        ).add()
+
+    return add_overlay
+
+
 @conditions.make_result('addShuffleGroup')
 def res_add_shuffle_group(
-    vmf: VMF, coll: collisions.Collisions, info: corridor.Info, res: Keyvalues,
+    coll: collisions.Collisions, info: corridor.Info, voice: QuoteInfo,
+    vmf: VMF, res: Keyvalues,
 ) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.
 
@@ -159,14 +208,14 @@ def res_add_shuffle_group(
     """
     conf_variable = res['var']
     conf_seed = 'sg' + res['seed', '']
-    conf_pools: Dict[str, List[str]] = {}
+    conf_pools: dict[str, list[str]] = {}
     for kv in res.find_children('pool'):
         if kv.has_children():
             raise ValueError('Instances in pool cannot be a property block!')
         conf_pools.setdefault(kv.name, []).append(kv.value)
 
     # (tests, value, pools)
-    conf_selectors: List[Tuple[List[Keyvalues], str, FrozenSet[str]]] = []
+    conf_selectors: list[tuple[list[Keyvalues], str, frozenset[str]]] = []
     for kv in res.find_all('selector'):
         conf_value = kv['value', '']
         conf_tests = list(kv.find_children('conditions'))
@@ -194,7 +243,7 @@ def res_add_shuffle_group(
         pools = all_pools.copy()
         for (tests, value, potential_pools) in conf_selectors:
             for test in tests:
-                if not conditions.check_test(test, coll, info, inst):
+                if not conditions.check_test(test, coll, info, voice, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [
@@ -222,7 +271,7 @@ def res_cave_portrait(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     Otherwise, this overlays an instance, setting the $skin variable
     appropriately. Config values match that of addOverlay.
     """
-    skin = options.get(int, 'cave_port_skin')
+    skin = options.CAVE_PORT_SKIN()
     if skin is not None:
         new_inst = res_add_overlay_inst(vmf, inst, res)
         if new_inst is not None:

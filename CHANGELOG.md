@@ -1,20 +1,140 @@
 # Changelog
 
-# Version `<dev>`
+# Version (dev)
+
+### Enhancements
+* #573: Show filename in tooltip for custom screenshots.
+* The app is now able to handle having music, voicelines etc selected that 
+  aren't defined in loaded packages. Exporting will fail, but no crash will
+  occur and the selection will still be saved.
+* If an error occurs, the compiler will now prepare a zip containing all the
+  relevant files for debugging the error.
+* Flip Panels will now have correct lighting in all positions.
+* Dynamic Angled Panels set to start deployed will be lit for that position.
+* Palettes and configs will now prompt if future versions of the files are found.
+  These will also be backed up if chosen to be loaded.
+* Connection Signage now has a legend like regular signage.
+
+### Bugfixes:
+* The case where no voicelines are set is once again handled correctly.
+* #4431: Fix monitors not showing the voiceline character.
+* #4431: Fix elevator videos not appearing.
+* Fix initial state for "variant" dropdown boxes on item properties pane.
+* Automatically patch `tools/toolsinvisible` to allow light to pass through.
+* Fix app not quitting when initial loading screen is closed.
+* Fix default values not being used for items like Cube Colourisers and Corridors.
+
+### UCP-Relevant changes:
+* Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 
+  which extend until impacting a surface.
+* `$fixup` variables may now be used directly in condition tests/results, behaving
+  like the `instvar`/`setinstvar` tests/results respectively.
+* `TrackPlatform` result changes:
+  * Add `multi_track`, which allows replacing the instances with multi-voxel 
+  long ones for better efficiency.
+  * Add `track_len_var`, set to the length of each track instance.
+  * The "bottom grate" instance will now inherit platform fixup variables.
+* Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
+* Templates may have "auto realign" enabled, which automatically realigns all 0.25-scale tile faces.
+* Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.
+* Allow fixup values in `MapInstVar` values.
+
+
+------------------------------------------
+
+# Version 4.45.2
+* #2050, #2053: Fix gameinfo.txt not being modified during exports.
+
+------------------------------------------
+
+# Version 4.45.1
+* Fix the application looking in the wrong location for the compiler.
+
+------------------------------------------
+
+# Version 4.45.0
+
+## New Features:
+* Glass/grating is now generated entirely by the compiler, allowing fully 
+  custom items to be made. The original glass/grating frame is now also 
+  generated slightly more efficiently.
+* Added the ability to define variants for corridors. In Clean style this 
+  allows specifying elevator directions, stair direction and the corridor's 
+  light temperature. 
+
+### Enhancements:
+* Added the ability to show multiple warning messages or errors for problems 
+  occurring during package loading and export.
+* Added signage configuration option to the item's context menu, to help make it more visible.
+* Shut down the error server automatically when Portal 2 quits.
+* Added additional EXEs for `compiler_settings.exe` and `backup.exe`. These 
+  allow quickly opening just these windows.
+* The logic for detecting paint splats placed on cubes is improved to 
+  prioritise gel placed directly on droppers. In particular a cleansing gel
+  splat can be placed on the dropper to allow the floor below to still be painted.
+
+### UCP-Relevant changes:
+* Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs 
+  with certain materials.
+* The barrier rework adds several new blocks to `vbsp_config`:
+  * `BarrierFrames` in `vbsp_config` contains definitions for the frame of barriers.
+  * `Barriers` in `vbsp_config` contains the definitions for the brushes to 
+    produce, and then which frame IDs to use.
+  * `BarrierHole` in `info.txt` defines a hole type. This is defined outside the
+    item, because the different style
+    variants can be independently specified by each barrier type.
+  * The `CustomBarrier` result produces an item that converts attached glass/grating.
+* As mentioned above, `CorridorGroup` now has `Options` blocks for specifying 
+  corridor options.
+  These ultimately just set fixups on the instance. `DefaultIndex` has been 
+  replaced with just `Disabled` - all corridors will now be enabled by default.
+* Music can now have a volume specified in the config.
+* Added the `AttachInputOverlay` result, which adds an overlay instance, 
+  but connects it to the original as an additional input. This significantly
+  simplifies logic if an additional prerequisite is required for the item to turn
+  on.
+* Fix catwalk end segment being placed at the top of upwards-facing stairs.
+* #2048: Fix ceiling Faith Plates not functioning correctly.
+* #2040: Warn if no compiler files were found when exporting.
+* #1343: Clone fizzler items if connected to multiple standing/reclined fizzlers.
+
+------------------------------------------
+
+# Version 4.44.1
+
+### Enhancements
+* Remove some now-outdated splash screens.
+
+### Bugfixes:
+* Fix add-game prompt failing to appear if installed fresh.
+
+------------------------------------------
+
+# Version 4.44.0
 
 ### Enhancements:
 * If a duplicate package is present, include the paths of both in the error message.
-* Change palette item format to permit "holes" in the position of items. This isn't exposed in the UI yet.
+* Change palette item format to permit "holes" in the position of items. This
+  isn't exposed in the UI yet.
 * Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
 * Display the authors of corridors.
-* Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
-  invalid manner.
+* Rearranged the UI on the corridor picker display.
+* Add some informative errors if Unstationary Scaffolds (or similar UCP items) 
+  are connected in an invalid manner.
+* Added "Compress Items" option, which hides all but one of each on the item list.
 * Skip disabled packages when extracting resources.
-* Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
-  items (Delayers). This allows them to show both count-down and count-up displays.
+* Timer-style indicator panels at the end of antlines can now have a custom 
+  appearance for some items (Delayers). This allows them to show both count-down 
+  and count-up displays.
 * Moved various palette-related buttons, to group them with the other palette options.
-* A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
-* Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
+* VPK files can be now placed into `vpk_override` to have them be combined with the built VPK. 
+* Added a warning screen to the developer tab of the options window, indicating 
+  that some of these options can temporarily break BEE if changed.
+* #1984: The "save settings to palette" will now change to match the selected 
+  palette. This means clicking "save" won't accidentally delete saved settings.
+* #1893: Add compile logs to error display windows.
+* Internal files are now placed in a `bin/` subfolder, instead of cluttering
+  the folders containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
 
 ### UCP-Relevant Changes:
 * Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
@@ -27,7 +147,9 @@
   is copied into those as a comment to help identify them.
 * Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
 * Added the `Error` result, which allows producing a custom error message from a package.
+* #1313: Allow disabling the triggers produced by `CustVactube`.
 * When Dev Mode is on, `SetTile` now dumps the tiles it's trying to set into the final map.
+* `ConfigGroup` slider widgets can now be set to display "Off" when set to zero, also fixed them not snapping to values.
 
 ### Bugfixes:
 * BEE will detect `portal2_dlc3` being in use and pick another DLC folder for its VPKs.
@@ -40,6 +162,9 @@
 * Fix single-dot antlines sometimes failing to be placed.
 * BEEmod/BEE2-items#4325: Set corridors to force upright even if vertical corridors are not available.
 * Piston Platforms will now correctly accept Surface Lacquer, if placed on their base.
+* Paint Splats will correctly rotate to aint Angled Panels they are placed on top of.
+* Removed the "Prevent Portal Bump (fizzler)" stylevar. It is useless and never worked.
+* #1955: Fix some situations causing incorrect catwalk placement.
 
 ------------------------------------------
 
@@ -68,6 +193,9 @@
 * Handle unparsable existing antigel materials gracefully.
 * Fix issues with P1 Track Platforms not generating correctly.
 * Fix export of corridor configuration in some cases when picking default corridors.
+* Warn and handle duplicate definitions in both the style and item packages. 
+  This fixes an issue where older style definitions would cause errors if checkmark/timer panels
+  were present in the map.
 
 ------------------------------------------
 

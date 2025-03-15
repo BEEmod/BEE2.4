@@ -8,44 +8,34 @@ various item properties.
   clicked widget from the event
 """
 from __future__ import annotations
-from typing import Any, Callable
+
+from contextlib import aclosing
 from enum import Enum
-import functools
 import webbrowser
 
-import tkinter as tk
-from tkinter import ttk
+from srctools.logger import get_logger
+from trio_util import AsyncValue
+import trio
 
-from ui_tk.img import TKImages, TK_IMG
-from .richTextBox import tkRichText
-from . import (
-    itemconfig, localisation, tkMarkdown, tooltip, tk_tools, sound, img, UI,
-    TK_ROOT, DEV_MODE, background_run
-)
-from .item_properties import PropertyWindow
-import utils
-import srctools.logger
-from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
+from async_util import EdgeTrigger
+from consts import DefaultItems
+from editoritems import Handle as RotHandle, ItemClass, SubType, Surface
 from editoritems_props import prop_timer_delay
-from app.localisation import TransToken
+from packages.item import Item, ItemVariant, SubItemRef, Version
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
+from transtoken import TransToken
+import packages
+
+from . import DEV_MODE, img, sound
+from .dialogs import Dialogs
+from .dragdrop import Slot
+from .item_picker import ItemPickerBase
+from .item_properties import PropertyWindow
+from .mdown import MarkdownData
+from .paletteLoader import Coord
 
 
-LOGGER = srctools.logger.get_logger(__name__)
-
-wid: dict[str, Any] = {}
-wid_subitem: dict[int, ttk.Label] = {}
-wid_sprite: dict[SPR, ttk.Label] = {}
-
-selected_item: UI.Item
-selected_sub_item: UI.PalItem
-
-version_lookup: list[str] = []
-
-window = tk.Toplevel(TK_ROOT, name='contextWin')
-window.overrideredirect(True)
-window.resizable(False, False)
-window.transient(master=TK_ROOT)
-window.withdraw()  # starts hidden
+LOGGER = get_logger(__name__)
 
 SUBITEM_POS = {
     # Positions of subitems depending on the number of subitems that exist
@@ -76,6 +66,7 @@ class SPR(Enum):
     ROTATION = 2
     COLLISION = 3
     FACING = 4
+
 
 SPRITE_TOOL = {
     # The tooltips associated with each sprite.
@@ -119,514 +110,521 @@ TRANS_TOOL_FIZZOUT = TransToken.ui(
     'This fizzler has an output. Due to an editor bug, this cannot be used directly. Instead '
     'the Fizzler Output Relay item should be placed on top of this fizzler.'
 )
+TRANS_URL_FAIL = TransToken.ui(
+    'Failed to open a web browser. Do you wish for the URL '
+    'to be copied to the clipboard instead?'
+)
 TRANS_TOOL_FIZZOUT_TIMED = TransToken.ui(
     'This fizzler has a timed output. Due to an editor bug, this cannot be used directly. Instead '
     'the Fizzler Output Relay item should be placed on top of this fizzler.'
 )
 TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
+TRANS_ENT_COUNT = TransToken.ui(
+    'The number of entities used for this item. The Source engine '
+    'limits this to 2048 in total. This provides a guide to how many of '
+    'these items can be placed in a map at once.'
+)
+TRANS_MISSING_ITEM = TransToken.ui(
+    'The item <{id}> is missing from package definitions. Check for missing packages. '
+    'Alternatively, this item may have been replaced or merged into another.\n\n'
+    'Export is not possible while this is present on the palette.'
+)
 
 
-def set_sprite(tk_img: TKImages, pos: SPR, sprite: str) -> None:
-    """Set one of the property sprites to a value."""
-    widget = wid_sprite[pos]
-    tk_img.apply(widget, img.Handle.sprite('icons/' + sprite, 32, 32))
-    tooltip.set_tooltip(widget, SPRITE_TOOL[sprite])
-
-
-def pos_for_item(ind: int) -> int | None:
+def pos_for_item(item: Item, ind: int) -> int | None:
     """Get the index the specified subitem is located at."""
-    positions = SUBITEM_POS[len(selected_item.visual_subtypes)]
+    positions = SUBITEM_POS[len(item.visual_subtypes)]
     for pos, sub in enumerate(positions):
-        if sub != -1 and ind == selected_item.visual_subtypes[sub]:
+        if sub != -1 and ind == item.visual_subtypes[sub]:
             return pos
     else:
         return None
 
 
-def ind_for_pos(pos: int) -> int | None:
+def ind_for_pos(item: Item, pos: int) -> int | None:
     """Return the subtype index for the specified position."""
-    ind = SUBITEM_POS[len(selected_item.visual_subtypes)][pos]
+    ind = SUBITEM_POS[len(item.visual_subtypes)][pos]
     if ind == -1:
         return None
     else:
-        return selected_item.visual_subtypes[ind]
-
-
-def sub_sel(pos, e=None) -> None:
-    """Change the currently-selected sub-item."""
-    ind = ind_for_pos(pos)
-    # Can only change the subitem on the preview window
-    if selected_sub_item.is_pre and ind is not None:
-        sound.fx('config')
-        selected_sub_item.change_subtype(ind)
-        # Redisplay the window to refresh data and move it to match
-        show_prop(selected_sub_item, warp_cursor=True)
-
-
-def sub_open(pos, e=None):
-    """Move the context window to apply to the given item."""
-    ind = ind_for_pos(pos)
-    if ind is not None:
-        sound.fx('expand')
-        selected_sub_item.open_menu_at_sub(ind)
-
-
-def open_event(item) -> Callable[[tk.Event], object]:
-    """Show the window for a particular PalItem."""
-    def func(e: tk.Event) -> None:
-        sound.fx('expand')
-        show_prop(item)
-    return func
-
-
-def is_visible() -> bool:
-    """Checks if the window is visible."""
-    return window.winfo_ismapped()
-
-
-def show_prop(widget: UI.PalItem, warp_cursor: bool = False) -> None:
-    """Show the properties window for an item.
-
-    wid should be the UI.PalItem widget that represents the item.
-    If warp_cursor is  true, the cursor will be moved relative to this window so
-    it stays on top of the selected subitem.
-    """
-    global selected_item, selected_sub_item
-    if warp_cursor and is_visible():
-        cursor_x, cursor_y = window.winfo_pointerxy()
-        off_x = cursor_x - window.winfo_rootx()
-        off_y = cursor_y - window.winfo_rooty()
-    else:
-        off_x, off_y = None, None
-    window.deiconify()
-    window.lift()
-    selected_item = widget.item
-    selected_sub_item = widget
-
-    adjust_position()
-
-    if off_x is not None and off_y is not None:
-        # move the mouse cursor
-        window.event_generate('<Motion>', warp=True, x=off_x, y=off_y)
-
-    load_item_data(TK_IMG)
-
-
-def set_item_version(tk_img: TKImages) -> None:
-    """Callback for the version combobox. Set the item variant."""
-    selected_item.change_version(version_lookup[wid['variant'].current()])
-    # Refresh our data.
-    load_item_data(tk_img)
-
-    # Refresh itemconfig comboboxes to match us.
-    for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
-        if selected_item.id == item_id:
-            func()
-
-
-def set_version_combobox(box: ttk.Combobox, item: UI.Item) -> list[str]:
-    """Set values on the variant combobox.
-
-    This is in a function so itemconfig can reuse it.
-    It returns a list of IDs in the same order as the names.
-    """
-    ver_lookup, version_names = item.get_version_names()
-    if len(version_names) <= 1:
-        # There aren't any alternates to choose from, disable the box
-        box.state(['disabled'])
-        box['values'] = [str(TRANS_NO_VERSIONS)]
-        box.current(0)
-    else:
-        box.state(['!disabled'])
-        box['values'] = version_names
-        box.current(ver_lookup.index(item.selected_version().id))
-    return ver_lookup
+        return item.visual_subtypes[ind]
 
 
 def get_description(
     global_last: bool,
-    glob_desc: tkMarkdown.MarkdownData,
-    style_desc: tkMarkdown.MarkdownData,
-) -> tkMarkdown.MarkdownData:
+    glob_desc: MarkdownData,
+    style_desc: MarkdownData,
+) -> MarkdownData:
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
         if global_last:
-            return tkMarkdown.join(style_desc, glob_desc)
+            return style_desc + glob_desc
         else:
-            return tkMarkdown.join(glob_desc, style_desc)
+            return glob_desc + style_desc
     elif glob_desc:
         return glob_desc
     elif style_desc:
         return style_desc
     else:
-        return tkMarkdown.MarkdownData.BLANK  # No description
+        return MarkdownData.BLANK  # No description
 
 
+class ContextWinBase:
+    """Shared logic for item context windows.
 
-def load_item_data(tk_img: TKImages) -> None:
-    """Refresh the window to use the selected item's data."""
-    item_data = selected_item.data
-
-    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
-        if pos == -1:
-            icon = IMG_ALPHA
-        else:
-            icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
-        tk_img.apply(wid_subitem[ind], icon)
-        wid_subitem[ind]['relief'] = 'flat'
-
-    wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
-
-    localisation.set_text(wid['author'], TransToken.list_and(
-        map(TransToken.untranslated, item_data.authors), sort=True,
-    ))
-    localisation.set_text(wid['name'], selected_sub_item.name)
-    wid['ent_count']['text'] = item_data.ent_count or '??'
-
-    desc = get_description(
-        global_last=selected_item.item.glob_desc_last,
-        glob_desc=selected_item.item.glob_desc,
-        style_desc=item_data.desc,
-    )
-    # Dump out the instances used in this item.
-    if DEV_MODE.get():
-        inst_desc = []
-        for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
-            if editor is selected_item.data.editor:
-                heading = '\n\nInstances:\n'
-            else:
-                heading = f'\nInstances ({editor.id}):\n'
-            inst_desc.append(tkMarkdown.TextSegment(heading, (tkMarkdown.TextTag.BOLD, )))
-            for ind, inst in enumerate(editor.instances):
-                inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', (tkMarkdown.TextTag.INDENT, )))
-                inst_desc.append(
-                    tkMarkdown.TextSegment(f'{inst.inst}\n', (tkMarkdown.TextTag.CODE, ))
-                    if inst.inst != FSPath() else tkMarkdown.TextSegment('""\n')
-                )
-            for name, inst_path in editor.cust_instances.items():
-                inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
-                inst_desc.append(
-                    tkMarkdown.TextSegment(f'{inst_path}\n', (tkMarkdown.TextTag.CODE, ))
-                    if inst_path != FSPath() else tkMarkdown.TextSegment('""\n')
-                )
-        desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
-
-    wid['desc'].set_text(desc)
-
-    if DEV_MODE.get():
-        source = selected_item.data.source.replace("from", "\nfrom")
-        wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
-        wid['item_id'].grid()
-    else:
-        wid['item_id'].grid_remove()
-
-    editor = item_data.editor
-
-    if PropertyWindow.can_edit(editor):
-        wid['changedefaults'].state(['!disabled'])
-    else:
-        wid['changedefaults'].state(['disabled'])
-
-    version_lookup[:] = set_version_combobox(wid['variant'], selected_item)
-
-    if selected_item.data.url is None:
-        wid['moreinfo'].state(['disabled'])
-        tooltip.set_tooltip(wid['moreinfo'], TransToken.BLANK)
-    else:
-        wid['moreinfo'].state(['!disabled'])
-        tooltip.set_tooltip(wid['moreinfo'], TransToken.untranslated(selected_item.data.url))
-
-    has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
-
-    if editor.has_prim_input():
-        if editor.has_sec_input():
-            set_sprite(tk_img, SPR.INPUT, 'in_dual')
-            # Real funnels work slightly differently.
-            if selected_item.id.casefold() == 'item_tbeam':
-                tooltip.set_tooltip(wid_sprite[SPR.INPUT], TRANS_TOOL_TBEAM)
-        else:
-            set_sprite(tk_img, SPR.INPUT, 'in_norm')
-    else:
-        set_sprite(tk_img, SPR.INPUT, 'in_none')
-
-    if editor.has_output():
-        if has_timer:
-            set_sprite(tk_img, SPR.OUTPUT, 'out_tim')
-            # Mention the Fizzler Output Relay here.
-            if editor.cls is ItemClass.FIZZLER:
-                tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TRANS_TOOL_FIZZOUT_TIMED)
-        else:
-            set_sprite(tk_img, SPR.OUTPUT, 'out_norm')
-            if editor.cls is ItemClass.FIZZLER:
-                tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TRANS_TOOL_FIZZOUT)
-    else:
-        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
-
-    set_sprite(tk_img, SPR.ROTATION, ROT_TYPES[editor.handle])
-
-    if editor.embed_voxels:
-        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
-    else:
-        set_sprite(tk_img, SPR.COLLISION, 'space_none')
-
-    face_spr = "surf"
-    if Surface.WALL not in editor.invalid_surf:
-        face_spr += "_wall"
-    if Surface.FLOOR not in editor.invalid_surf:
-        face_spr += "_floor"
-    if Surface.CEIL not in editor.invalid_surf:
-        face_spr += "_ceil"
-    if face_spr == "surf":
-        # This doesn't seem right - this item won't be placeable at all...
-        LOGGER.warning(
-            "Item <{}> disallows all orientations. Is this right?",
-            selected_item.id,
-        )
-        face_spr += "_none"
-
-    set_sprite(tk_img, SPR.FACING, face_spr)
-
-    # Now some special overrides for certain classes.
-    if selected_item.id == "ITEM_CUBE":
-        # Cubes - they should show info for the dropper.
-        set_sprite(tk_img, SPR.FACING, 'surf_ceil')
-        set_sprite(tk_img, SPR.INPUT, 'in_norm')
-        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
-        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
-        # This can have 2 handles - the specified one, overridden to 36 on reflection cubes.
-        # Concatenate the two definitions.
-        tooltip.set_tooltip(wid_sprite[SPR.ROTATION], TRANS_TOOL_CUBE.format(
-            generic_rot=SPRITE_TOOL[ROT_TYPES[editor.handle]]
-        ))
-
-    if editor.cls is ItemClass.GEL:
-        # Reflection or normal gel...
-        set_sprite(tk_img, SPR.FACING, 'surf_wall_ceil')
-        set_sprite(tk_img, SPR.INPUT, 'in_norm')
-        set_sprite(tk_img, SPR.COLLISION, 'space_none')
-        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
-        set_sprite(tk_img, SPR.ROTATION, 'rot_paint')
-    elif editor.cls is ItemClass.TRACK_PLATFORM:
-        # Track platform - always embeds into the floor.
-        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
-
-    real_conn_item = editor
-    if selected_item.id in ["ITEM_CUBE", "ITEM_PAINT_SPLAT"]:
-        # The connections are on the dropper.
-        try:
-            [real_conn_item] = selected_item.data.editor_extra
-        except ValueError:
-            # Moved elsewhere?
-            pass
-
-    if DEV_MODE.get() and real_conn_item.conn_config is not None:
-        # Override tooltips with the raw information.
-        blurb = real_conn_item.conn_config.get_input_blurb()
-        if real_conn_item.force_input:
-            # Strip to remove \n if blurb is empty.
-            blurb = ('Input force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.INPUT], TransToken.untranslated(blurb))
-
-        blurb = real_conn_item.conn_config.get_output_blurb()
-        if real_conn_item.force_output:
-            blurb = ('Output force-enabled!\n' + blurb).strip()
-        tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TransToken.untranslated(blurb))
-
-
-def adjust_position(e=None) -> None:
-    """Move the properties window onto the selected item.
-
-    We call this constantly, so the property window will not go outside
-    the screen, and snap back to the item when the main window returns.
+    TargetT: The widget representing palette icons.
     """
-    if not is_visible() or selected_sub_item is None:
-        return
+    # If we are open, info about the selected widget.
+    selected: SubItemRef | None
+    selected_slot: Slot[SubItemRef] | None  # The slot we're opening on.
+    selected_pal_pos: Coord | None  # Palette position, if from there. Allows changing version.
 
-    # Calculate the pixel offset between the window and the subitem in
-    # the properties dialog, and shift if needed to keep it inside the
-    # window
-    icon_widget = wid_subitem[pos_for_item(selected_sub_item.subKey)]
+    dialog: Dialogs
+    picker: ItemPickerBase
+    current_style: AsyncValue[packages.PakRef[packages.Style]]
+    # If set, the item properties window is open and suppressing us.
+    props_open: bool
+    # If set, a special warning is visible for items that are not defined.
+    missing_item_visible: bool
 
-    loc_x, loc_y = tk_tools.adjust_inside_screen(
-        x=(
-            selected_sub_item.label.winfo_rootx()
-            + window.winfo_rootx()
-            - icon_widget.winfo_rootx()
-        ),
-        y=(
-            selected_sub_item.label.winfo_rooty()
-            + window.winfo_rooty()
-            - icon_widget.winfo_rooty()
-        ),
-        win=window,
-    )
+    moreinfo_url: AsyncValue[str | None]
+    moreinfo_trigger: EdgeTrigger[str]
+    defaults_trigger: EdgeTrigger[()]
 
-    window.geometry(f'+{loc_x!s}+{loc_y!s}')
+    def __init__(
+        self,
+        item_picker: ItemPickerBase,
+        dialog: Dialogs,
+        current_style: AsyncValue[packages.PakRef[packages.Style]],
+    ) -> None:
+        self.selected = None
+        self.selected_slot = None
+        self.selected_pal_pos = None
+        self.dialog = dialog
+        self.picker = item_picker
+        self.current_style = current_style
+        self.props_open = False
+        self.missing_item_visible = False
+        self.packset = packages.PackagesSet.blank()
 
-# When the main window moves, move the context window also.
-TK_ROOT.bind("<Configure>", adjust_position, add='+')
+        # The current URL in the more-info button, if available.
+        self.moreinfo_url = AsyncValue(None)
+        self.moreinfo_trigger = EdgeTrigger()
+        # Triggered to open the change-defaults button.
+        self.defaults_trigger = EdgeTrigger()
 
+    @property
+    def is_visible(self) -> bool:
+        """We are visible if a selected item is defined."""
+        return self.selected is not None and not self.props_open
 
-def hide_context(e=None):
-    """Hide the properties window, if it's open."""
-    global selected_item, selected_sub_item
-    if is_visible():
-        window.withdraw()
-        sound.fx('contract')
-        selected_item = selected_sub_item = None
-        # Clear the description, to free images.
-        wid['desc'].set_text('')
+    async def init_widgets(
+        self,
+        signage_trigger: EdgeTrigger[()],
+        *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+    ) -> None:
+        """Initialise all the window components."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self.ui_task, signage_trigger)
+            nursery.start_soon(self._moreinfo_task)
+            nursery.start_soon(self._packset_changed_task)
+            nursery.start_soon(self._style_changed_task)
+            nursery.start_soon(self.picker.open_contextwin_task, self.show_prop)
+            task_status.started()
 
+    async def _packset_changed_task(self) -> None:
+        """Whenever packages change, force-close."""
+        async with aclosing(packages.LOADED.eventual_values()) as agen:
+            async for self.packset in agen:
+                self.hide_context()
+                await trio.lowlevel.checkpoint()
 
-def init_widgets(tk_img: TKImages) -> None:
-    """Initiallise all the window components."""
-    f = ttk.Frame(window, relief="raised", borderwidth="4")
-    f.grid(row=0, column=0)
+    async def _style_changed_task(self) -> None:
+        """Whenever styles change, reload data."""
+        while True:
+            await self.current_style.wait_transition()
+            if self.is_visible:
+                self.load_item_data()
+            await trio.lowlevel.checkpoint()
 
-    localisation.set_text(ttk.Label(f, anchor="center"), TransToken.ui("Properties:")).grid(
-        row=0,
-        column=0,
-        columnspan=3,
-        sticky="EW",
-    )
+    def get_current(self) -> tuple[Item, Version, ItemVariant, SubType]:
+        """Fetch the tree representing the selected subtype."""
+        assert self.selected is not None
+        item = self.selected.item.resolve(self.packset)
+        if item is None:
+            raise LookupError
+        version = item.selected_version()
+        style_ref = self.current_style.value
+        try:
+            variant = version.styles[style_ref.id]
+        except KeyError:
+            LOGGER.warning('No {} style for {}!', style_ref, self.selected)
+            variant = version.def_style
+        try:
+            subtype = variant.editor.subtypes[self.selected.subtype]
+        except KeyError:
+            LOGGER.warning('No subtype {} in style {}!', self.selected, style_ref)
+            first = item.visual_subtypes[0]
+            self.selected = self.selected.with_subtype(first)
+            subtype = variant.editor.subtypes[first]
 
-    wid['name'] = ttk.Label(f, text="", anchor="center")
-    wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
+        return item, version, variant, subtype
 
-    wid['item_id'] = ttk.Label(f, text="", anchor="center")
-    wid['item_id'].grid(row=2, column=0, columnspan=3, sticky="EW")
-    tooltip.add_tooltip(wid['item_id'])
+    def load_item_data(self) -> None:
+        """Refresh the window to use the selected item's data."""
+        if self.selected is None:
+            return
+        try:
+            item, version, variant, subtype = self.get_current()
+        except LookupError:  # Not defined?
+            return
+        item_id = self.selected.item.id
+        style_ref = self.current_style.value
 
-    wid['ent_count'] = ttk.Label(
-        f,
-        text="",
-        anchor="e",
-        compound="left",
-    )
-    tk_img.apply(wid['ent_count'], img.Handle.sprite('icons/gear_ent', 32, 32))
-    wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky='e')
-    tooltip.add_tooltip(
-        wid['ent_count'],
-        TransToken.ui(
-            'The number of entities used for this item. The Source engine '
-            'limits this to 2048 in total. This provides a guide to how many of '
-            'these items can be placed in a map at once.'
-        ),
-    )
+        sel_pos = pos_for_item(item, self.selected.subtype)
+        for ind, pos in enumerate(SUBITEM_POS[len(item.visual_subtypes)]):
+            if pos == -1:
+                icon = IMG_ALPHA
+            else:
+                icon = item.get_icon(style_ref, item.visual_subtypes[pos])
+            self.ui_set_props_icon(ind, icon, ind == sel_pos)
 
-    wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
-    wid['author'].grid(row=3, column=0, columnspan=3, sticky="EW")
+        desc = get_description(
+            global_last=item.glob_desc_last,
+            glob_desc=item.glob_desc,
+            style_desc=variant.desc,
+        )
+        # Dump out the instances used in this item.
+        if DEV_MODE.value:
+            desc += variant.instance_desc()
 
-    sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    sub_frame.grid(column=0, columnspan=3, row=4)
-    for i in range(5):
-        wid_subitem[i] = ttk.Label(sub_frame)
-        tk_img.apply(wid_subitem[i], IMG_ALPHA)
-        wid_subitem[i].grid(row=0, column=i)
-        tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
-        tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
+        self.ui_set_props_main(
+            name=subtype.name,
+            authors=TransToken.list_and(
+                map(TransToken.untranslated, variant.authors), sort=True,
+            ),
+            desc=desc,
+            ent_count=variant.ent_count or '??',
+        )
 
-    localisation.set_text(
-        ttk.Label(f, anchor="sw"),
-        TransToken.ui("Description:")
-    ).grid(row=5, column=0, sticky="SW")
+        if DEV_MODE.value:
+            source = variant.source.replace("from", "\nfrom")
+            self.ui_set_debug_itemid(f'{source}\n-> {self.selected}')
+        else:
+            self.ui_set_debug_itemid('')
 
-    spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    spr_frame.grid(column=1, columnspan=2, row=5, sticky='w')
-    # sprites: inputs, outputs, rotation handle, occupied/embed state,
-    # desiredFacing
-    for spr_id in SPR:
-        wid_sprite[spr_id] = sprite = ttk.Label(spr_frame, relief="raised")
-        tk_img.apply(sprite, img.Handle.sprite('icons/ap_grey', 32, 32))
-        sprite.grid(row=0, column=spr_id.value)
-        tooltip.add_tooltip(sprite)
+        self.ui_set_defaults_enabled(PropertyWindow.can_edit(variant.editor))
 
-    desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
-    desc_frame.grid(row=6, column=0, columnspan=3, sticky="EW")
-    desc_frame.columnconfigure(0, weight=1)
+        if self.selected.item == SIGNAGE_ITEM_ID:
+            self.ui_show_sign_config()
+        else:
+            self.ui_show_variants(item)
 
-    wid['desc'] = tkRichText(desc_frame, width=40, height=16)
-    wid['desc'].grid(row=0, column=0, sticky="EW")
+        self.moreinfo_url.value = variant.url
+        has_timer = any(prop.kind is prop_timer_delay for prop in variant.editor.properties.values())
 
-    desc_scroll = tk_tools.HidingScroll(
-        desc_frame,
-        orient=tk.VERTICAL,
-        command=wid['desc'].yview,
-    )
-    wid['desc']['yscrollcommand'] = desc_scroll.set
-    desc_scroll.grid(row=0, column=1, sticky="NS")
+        if variant.editor.has_prim_input():
+            if variant.editor.has_sec_input():
+                self.set_sprite(SPR.INPUT, 'in_dual')
+                # Real funnels work slightly differently.
+                if item_id == DefaultItems.funnel.id:
+                    self.ui_set_sprite_tool(SPR.INPUT, TRANS_TOOL_TBEAM)
+            else:
+                self.set_sprite(SPR.INPUT, 'in_norm')
+        else:
+            self.set_sprite(SPR.INPUT, 'in_none')
 
-    def show_more_info() -> None:
-        """Show the 'more info' URL."""
-        url = selected_item.data.url
-        if url is not None:
+        if variant.editor.has_output():
+            if has_timer:
+                self.set_sprite(SPR.OUTPUT, 'out_tim')
+                # Mention the Fizzler Output Relay here.
+                if variant.editor.cls is ItemClass.FIZZLER:
+                    self.ui_set_sprite_tool(SPR.OUTPUT, TRANS_TOOL_FIZZOUT_TIMED)
+            else:
+                self.set_sprite(SPR.OUTPUT, 'out_norm')
+                if variant.editor.cls is ItemClass.FIZZLER:
+                    self.ui_set_sprite_tool(SPR.OUTPUT, TRANS_TOOL_FIZZOUT)
+        else:
+            self.set_sprite(SPR.OUTPUT, 'out_none')
+
+        self.set_sprite(SPR.ROTATION, ROT_TYPES[variant.editor.handle])
+
+        if variant.editor.embed_voxels:
+            self.set_sprite(SPR.COLLISION, 'space_embed')
+        else:
+            self.set_sprite(SPR.COLLISION, 'space_none')
+
+        face_spr = "surf"
+        if Surface.WALL not in variant.editor.invalid_surf:
+            face_spr += "_wall"
+        if Surface.FLOOR not in variant.editor.invalid_surf:
+            face_spr += "_floor"
+        if Surface.CEIL not in variant.editor.invalid_surf:
+            face_spr += "_ceil"
+        if face_spr == "surf":
+            # This doesn't seem right - this item won't be placeable at all...
+            LOGGER.warning(
+                "Item <{}> disallows all orientations. Is this right?",
+                self.selected.item,
+            )
+            face_spr += "_none"
+
+        self.set_sprite(SPR.FACING, face_spr)
+
+        # Now some special overrides for certain classes.
+        if item_id == DefaultItems.cube.id:
+            # Cubes - they should show info for the dropper.
+            self.set_sprite(SPR.FACING, 'surf_ceil')
+            self.set_sprite(SPR.INPUT, 'in_norm')
+            self.set_sprite(SPR.COLLISION, 'space_embed')
+            self.set_sprite(SPR.OUTPUT, 'out_none')
+            # This can have 2 handles - the specified one, overridden to 36 on reflection cubes.
+            # Concatenate the two definitions.
+            self.ui_set_sprite_tool(SPR.ROTATION, TRANS_TOOL_CUBE.format(
+                generic_rot=SPRITE_TOOL[ROT_TYPES[variant.editor.handle]]
+            ))
+
+        if variant.editor.cls is ItemClass.GEL:
+            # Reflection or normal gel...
+            self.set_sprite(SPR.FACING, 'surf_wall_ceil')
+            self.set_sprite(SPR.INPUT, 'in_norm')
+            self.set_sprite(SPR.COLLISION, 'space_none')
+            self.set_sprite(SPR.OUTPUT, 'out_none')
+            self.set_sprite(SPR.ROTATION, 'rot_paint')
+        elif variant.editor.cls is ItemClass.TRACK_PLATFORM:
+            # Track platform - always embeds into the floor.
+            self.set_sprite(SPR.COLLISION, 'space_embed')
+
+        real_conn_item = variant.editor
+        if item_id == DefaultItems.cube.id or item_id == DefaultItems.gel_splat.id:
+            # The connections are on the dropper.
+            try:
+                [real_conn_item] = variant.editor_extra
+            except ValueError:
+                # Moved elsewhere?
+                pass
+
+        if DEV_MODE.value and real_conn_item.conn_config is not None:
+            # Override tooltips with the raw information.
+            blurb = real_conn_item.conn_config.get_input_blurb()
+            if real_conn_item.force_input:
+                # Strip to remove \n if blurb is empty.
+                blurb = ('Input force-enabled!\n' + blurb).strip()
+            self.ui_set_sprite_tool(SPR.INPUT, TransToken.untranslated(blurb))
+
+            blurb = real_conn_item.conn_config.get_output_blurb()
+            if real_conn_item.force_output:
+                blurb = ('Output force-enabled!\n' + blurb).strip()
+            self.ui_set_sprite_tool(SPR.OUTPUT, TransToken.untranslated(blurb))
+
+    def hide_context(self, _: object = None, /) -> None:
+        """Hide the properties window, if it's open."""
+        if self.is_visible:
+            self.ui_hide_window()
+            sound.fx('contract')
+            self.selected = self.selected_slot = self.selected_pal_pos = None
+        if self.missing_item_visible:
+            self.ui_hide_missing_win()
+            sound.fx('contract')
+            self.missing_item_visible = False
+
+    def show_prop(
+        self,
+        slot: Slot[SubItemRef],
+        pal_pos: Coord | None,
+        warp_cursor: bool = False,
+    ) -> None:
+        """Show the properties window for an item in a slot.
+
+        - widget should be the widget that represents the item.
+        - If warp_cursor is true, the cursor will be moved relative to this window so that
+          it stays on top of the selected subitem.
+        - If from the palette, pal_pos is the position.
+        """
+        self.ui_hide_missing_win()
+        if warp_cursor and self.is_visible:
+            offset = self.ui_get_cursor_offset()
+        else:
+            offset = None
+        selected = slot.contents
+        if selected is None:
+            LOGGER.warning('Selected empty slot?')
+            self.hide_context()
+            return
+
+        x, y = slot.get_coords()
+
+        # Check to see if it's actually a valid item too.
+        if selected.item.resolve(self.packset) is None:
+            LOGGER.info('Item {} not defined!', selected.item)
+            self.hide_context()
+            self.missing_item_visible = True
+            self.ui_show_missing_win(
+                x, y,
+                TRANS_MISSING_ITEM.format(id=selected.item),
+            )
+            return
+
+        self.selected = selected
+        self.selected_slot = slot
+        self.selected_pal_pos = pal_pos
+
+        sound.fx('expand')
+        self.ui_show_window(x, y)
+        self.adjust_position()
+
+        if offset is not None:
+            self.ui_set_cursor_offset(offset)
+        self.load_item_data()
+
+    async def _moreinfo_task(self) -> None:
+        """Task to handle clicking on the 'more info' URL."""
+        while True:
+            url = await self.moreinfo_trigger.wait()
+
             try:
                 webbrowser.open_new_tab(url)
             except webbrowser.Error:
-                if tk_tools.askyesno(
-                    icon="error",
+                if await self.dialog.ask_yes_no(
                     title=TransToken.ui("BEE2 - Error"),
-                    message=TransToken.ui(
-                        'Failed to open a web browser. Do you wish for the URL '
-                        'to be copied to the clipboard instead?'
-                    ),
-                    detail=f'"{url!s}"',
-                    parent=window,
+                    message=TRANS_URL_FAIL,
+                    icon=self.dialog.ERROR,
+                    detail=f'"{url}"',
                 ):
                     LOGGER.info("Saving {} to clipboard!", url)
-                    TK_ROOT.clipboard_clear()
-                    TK_ROOT.clipboard_append(url)
-            # Either the webbrowser or the messagebox could cause the
+                    self.ui_set_clipboard(url)
+            # Either the web browser or the messagebox could cause the
             # properties to move behind the main window, so hide it
-            # so it doesn't appear there.
-            hide_context(None)
+            # so that it doesn't appear there.
+            self.hide_context()
 
-    wid['moreinfo'] = ttk.Button(f, command=show_more_info)
-    localisation.set_text(wid['moreinfo'], TransToken.ui("More Info>>"))
-    wid['moreinfo'].grid(row=7, column=2, sticky='e')
-    tooltip.add_tooltip(wid['moreinfo'])
+    def set_sprite(self, pos: SPR, sprite: str) -> None:
+        """Set one of the property sprites to a value, with the default context menu."""
+        self.ui_set_sprite_img(pos, img.Handle.sprite('icons/' + sprite, 32, 32))
+        self.ui_set_sprite_tool(pos, SPRITE_TOOL[sprite])
 
-    was_temp_hidden = False
+    def sub_sel(self, pos: int, _: object = None, /) -> None:
+        """Change the currently-selected sub-item."""
+        if self.selected is None or self.selected_slot is None:
+            return
+        item = self.selected.item.resolve(packages.get_loaded_packages())
+        if item is None:
+            return
+        ind = ind_for_pos(item, pos)
+        # Can only change the subitem on the preview window
+        if self.selected_pal_pos is not None and ind is not None:
+            sound.fx('config')
+            ref = self.selected.with_subtype(ind)
+            if self.picker.change_pal_subtype(self.selected_slot, ref):
+                # Redisplay the window to refresh data and move it to match
+                self.show_prop(self.selected_slot, self.selected_pal_pos, warp_cursor=True)
 
-    def hide_item_props() -> None:
-        """Called when the item properties panel is hidden."""
-        sound.fx('contract')
-        if was_temp_hidden:
-            # Restore the context window if we hid it earlier.
-            window.deiconify()
+    def sub_open(self, pos: int, _: object = None, /) -> None:
+        """Move the context window to apply to the given item."""
+        assert self.selected is not None
+        item = self.selected.item.resolve(packages.get_loaded_packages())
+        if item is not None:
+            ind = ind_for_pos(item, pos)
+            if ind is not None:
+                sound.fx('expand')
+                slot, pal_pos = self.picker.find_matching_slot(
+                    self.selected.with_subtype(ind),
+                    check_palette=self.selected_pal_pos is not None,
+                )
+                if slot is not None:
+                    self.show_prop(slot, pal_pos)
 
-    async def show_item_props() -> None:
-        """Display the item property pane."""
-        nonlocal was_temp_hidden
-        sound.fx('expand')
-        await prop_window.show(
-            selected_item.data.editor,
-            wid['changedefaults'],
-            selected_sub_item.name,
-        )
-        was_temp_hidden = is_visible()
-        if was_temp_hidden:
-            # Temporarily hide the context window while we're open.
-            window.withdraw()
+    def adjust_position(self, _: object = None, /) -> None:
+        """Move the properties window onto the selected item.
 
-    prop_window = PropertyWindow(tk_img, hide_item_props)
+        We call this constantly, so the property window will not go outside
+        the screen, and snap back to the item when the main window returns.
+        """
+        if not self.is_visible or self.selected is None or self.selected_slot is None:
+            return
+        if (item := self.selected.item.resolve(packages.get_loaded_packages())) is None:
+            return
+        if (pos := pos_for_item(item, self.selected.subtype)) is None:
+            return
 
-    wid['changedefaults'] = ttk.Button(f, command=lambda: background_run(show_item_props))
-    localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
-    wid['changedefaults'].grid(row=7, column=1)
-    tooltip.add_tooltip(
-        wid['changedefaults'],
-        TransToken.ui('Change the default settings for this item when placed.')
-    )
+        # Calculate the pixel offset between the window and the subitem in
+        # the properties dialog, and shift if needed to keep it inside the
+        # window
+        targ_x, targ_y = self.selected_slot.get_coords()
+        icon_x, icon_y = self.ui_get_icon_offset(pos)
 
-    wid['variant'] = ttk.Combobox(
-        f,
-        values=['VERSION'],
-        exportselection=False,
-        # On Mac this defaults to being way too wide!
-        width=7 if utils.MAC else None,
-    )
-    wid['variant'].state(['readonly'])  # Prevent directly typing in values
-    wid['variant'].bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
-    wid['variant'].current(0)
-    wid['variant'].grid(row=7, column=0, sticky='w')
+        self.ui_show_window(targ_x - icon_x, targ_y - icon_y)
+
+    async def ui_task(self, signage_trigger: EdgeTrigger[()]) -> None:
+        """Run logic to update the UI."""
+        raise NotImplementedError
+
+    def ui_set_sprite_img(self, sprite: SPR, icon: img.Handle) -> None:
+        """Set the image for a connection sprite."""
+        raise NotImplementedError
+
+    def ui_set_sprite_tool(self, sprite: SPR, tool: TransToken) -> None:
+        """Set the tooltip for a connection sprite."""
+        raise NotImplementedError
+
+    def ui_set_props_main(
+        self,
+        name: TransToken,
+        authors: TransToken,
+        desc: MarkdownData,
+        ent_count: str,
+    ) -> None:
+        """Set the main set of widgets for properties."""
+        raise NotImplementedError
+
+    def ui_set_props_icon(self, ind: int, icon: img.Handle, selected: bool) -> None:
+        """Set the palette icon in the menu."""
+        raise NotImplementedError
+
+    def ui_set_debug_itemid(self, itemid: str) -> None:
+        """Set the debug item ID, or hide it if blank."""
+        raise NotImplementedError
+
+    def ui_get_icon_offset(self, ind: int) -> tuple[int, int]:
+        """Get the offset of this palette icon widget."""
+        raise NotImplementedError
+
+    def ui_hide_window(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
+
+    def ui_show_window(self, x: int, y: int) -> None:
+        """Show the window, at the specified position."""
+        raise NotImplementedError
+
+    def ui_show_missing_win(self, x: int, y: int, text: TransToken) -> None:
+        """Show an error window identifying missing items."""
+        raise NotImplementedError
+
+    def ui_hide_missing_win(self) -> None:
+        """Hide the missing-item window."""
+        raise NotImplementedError
+
+    def ui_get_cursor_offset(self) -> tuple[int, int]:
+        """Fetch the offset of the cursor relative to the window, for restoring when it moves."""
+        raise NotImplementedError
+
+    def ui_set_cursor_offset(self, offset: tuple[int, int]) -> None:
+        """Apply the offset, after the window has moved."""
+        raise NotImplementedError
+
+    def ui_set_clipboard(self, text: str) -> None:
+        """Add the specified text to the clipboard."""
+        raise NotImplementedError
+
+    def ui_show_sign_config(self) -> None:
+        """Show the special signage-configure button."""
+        raise NotImplementedError
+
+    def ui_show_variants(self, item: Item) -> None:
+        """Show the variants combo-box, and configure it."""
+        raise NotImplementedError
+
+    def ui_set_defaults_enabled(self, enable: bool) -> None:
+        """Set whether the Change Defaults button is enabled."""
+        raise NotImplementedError

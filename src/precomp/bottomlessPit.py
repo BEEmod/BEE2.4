@@ -1,5 +1,5 @@
 """Generates Bottomless Pits."""
-from typing import Set
+from typing import Dict, List, Set
 
 from srctools import FrozenVec, Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
@@ -16,7 +16,7 @@ BOTTOMLESS_PIT_MIN = 192
 
 # The set config options for pits. If SETTINGS is empty, no pits are used.
 SETTINGS: dict = {}  # TODO: Type correctly
-PIT_INST = {}
+PIT_INST: Dict[str, List[str]] = {}
 
 
 def pits_allowed() -> bool:
@@ -24,7 +24,7 @@ def pits_allowed() -> bool:
     return bool(SETTINGS)
 
 
-def is_pit(bbox_min: Vec, bbox_max: Vec):
+def is_pit(bbox_min: Vec, bbox_max: Vec) -> bool:
     """Check if the given location can be a bottomless pit."""
     return BOTTOMLESS_PIT_MIN >= bbox_min.z
 
@@ -64,7 +64,7 @@ def load_settings(pit: Keyvalues) -> None:
         PIT_INST[inst_type] = vals
 
 
-def make_bottomless_pit(vmf: VMF, max_height):
+def make_bottomless_pit(vmf: VMF, max_height: float) -> None:
     """Generate bottomless pits."""
     import vbsp
 
@@ -82,7 +82,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
         tele_off = Vec(0, 0, 0)
 
     # Controlled by the style, not skybox!
-    blend_light = options.get(str, 'pit_blend_light')
+    blend_light = options.PIT_BLEND_LIGHT()
 
     if use_skybox:
         # Add in the actual skybox edges and triggers.
@@ -224,7 +224,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             )
 
         wall_pos |= {
-            (pos + off).freeze()
+            (pos + off)
             for off in [
                 (0, -128, 0), (0, +128, 0),
                 (-128, 0, 0), (+128, 0, 0),
@@ -257,7 +257,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     LOGGER.info('Pit instances: {}', side_types)
 
-    for pos in map(FrozenVec.thaw, wall_pos):
+    for pos in wall_pos:
         if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue
@@ -301,7 +301,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 ).make_unique()
 
 
-def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
+def fix_base_brush(vmf: VMF, solid: Solid, face: Side) -> None:
     """Retexture the brush forming the bottom of a pit."""
     if SETTINGS['skybox'] != '':
         face.mat = 'tools/toolsskybox'
@@ -310,7 +310,7 @@ def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
         vmf.remove_brush(solid)
 
 
-def make_pit_shell(vmf: VMF):
+def make_pit_shell(vmf: VMF) -> None:
     """If the pit is surrounded on all sides, we can just extend walls down.
 
     That avoids needing to use skybox workarounds."""
@@ -361,7 +361,7 @@ def make_pit_shell(vmf: VMF):
         classname='trigger_multiple',
         spawnflags=4104,
         wait=0.1,
-        origin=options.get(Vec, 'global_pti_ents_loc'),
+        origin=options.GLOBAL_PTI_ENTS_LOC(),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -4182),
@@ -378,7 +378,7 @@ def make_pit_shell(vmf: VMF):
     # to stop players from portalling past the hurt trigger.
     diss_trig = vmf.create_ent(
         classname='func_noportal_volume',
-        origin=options.get(Vec, 'global_pti_ents_loc'),
+        origin=options.GLOBAL_PTI_ENTS_LOC(),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -64),

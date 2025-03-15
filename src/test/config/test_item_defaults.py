@@ -4,6 +4,7 @@ from srctools.dmx import Element, ValueType
 import pytest
 
 from config.item_defaults import LEGACY, ItemDefault
+from config import UnknownVersion
 from editoritems import ItemPropKind
 import editoritems_props
 
@@ -47,6 +48,15 @@ def test_parse_legacy() -> None:
         }
 
 
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        ItemDefault.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        ItemDefault.parse_dmx(Element('ItemDefault', 'DMConfig'), 2)
+
+
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
     assert ItemDefault.parse_kv1(Keyvalues('', []), 1) == ItemDefault('VER_DEFAULT', {})
@@ -63,9 +73,6 @@ def test_parse_kv1() -> None:
         editoritems_props.prop_angled_panel_anim: 'ramp_45_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
     })
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        ItemDefault.parse_kv1(Keyvalues('', []), 2)
 
 
 def test_export_kv1() -> None:
@@ -104,9 +111,6 @@ def test_parse_dmx() -> None:
         editoritems_props.prop_angled_panel_anim: 'ramp_45_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
     })
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        ItemDefault.parse_dmx(elem, 2)
 
 
 def test_export_dmx() -> None:

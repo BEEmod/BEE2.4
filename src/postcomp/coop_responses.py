@@ -1,5 +1,3 @@
-from typing import Dict, List, Optional
-
 from srctools import Entity
 import srctools.logger
 from hammeraddons.bsp_transform import Context, trans
@@ -10,9 +8,9 @@ LOGGER = srctools.logger.get_logger(__name__)
 @trans('BEE2: Coop Responses')
 def generate_coop_responses(ctx: Context) -> None:
     """If the entities are present, add the coop response script."""
-    responses: Dict[str, List[str]] = {}
+    responses: dict[str, list[str]] = {}
     for response in ctx.vmf.by_class['bee2_coop_response']:
-        responses[response['type']] = [
+        responses[response['type'].casefold()] = [
             value for key, value in response.items()
             if key.startswith('choreo')
         ]
@@ -30,7 +28,7 @@ def generate_coop_responses(ctx: Context) -> None:
     script.append('};')
 
     # We want to write this onto the '@glados' entity.
-    ent: Optional[Entity] = None
+    ent: Entity | None = None
     for ent in ctx.vmf.by_target['@glados']:
         ctx.add_code(ent, '\n'.join(script))
         # Also include the actual script.

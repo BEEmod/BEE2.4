@@ -3,22 +3,24 @@
 This allows checking which items are connected to what, and also regenerates
 the outputs with optimisations and custom settings.
 """
+from __future__ import annotations
+from typing import assert_never
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Sequence
 
-from typing_extensions import assert_never
-
-from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import conv_bool
 from srctools.math import Vec, Angle, format_float
 from srctools.vmf import VMF, EntityFixup, Entity, Output
-from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
-from precomp import instance_traits, options, packing, conditions
-import editoritems
-import consts
 import srctools.logger
 
-from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterator, Union
+from connections import InputType, FeatureMode, Config, ConnType, OutNames
+from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
+from precomp.texturing import MaterialConf
+from precomp import instance_traits, options, packing, conditions
+import consts
+import editoritems
 import user_errors
+import utils
 
 
 __all__ = [
@@ -26,17 +28,19 @@ __all__ = [
     'ITEMS', 'ShapeSignage', 'Item', 'Connection',
     'read_configs', 'calc_connections', 'gen_item_outputs'
 ]
+
+
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
-ITEM_TYPES: Dict[str, Optional[Config]] = {}
+ITEM_TYPES: dict[utils.ObjectID, Config] = {}
 
 # Targetname -> item
-ITEMS: Dict[str, 'Item'] = {}
+ITEMS: dict[str, Item] = {}
 
 # We need different names for each kind of input type, so they don't
 # interfere with each other. We use the 'inst_local' pattern not 'inst-local'
 # deliberately so the actual item can't affect the IO input.
-COUNTER_NAME: Dict[str, str] = {
+COUNTER_NAME: dict[str, str] = {
     consts.FixupVars.CONN_COUNT: '_counter',
     consts.FixupVars.CONN_COUNT_TBEAM: '_counter_polarity',
     consts.FixupVars.BEE_CONN_COUNT_A: '_counter_a',
@@ -75,11 +79,15 @@ SIGN_ORDER = [
     consts.Signage.SHAPE_WAVY
 ]
 
-SIGN_ORDER_LOOKUP: Dict[Union[consts.Signage, str], int] = {
+SIGN_ORDER_LOOKUP: dict[consts.Signage | str, int] = {
     sign: index
     for index, sign in
     enumerate(SIGN_ORDER)
 }
+
+# The generated item for antlasers, which we want to treat as an antline even though it's
+# a non-logic item.
+ID_ANTLASER = utils.special_id('<ANTLASER>')
 
 
 class ShapeSignage:
@@ -92,7 +100,7 @@ class ShapeSignage:
         'overlay_frames',
     )
 
-    def __init__(self, overlays: List[Entity]):
+    def __init__(self, overlays: list[Entity]) -> None:
         if not overlays:
             raise ValueError('No overlays')
         self.overlays = list(overlays)
@@ -109,7 +117,7 @@ class ShapeSignage:
         # Groups these into repeats of the shapes.
         self.repeat_group = 0
 
-        self.overlay_frames = []  # type: List[Entity]
+        self.overlay_frames: list[Entity] = []
 
     def __iter__(self) -> Iterator[Entity]:
         return iter(self.overlays)
@@ -130,15 +138,15 @@ class ShapeSignage:
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
-        'inst', 'config', '_kv_setters',
+        'inst', 'config', '_kv_setters', 'ind_state_relays',
         'ind_panels',
         'antlines', 'shape_signs',
         'ind_style',
         'inputs', 'outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
-        'ant_toggle_var',
     ]
+    ind_state_relays: dict[str, Entity] | None
 
     def __init__(
         self,
@@ -146,30 +154,25 @@ class Item:
         item_type: Config,
         *,  # Don't mix up antlines!
         ind_style: IndicatorStyle,
-        panels: Iterable[Entity]=(),
-        antlines: Iterable[Antline]=(),
-        shape_signs: Iterable[ShapeSignage]=(),
-        ant_toggle_var: str='',
-    ):
+        panels: Iterable[Entity] = (),
+        antlines: Iterable[Antline] = (),
+        shape_signs: Iterable[ShapeSignage] = (),
+    ) -> None:
         self.inst = inst
         self.config = item_type
 
         # Associated indicator panels and antlines
-        self.ind_panels = set(panels)  # type: Set[Entity]
-        self.antlines = set(antlines)
-        self.shape_signs = list(shape_signs)
+        self.ind_panels: set[Entity] = set(panels)
+        self.antlines: set[Antline] = set(antlines)
+        self.shape_signs: list[ShapeSignage] = list(shape_signs)
 
         # And the style to use for the antlines.
         self.ind_style = ind_style
 
-        # If set, the item has special antlines. This is a fixup var,
-        # which gets the antline name filled in for us.
-        self.ant_toggle_var = ant_toggle_var
-
         # From this item
-        self.outputs: Set[Connection] = set()
+        self.outputs: set[Connection] = set()
         # To this item
-        self.inputs: Set[Connection] = set()
+        self.inputs: set[Connection] = set()
 
         # Copy these, allowing them to be altered for a specific item.
         self.enable_cmd = item_type.enable_cmd
@@ -181,7 +184,9 @@ class Item:
         # The postcompiler entities to add outputs to the instance.
         # This eliminates needing io_proxies.
         # The key is the name of the local ent.
-        self._kv_setters: Dict[str, Entity] = {}
+        self._kv_setters: dict[str, Entity] = {}
+        # For custom antlines, the state comp_relays.
+        self.ind_state_relays = None
 
         assert self.name, 'Blank name!'
 
@@ -197,7 +202,7 @@ class Item:
         return f'<Item {self.config.id}: "{self.name}">'
 
     @property
-    def traits(self) -> Set[str]:
+    def traits(self) -> set[str]:
         """Return the set of instance traits for the item."""
         return instance_traits.get(self.inst)
 
@@ -217,17 +222,17 @@ class Item:
         self.inst['targetname'] = value
 
     @property
-    def timer(self) -> Optional[int]:
+    def timer(self) -> float | None:
         """Return the current $timer_delay value for this item, or None if it is not timed."""
         if consts.FixupVars.TIM_DELAY in self.inst.fixup:
-            timer_delay = self.inst.fixup.int(consts.FixupVars.TIM_DELAY)
-            if 1 <= timer_delay <= 30:
+            timer_delay = self.inst.fixup.float(consts.FixupVars.TIM_DELAY)
+            if 0 < timer_delay <= 30:
                 return timer_delay
             # else, it's an infinite timer.
         return None
 
     @timer.setter
-    def timer(self, value: Optional[int]) -> None:
+    def timer(self, value: float | None) -> None:
         """Set the current timer delay value for this item."""
         if value is not None and 1 <= value <= 30:
             self.inst.fixup[consts.FixupVars.TIM_DELAY] = value
@@ -240,7 +245,34 @@ class Item:
         """Remove the timer delay fixup value."""
         del self.inst.fixup[consts.FixupVars.TIM_DELAY]
 
-    def output_act(self) -> Optional[Tuple[Optional[str], str]]:
+    def clone(self, inst: Entity, name: str) -> Item:
+        """Create a copy of this item, under a new name and using a different instance.
+
+        I/O and antlines are not cloned.
+        """
+        copy = Item.__new__(Item)
+        copy.inst = inst
+        copy.config = self.config
+
+        copy.ind_panels = set()
+        copy.antlines = set()
+        copy.shape_signs = []
+
+        copy.ind_style = self.ind_style
+
+        copy.outputs = set()
+        copy.inputs = set()
+
+        copy.enable_cmd = self.enable_cmd
+        copy.disable_cmd = self.disable_cmd
+        copy.sec_enable_cmd = self.sec_enable_cmd
+        copy.sec_disable_cmd = self.sec_disable_cmd
+
+        copy._kv_setters = {}
+        ITEMS[name] = copy
+        return copy
+
+    def output_act(self) -> tuple[str | None, str] | None:
         """Return the output used when this is activated."""
         if self.config.spawn_fire.valid(bool(self.inputs)) and self.is_logic:
             return None, 'OnUser2'
@@ -255,7 +287,7 @@ class Item:
 
         return self.config.output_act
 
-    def output_deact(self) -> Optional[Tuple[Optional[str], str]]:
+    def output_deact(self) -> tuple[str | None, str] | None:
         """Return the output to use when this is deactivated."""
         if self.config.spawn_fire.valid(bool(self.inputs)) and self.is_logic:
             return None, 'OnUser1'
@@ -282,7 +314,7 @@ class Item:
         self.ind_panels.clear()
         self.shape_signs.clear()
 
-    def transfer_antlines(self, item: 'Item') -> None:
+    def transfer_antlines(self, item: Item) -> None:
         """Transfer the antlines and checkmarks from this item to another."""
         item.antlines.update(self.antlines)
         item.ind_panels.update(self.ind_panels)
@@ -292,17 +324,50 @@ class Item:
         self.ind_panels.clear()
         self.shape_signs.clear()
 
+    def walk_nonlogic_outputs(self, ignore_antlaser: bool) -> Iterator[tuple[Sequence[Item], Connection]]:
+        """Iterate over all items this outputs to, passing through logic item connections.
+
+        This yields the connection to the final item, plus any logic gates in-between.
+        Raises a UserError if loops are found.
+        """
+        todo: list[tuple[list[Item], Connection]] = [
+            ([], conn)
+            for conn in self.outputs
+        ]
+        while todo:
+            path, conn = todo.pop()
+            if conn.to_item in path:
+                raise user_errors.UserError(user_errors.TOK_CHAINING_LOOP, points=[
+                    Vec.from_str(item.inst['origin'])
+                    for item in path
+                ])
+            dest = conn.to_item
+            if len(dest.inputs) != 1:
+                # Must include.
+                yield path, conn
+                continue
+
+            if dest.is_logic or (
+                ignore_antlaser and dest.config.id == ID_ANTLASER
+            ):
+                # Collapsable, search through this.
+                subpath = [*path, dest]
+                for subitem in dest.outputs:
+                    todo.append((subpath, subitem))
+            else:
+                yield path, conn
+
     def add_io_command(
         self,
-        output: Optional[Tuple[Optional[str], str]],
-        target: Union[Entity, str],
+        output: tuple[str | None, str] | None,
+        target: Entity | str,
         inp_cmd: str,
         params: str = '',
         delay: float = 0.0,
         times: int = -1,
-        inst_in: Optional[str]=None,
+        inst_in: str | None = None,
     ) -> None:
-        """Add an output to this item.
+        """Add an output to this item. Should only be used here during generation.
 
         For convenience, if the output is None this does nothing.
         """
@@ -340,11 +405,28 @@ class Item:
             inst_in=inst_in,
         ))
 
+    def get_ind_state_relay(self, relay_name: str) -> Entity:
+        """Fetch or create the indicator state comp_relay with the given name."""
+        if self.ind_state_relays is None:
+            self.ind_state_relays = {}
+
+        key = relay_name.casefold()
+        try:
+            return self.ind_state_relays[key]
+        except KeyError:
+            self.ind_state_relays[key] = relay =  self.inst.map.create_ent(
+                'comp_relay',
+                targetname=conditions.local_name(self.inst, relay_name),
+                origin=self.inst['origin'],
+            )
+            return relay
+
 
 class Connection:
     """Represents a connection between two items."""
 
     __slots__ = ['_to', '_from', 'type', 'outputs']
+
     def __init__(
         self,
         to_item: Item,   # Item this is triggering
@@ -358,11 +440,7 @@ class Connection:
         self.outputs = list(outputs)
 
     def __repr__(self) -> str:
-        return '<Connection {} {} -> {}>'.format(
-            CONN_NAMES[self.type],
-            self._from.name,
-            self._to.name,
-        )
+        return f'<Connection {CONN_NAMES[self.type]} {self._from.name} -> {self._to.name}>'
 
     def add(self) -> None:
         """Add this to the directories."""
@@ -428,27 +506,27 @@ def collapse_item(item: Item) -> None:
 def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     """Load our connection configuration from the config files."""
     for item in all_items:
-        if item.id.casefold() in ITEM_TYPES:
+        if item.id in ITEM_TYPES:
             raise ValueError(f'Duplicate item type "{item.id}"')
-        if item.conn_config is None and (item.force_input or item.force_output):
-            # The item has no config, but it does force input/output.
-            # Generate a blank config so the Item is created.
-            ITEM_TYPES[item.id.casefold()] = Config(item.id)
+        if item.conn_config is None:
+            # Generate a blank config.
+            ITEM_TYPES[item.id] = Config(item.id)
         else:
-            ITEM_TYPES[item.id.casefold()] = item.conn_config
+            ITEM_TYPES[item.id] = item.conn_config
 
     # These must exist.
-    for item_id in ['item_indicator_panel', 'item_indicator_panel_timer']:
-        if ITEM_TYPES.get(item_id) is None:
+    for def_item in [consts.DefaultItems.indicator_check, consts.DefaultItems.indicator_timer]:
+        if def_item.id not in ITEM_TYPES:
             raise user_errors.UserError(
-                user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
+                user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=def_item.id)
             )
 
 
 def calc_connections(
     vmf: VMF,
-    antlines: Dict[str, List[Antline]],
-    shape_frame_tex: List[str],
+    antlines: dict[str, list[Antline]],
+    *,
+    shape_frame_mat: Sequence[MaterialConf],
     enable_shape_frame: bool,
     ind_style: IndicatorStyle,
 ) -> None:
@@ -459,13 +537,13 @@ def calc_connections(
     It also applies frames to shape signage to distinguish repeats.
     """
     # First we want to match targetnames to item types.
-    toggles: Dict[str, Entity] = {}
+    toggles: dict[str, Entity] = {}
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
-    sign_shape_overlays: Dict[Tuple[str, str], List[Entity]] = defaultdict(list)
+    sign_shape_overlays: dict[tuple[str, str], list[Entity]] = defaultdict(list)
 
     # Indicator panels
-    panels: Dict[str, Entity] = {}
+    panels: dict[str, Entity] = {}
 
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
@@ -475,7 +553,7 @@ def calc_connections(
 
     # Corridors have a numeric suffix depending on the corridor index.
     # That's no longer valid, so we want to strip it.
-    corridors: List[Entity] = []
+    corridors: list[Entity] = []
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
@@ -502,12 +580,9 @@ def calc_connections(
                 LOGGER.warning('No item ID for "{}"!', inst)
                 continue
             try:
-                item_type = ITEM_TYPES[item_id.casefold()]
+                item_type = ITEM_TYPES[item_id]
             except KeyError:
                 LOGGER.warning('No item type for "{}"!', item_id)
-                continue
-            if item_type is None:
-                # It exists, but has no I/O.
                 continue
 
             # Pass in the defaults for antline styles.
@@ -532,9 +607,9 @@ def calc_connections(
             sign_shape_overlays[name, mat.casefold()].append(over)
 
     # Name -> signs pairs
-    sign_shapes = defaultdict(list)  # type: Dict[str, List[ShapeSignage]]
+    sign_shapes: dict[str, list[ShapeSignage]] = defaultdict(list)
     # By material index, for group frames.
-    sign_shape_by_index = defaultdict(list)  # type: Dict[int, List[ShapeSignage]]
+    sign_shape_by_index: dict[int, list[ShapeSignage]] = defaultdict(list)
     for (name, mat), sign_pair in sign_shape_overlays.items():
         # It's possible - but rare - for more than 2 to be in a pair.
         # We have to just treat them as all in their 'pair'.
@@ -545,15 +620,13 @@ def calc_connections(
 
     # Now build the connections and items.
     for item in ITEMS.values():
-        input_items: List[Item] = []  # Instances we trigger
-        inputs: Dict[str, List[Output]] = defaultdict(list)
+        input_items: list[Item] = []  # Instances we trigger
+        inputs: dict[str, list[Output]] = defaultdict(list)
 
         if item.inst.outputs and item.config is None:
             raise ValueError(
-                'No connections for item "{}", '
-                'but outputs in the map!'.format(
-                    instance_traits.get_item_id(item.inst)
-                )
+                f'No connections for item "{instance_traits.get_item_id(item.inst)}", '
+                f'but outputs in the map!'
             )
 
         for out in item.inst.outputs:
@@ -584,7 +657,7 @@ def calc_connections(
                 if item.timer is None:
                     if pan.fixup.bool(consts.FixupVars.TIM_ENABLED):
                         item.timer = tim = pan.fixup.int(consts.FixupVars.TIM_DELAY)
-                        if not (1 <= tim <= 30):
+                        if not (0 < tim <= 30):
                             # These would be infinite.
                             item.timer = None
             else:
@@ -608,7 +681,7 @@ def calc_connections(
             conn_type = ConnType.DEFAULT
             in_outputs = inputs[inp_item.name]
 
-            if inp_item.config.id == 'ITEM_TBEAM':
+            if inp_item.config.id == consts.DefaultItems.funnel.id:
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:
@@ -640,8 +713,8 @@ def calc_connections(
             conn.add()
 
     # Make signage frames
-    shape_frame_tex = [mat for mat in shape_frame_tex if mat]
-    if shape_frame_tex and enable_shape_frame:
+    shape_frame_mat = [mat for mat in shape_frame_mat if mat]
+    if shape_frame_mat and enable_shape_frame:
         for shape_mat in sign_shape_by_index.values():
             # Sort so which gets what frame is consistent.
             shape_mat.sort()
@@ -649,13 +722,13 @@ def calc_connections(
                 shape.repeat_group = index
                 if index == 0:
                     continue  # First, no frames..
-                frame_mat = shape_frame_tex[(index-1) % len(shape_frame_tex)]
+                frame_mat = shape_frame_mat[(index-1) % len(shape_frame_mat)]
 
                 for overlay in shape:
                     frame = overlay.copy()
                     shape.overlay_frames.append(frame)
                     vmf.add_ent(frame)
-                    frame['material'] = frame_mat
+                    frame_mat.apply_over(frame)
                     frame['renderorder'] = 1  # On top
 
     # Now we've computed everything, strip numbers.
@@ -674,7 +747,7 @@ def do_item_optimisation(vmf: VMF) -> None:
 
     for item in list(ITEMS.values()):
         # We can't remove items that have functionality, or don't have IO.
-        if item.config is None or not item.config.input_type.is_logic:
+        if not item.config.input_type.is_logic:
             continue
 
         prim_inverted = conv_bool(item.inst.fixup.substitute(item.config.invert_var, allow_invert=True))
@@ -704,25 +777,26 @@ def do_item_optimisation(vmf: VMF) -> None:
     if needs_global_toggle:
         vmf.create_ent(
             classname='env_texturetoggle',
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             targetname='_static_ind_tog',
             target='_static_ind',
         )
 
 
-@conditions.meta_cond(-250, only_once=True)
+@conditions.MetaCond.Connections.register
 def gen_item_outputs(vmf: VMF) -> None:
     """Create outputs for all items with connections.
 
     This performs an optimization pass over items with outputs to remove
     redundancy, then applies all the outputs to the instances. Before this,
     connection count and inversion values are not valid. After this point,
-    items may not have connections altered.
+    items may not have connections altered, but the connection count is set,
+    checkmark/timer instances exist, etc.
     """
     LOGGER.info('Generating item IO...')
 
     # For logic items without inputs, collect the instances to fix up later.
-    dummy_logic_ents: List[Entity] = []
+    dummy_logic_ents: list[Entity] = []
 
     # Apply input A/B types to connections.
     # After here, all connections are primary or secondary only.
@@ -747,9 +821,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
-        if item.config is None:  # Has no I/O.
-            continue
-
         # Try to add the locking IO.
         add_locking(item)
 
@@ -814,10 +885,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 '_inv_rl',
             )
 
-    logic_auto = vmf.create_ent(
-        'logic_auto',
-        origin=options.get(Vec, 'global_ents_loc')
-    )
+    logic_auto = vmf.create_ent('logic_auto', origin=options.GLOBAL_ENTS_LOC())
 
     for ent in dummy_logic_ents:
         # Condense all these together now.
@@ -897,7 +965,7 @@ def add_locking(item: Item) -> None:
 def localise_output(
     out: Output, out_name: str, inst: Entity,
     *,
-    delay: float=0.0, only_once: bool=False,
+    delay: float = 0.0, only_once: bool = False,
 ) -> Output:
     """Create a copy of an output, with instance fixups substituted and with names localised."""
     return Output(
@@ -936,12 +1004,11 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         relay['origin'] = item.inst['origin']
 
     for cmd in item.config.timer_done_cmd:
-        if cmd:
-            relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
+        relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
 
     if item.config.timer_sound_pos is not None and has_sounds:
-        timer_sound = options.get(str, 'timer_sound')
-        timer_cc = options.get(str, 'timer_sound_cc')
+        timer_sound = options.TIMER_SOUND()
+        timer_cc = options.TIMER_SOUND_CC()
 
         # The default sound has 'ticking' closed captions.
         # So reuse that if the style doesn't specify a different noise.
@@ -965,7 +1032,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         )
         packing.pack_files(item.inst.map, timer_sound, file_type='sound')
 
-        for delay in range(timer_delay):
+        for delay in range(int(timer_delay)):
             relay.add_out(Output(
                 'OnTrigger',
                 '!self',
@@ -997,10 +1064,10 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
 
 
 def add_item_inputs(
-    dummy_logic_ents: List[Entity],
+    dummy_logic_ents: list[Entity],
     item: Item,
     logic_type: InputType,
-    inputs: List[Connection],
+    inputs: list[Connection],
     count_var: str,
     enable_cmd: Iterable[Output],
     disable_cmd: Iterable[Output],
@@ -1295,11 +1362,12 @@ def add_item_indicators(
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, item.ind_style)
+        ant.export(item.inst.map, style)
 
     # Special case - the item wants full control over its antlines.
-    if has_ant and item.ant_toggle_var:
-        item.inst.fixup[item.ant_toggle_var] = ant_name
+    if has_ant and style.toggle_var:
+        # Deprecated method, give the item full control.
+        item.inst.fixup[style.toggle_var] = ant_name
         # We don't have antlines to control.
         has_ant = False
 
@@ -1308,7 +1376,7 @@ def add_item_indicators(
     # If that is defined, use advanced/custom timer logic if the style supports it.
     adv_timer = independent_timer and style.has_advanced_timer()
 
-    conn_pairs: List[Tuple[Optional[Tuple[Optional[str], str]], float, Sequence[Output]]]
+    conn_pairs: list[tuple[tuple[str | None, str] | None, float, Sequence[Output]]]
     panel_fixup = EntityFixup(item.inst.fixup.copy_values())
     if timer_delay is not None:  # We have a timer.
         inst_type = style.timer_switching
@@ -1364,8 +1432,15 @@ def add_item_indicators(
             (item.output_act(), 0.0, style.check_cmd),
             (item.output_deact(), 0.0, style.cross_cmd),
         ]
-    if pan_filename and item.ind_panels:
-        conditions.ALL_INST.add(pan_filename.casefold())
+    if pan_filename:
+        if item.ind_panels:
+            conditions.ALL_INST.add(pan_filename.casefold())
+    else:
+        # No sign filename, remove the panels.
+        has_sign = False
+        for pan in item.ind_panels:
+            pan.remove()
+        item.ind_panels.clear()
 
     if timer_delay is not None:
         panel_fixup['$time'] = format_float(timer_delay)
@@ -1376,14 +1451,14 @@ def add_item_indicators(
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
-        if independent_timer:
+        if independent_timer or style.states:
             # We need to not tie antline control to the timer.
             needs_toggle = has_ant
             inst_type = PanelSwitchingStyle.CUSTOM
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise assert_never(inst_type)
+        assert_never(inst_type)
 
     first_inst = True
 
@@ -1392,7 +1467,7 @@ def add_item_indicators(
             pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name
         # Ensure only one gets the indicator name.
         elif first_inst and inst_type is PanelSwitchingStyle.INTERNAL:
-            pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else ' '
+            pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else '-'
             first_inst = False
         else:
             # VBSP and/or Hammer seems to get confused with totally empty
@@ -1436,16 +1511,23 @@ def add_item_indicators(
             targetname='toggle_' + item.name,
             target=ant_name,
         )
-        # Don't use the configurable inputs - if they want that, use custAntline.
-        item.add_io_command(
-            item.output_deact(),
-            toggle,
-            'SetTextureIndex',
-            '0',
-        )
-        item.add_io_command(
-            item.output_act(),
-            toggle,
-            'SetTextureIndex',
-            '1',
-        )
+        if style.states:
+            for state in style.states:
+                item.get_ind_state_relay(state.name).add_out(Output(
+                    'OnTrigger', toggle,
+                    'SetTextureIndex', state.frame
+                ))
+        else:
+            # Default behaviour.
+            item.add_io_command(
+                item.output_deact(),
+                toggle,
+                'SetTextureIndex',
+                '0',
+            )
+            item.add_io_command(
+                item.output_act(),
+                toggle,
+                'SetTextureIndex',
+                '1',
+            )

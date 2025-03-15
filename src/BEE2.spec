@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 import contextlib
-from typing import Any, Iterable, List, Optional, Tuple, Union, cast
+from typing import Iterable, List, Optional, Tuple, Union
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -15,9 +15,11 @@ from babel.messages.mofile import write_mo
 from srctools.fgd import FGD
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+
 # Injected by PyInstaller.
-workpath: str
-SPECPATH: str
+workpath: str = globals()['workpath']
+SPECPATH: str = globals()['SPECPATH']
+DISTPATH: str = globals()['DISTPATH']
 
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 
@@ -25,17 +27,44 @@ hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(SPECPATH)
 import utils
 
-# src -> build subfolder.
-data_files = [
+# src -> binaries subfolder.
+data_bin_files = [
     ('../BEE2.ico', '.'),
     ('../BEE2.fgd', '.'),
     ('../hammeraddons.fgd', '.'),
+]
+# src -> app subfolder, in 6.0+
+data_files = [
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
+    ('../sounds/*.ogg', 'sounds'),
+    ('../INSTALL_GUIDE.txt', '.'),
 ]
 
 HA_VERSION = utils.get_git_version(hammeraddons)
+
+
+def copy_datas(appfolder: Path, compiler_loc: str) -> None:
+    """Copy `datas_files` files to the root of the app folder."""
+    for gl_src, dest in data_files:
+        for filename in Path().glob(gl_src):
+            name = filename.name
+            if name == 'INSTALL_GUIDE.txt':
+                # Special case, use a different name.
+                name = 'README.txt'
+
+            p_dest = Path(appfolder, dest, name)
+
+            print(filename, '->', p_dest)
+            p_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(filename, p_dest)
+
+    (appfolder / 'packages').mkdir(exist_ok=True)
+
+    compiler_dest = Path(appfolder, 'bin', 'compiler')
+    print(compiler_loc, '->', compiler_dest)
+    shutil.copytree(compiler_loc, compiler_dest)
 
 
 def do_localisation() -> None:
@@ -163,58 +192,24 @@ build_fgd()
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # We just use idlelib.WidgetRedirector and idlelib.query
-    'idlelib.ClassBrowser',
-    'idlelib.ColorDelegator',
-    'idlelib.Debugger',
-    'idlelib.Delegator',
-    'idlelib.EditorWindow',
-    'idlelib.FileList',
-    'idlelib.GrepDialog',
-    'idlelib.IOBinding',
-    'idlelib.IdleHistory',
-    'idlelib.MultiCall',
-    'idlelib.MultiStatusBar',
-    'idlelib.ObjectBrowser',
-    'idlelib.OutputWindow',
-    'idlelib.PathBrowser',
-    'idlelib.Percolator',
-    'idlelib.PyParse',
-    'idlelib.PyShell',
-    'idlelib.RemoteDebugger',
-    'idlelib.RemoteObjectBrowser',
-    'idlelib.ReplaceDialog',
-    'idlelib.ScrolledList',
-    'idlelib.SearchDialog',
-    'idlelib.SearchDialogBase',
-    'idlelib.SearchEngine',
-    'idlelib.StackViewer',
-    'idlelib.TreeWidget',
-    'idlelib.UndoDelegator',
-    'idlelib.WindowList',
-    'idlelib.ZoomHeight',
-    'idlelib.aboutDialog',
-    'idlelib.configDialog',
-    'idlelib.configHandler',
-    'idlelib.configHelpSourceEdit',
-    'idlelib.configSectionNameDialog',
-    'idlelib.dynOptionMenuWidget',
-    'idlelib.idle_test.htest',
-    'idlelib.idlever',
-    'idlelib.keybindingDialog',
-    'idlelib.macosxSupport',
-    'idlelib.rpc',
-    'idlelib.tabbedpages',
-    'idlelib.textView',
-
+    'idlelib',
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
+    'stackscope',  # Only used in dev.
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
-    # Imported by logging handlers which we don't use..
+    # Imported by logging handlers which we don't use...
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
+
+    # Pulls in all of pytest etc, not required.
+    'trio.testing',
+    # Trio -> CFFI -> uses setuptools for C compiler in some modes, but
+    # trio doesn't use those. PyInstaller ends up pulling in pkg_resources though.
+    # 'setuptools',
+
+    'markupsafe',  # Used by TransToken.translate_html(), only relevant for Jinja.
 
     'unittest',  # Imported in __name__==__main__..
     'doctest',
@@ -266,21 +261,16 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
-for snd in os.listdir('../sounds/'):
-    if snd == 'music_samp':
-        continue
-    data_files.append(('../sounds/' + snd, 'sounds'))
-
 # Include the compiler, picking the right architecture.
 bitness = 64 if sys.maxsize > (2**33) else 32
-data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
+COMPILER_LOC = f'../dist/{bitness}bit/compiler/'
 
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
-    ['BEE2_launch.pyw'],
+    ['BEE2_launch.py'],
     pathex=[workpath],
-    datas=data_files,
+    datas=data_files + data_bin_files,
     hiddenimports=[
         'PIL._tkinter_finder',
         # Needed to unpickle the CLDR.
@@ -295,19 +285,12 @@ bee2_a = Analysis(
     noarchive=False
 )
 
-# Need to add this manually, so it can have a different name.
-bee2_a.datas.append((
-    'README.txt',
-    os.path.join(os.getcwd(), '../INSTALL_GUIDE.txt'),
-    'DATA',
-))
-
 pyz = PYZ(
     bee2_a.pure,
     bee2_a.zipped_data,
 )
 
-exe = EXE(
+bee_exe = EXE(
     pyz,
     bee2_a.scripts,
     [],
@@ -318,12 +301,45 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
+backup_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='backup',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
+compiler_settings_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='compiler_settings',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
     windowed=True,
     icon='../BEE2.ico'
 )
 
 coll = COLLECT(
-    exe,
+    bee_exe, backup_exe, compiler_settings_exe,
     bee2_a.binaries,
     bee2_a.zipfiles,
     bee2_a.datas,
@@ -331,3 +347,5 @@ coll = COLLECT(
     upx=True,
     name='BEE2',
 )
+
+copy_datas(Path(coll.name), COMPILER_LOC)

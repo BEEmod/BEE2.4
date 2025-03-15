@@ -4,25 +4,33 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-from typing import Callable, Dict, List, Optional, Tuple
+from __future__ import annotations
+from typing import assert_never, override
+
+from collections.abc import Callable
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
 import tkinter as tk
 import logging
 import multiprocessing.connection
-import sys
+import queue
+import time
 
 from PIL import ImageTk
 
-from app import TK_ROOT, img, tk_tools
+from ui_tk import TK_ROOT, tk_tools
+from app import img
+from ipc_types import (
+    ScreenID, StageID,
+    ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,
+)
+import ipc_types
 import utils
 
 
-# ID -> screen.
-SCREENS: Dict[int, 'BaseLoadScreen'] = {}
-
-PIPE_REC: multiprocessing.connection.Connection
-PIPE_SEND: multiprocessing.connection.Connection
+SCREENS: dict[ScreenID, LoadScreen | SplashScreen] = {}
+QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
+TIMEOUT = 0.125  # New iteration if we take more than this long.
 
 # Stores translated strings, which are done in the main process.
 TRANSLATION = {
@@ -61,15 +69,15 @@ START = '1.0'  # Row 1, column 0 = first character
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
-    drag_x: Optional[int]
-    drag_y: Optional[int]
+    drag_x: int | None
+    drag_y: int | None
 
     def __init__(
         self,
-        scr_id: int,
+        scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[str, str]],
+        stages: list[tuple[StageID, str]],
     ) -> None:
         self.scr_id = scr_id
         self.title_text = title_text
@@ -77,14 +85,16 @@ class BaseLoadScreen:
         self.win = tk.Toplevel(TK_ROOT, name=f'loadscreen_{scr_id}')
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', int(force_ontop))
+        self.win.wm_attributes('-topmost', int(force_ontop))
+        if utils.LINUX:
+            self.win.wm_attributes('-type', 'splash')
         self.win['cursor'] = tk_tools.Cursors.WAIT
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
 
-        self.values = {}
-        self.maxes = {}
-        self.names = {}
+        self.values: dict[StageID, int] = {}
+        self.maxes: dict[StageID, int] = {}
+        self.names: dict[StageID, str] = {}
         self.stages = stages
         self.is_shown = False
 
@@ -101,10 +111,10 @@ class BaseLoadScreen:
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event: Optional[tk.Event]=None) -> None:
+    def cancel(self, event: object = None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
-        PIPE_SEND.send(('cancel', self.scr_id))
+        QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_Cancel(self.scr_id))
 
     def move_start(self, event: tk.Event) -> None:
         """Record offset of mouse on click."""
@@ -121,25 +131,24 @@ class BaseLoadScreen:
         """Move the window when moving the mouse."""
         if self.drag_x is None or self.drag_y is None:
             return
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=self.win.winfo_x() + (event.x - self.drag_x),
-            y=self.win.winfo_y() + (event.y - self.drag_y),
-        ))
+        x = self.win.winfo_x() + event.x - self.drag_x
+        y = self.win.winfo_y() + event.y - self.drag_y
+        self.win.geometry(f'+{x:g}+{y:g}')
 
-    def op_show(self, title: str, labels: List[str]) -> None:
+    def op_show(self, title: str, stages: list[tuple[str, int]]) -> None:
         """Show the window."""
         self.win.title(title)
-        for (st_id, _), name in zip(self.stages, labels):
+        for (st_id, _), (name, max_val) in zip(self.stages, stages, strict=True):
             self.names[st_id] = name
+            self.maxes[st_id] = max_val
 
         self.is_shown = True
         self.win.deiconify()
         self.win.lift()
         self.win.update()  # Force an update so the reqwidth is correct
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=(self.win.winfo_screenwidth() - self.win.winfo_reqwidth()) // 2,
-            y=(self.win.winfo_screenheight() - self.win.winfo_reqheight()) // 2,
-        ))
+        x = self.win.winfo_screenwidth() - self.win.winfo_reqwidth()
+        y = self.win.winfo_screenheight() - self.win.winfo_reqheight()
+        self.win.geometry(f'+{x // 2:g}+{y // 2:g}')
 
     def op_hide(self) -> None:
         """Hide the window."""
@@ -150,16 +159,15 @@ class BaseLoadScreen:
         """Hide and reset values in all bars."""
         self.op_hide()
         for stage in self.values.keys():
-            self.maxes[stage] = 10
             self.values[stage] = 0
         self.reset_stages()
 
-    def op_step(self, stage: str) -> None:
-        """Increment the specified value."""
-        self.values[stage] += 1
+    def op_set_value(self, stage: StageID, value: int) -> None:
+        """Set the value for the specified stage."""
+        self.values[stage] = value
         self.update_stage(stage)
 
-    def op_set_length(self, stage: str, num: int) -> None:
+    def op_set_length(self, stage: StageID, num: int) -> None:
         """Set the number of items in a stage."""
         if num == 0:
             self.op_skip_stage(stage)
@@ -167,11 +175,11 @@ class BaseLoadScreen:
             self.maxes[stage] = num
             self.update_stage(stage)
 
-    def op_skip_stage(self, stage: str) -> None:
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         raise NotImplementedError
 
-    def update_stage(self, stage: str) -> None:
+    def update_stage(self, stage: StageID) -> None:
         """Update the UI for the given stage."""
         raise NotImplementedError
 
@@ -189,8 +197,14 @@ class BaseLoadScreen:
 class LoadScreen(BaseLoadScreen):
     """Normal loading screens."""
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: ScreenID,
+        title_text: str,
+        force_ontop: bool,
+        stages: list[tuple[StageID, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
@@ -211,10 +225,10 @@ class LoadScreen(BaseLoadScreen):
         self.cancel_btn = ttk.Button(self.frame, command=self.cancel)
         self.cancel_btn.grid(row=0, column=1)
 
-        self.bar_var = {}
-        self.bars = {}
-        self.titles = {}
-        self.labels = {}
+        self.bar_var: dict[StageID, tk.IntVar] = {}
+        self.bars: dict[StageID, ttk.Progressbar] = {}
+        self.titles: dict[StageID, ttk.Label] = {}
+        self.labels: dict[StageID, ttk.Label] = {}
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
@@ -250,13 +264,15 @@ class LoadScreen(BaseLoadScreen):
         """Update translations."""
         self.cancel_btn['text'] = TRANSLATION['cancel']
 
+    @override
     def reset_stages(self) -> None:
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
             self.bar_var[stage].set(0)
             self.labels[stage]['text'] = '0/??'
 
-    def update_stage(self, stage: str) -> None:
+    @override
+    def update_stage(self, stage: StageID) -> None:
         """Redraw the given stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
@@ -265,22 +281,21 @@ class LoadScreen(BaseLoadScreen):
             self.bar_var[stage].set(round(
                 1000 * self.values[stage] / max_val
             ))
-        self.labels[stage]['text'] = '{!s}/{!s}'.format(
-            self.values[stage],
-            max_val,
-        )
+        self.labels[stage]['text'] = f'{self.values[stage]!s}/{max_val!s}'
 
-    def op_show(self, title: str, labels: List[str]) -> None:
+    @override
+    def op_show(self, title: str, stages: list[tuple[str, int]]) -> None:
         """Show the window."""
         self.title_text = title
         self.win.title(title)
         self.title_lbl['text'] = title + '...',
-        for (st_id, _), name in zip(self.stages, labels):
+        for (st_id, _), (name, max_val) in zip(self.stages, stages, strict=True):
             if st_id in self.titles:
                 self.titles[st_id]['text'] = name + ':'
-        super().op_show(title, labels)
+        super().op_show(title, stages)
 
-    def op_skip_stage(self, stage: str) -> None:
+    @override
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -295,8 +310,14 @@ class SplashScreen(BaseLoadScreen):
     about reloading translations.
     """
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: ScreenID,
+        title_text: str,
+        force_ontop: bool,
+        stages: list[tuple[StageID, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.is_compact = True
 
@@ -511,7 +532,8 @@ class SplashScreen(BaseLoadScreen):
                     font=progress_font,
                 )
 
-    def update_stage(self, stage: str) -> None:
+    @override
+    def update_stage(self, stage: StageID) -> None:
         """Update all the text."""
         if self.maxes[stage] == 0:
             text = f'{self.names[stage]}: (0/0)'
@@ -538,7 +560,8 @@ class SplashScreen(BaseLoadScreen):
                 y2,
             )
 
-    def op_set_length(self, stage: str, num: int) -> None:
+    @override
+    def op_set_length(self, stage: StageID, num: int) -> None:
         """Set the number of items in a stage."""
         self.maxes[stage] = num
         self.update_stage(stage)
@@ -567,11 +590,13 @@ class SplashScreen(BaseLoadScreen):
                 )
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
+    @override
     def reset_stages(self) -> None:
         """Reset all stages."""
         pass
 
-    def op_skip_stage(self, stage: str) -> None:
+    @override
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -592,7 +617,7 @@ class SplashScreen(BaseLoadScreen):
         else:
             self.sml_canvas.grid_remove()
             self.lrg_canvas.grid(row=0, column=0)
-        PIPE_SEND.send(('main_set_compact', is_compact))
+        QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_MainSetCompact(is_compact))
 
     def toggle_compact(self, event: tk.Event) -> None:
         """Toggle when the splash screen is double-clicked."""
@@ -613,19 +638,16 @@ class SplashScreen(BaseLoadScreen):
             """Event handler."""
             self.op_set_is_compact(compact)
             # Snap to where the button is.
-            self.win.wm_geometry('+{:g}+{:g}'.format(
-                self.win.winfo_x() + offset,
-                self.win.winfo_y(),
-            ))
+            self.win.wm_geometry(f'+{self.win.winfo_x() + offset:g}+{self.win.winfo_y():g}')
         return func
 
 
 class LogWindow:
     """Implements the logging window."""
-    def __init__(self, pipe: multiprocessing.connection.Connection) -> None:
+    def __init__(self, queue: multiprocessing.Queue[ARGS_REPLY_LOGGING]) -> None:
         """Initialise the window."""
         self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
-        self.pipe = pipe
+        self.queue = queue
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
         window.protocol('WM_DELETE_WINDOW', self.evt_close)
@@ -662,7 +684,7 @@ class LogWindow:
             background='red',
         )
         # If multi-line messages contain carriage returns, lmargin2 doesn't
-        # work. Add an additional tag for that.
+        # work. Add a tag for that.
         self.text.tag_config(
             'INDENT',
             lmargin1=30,
@@ -740,7 +762,7 @@ class LogWindow:
         firstline, *lines = text.split('\n')
 
         if self.has_text:
-            # Start with a newline so it doesn't end with one.
+            # Add a newline to the existing text, since we don't end with it.
             self.text.insert(tk.END, '\n', ())
 
         self.text.insert(tk.END, firstline, (level_name,))
@@ -750,7 +772,7 @@ class LogWindow:
                 '\n',
                 ('INDENT',),
                 line,
-                # Indent following lines.
+                # Indent lines after the first.
                 (level_name, 'INDENT'),
             )
         self.text.see(tk.END)  # Scroll to the end
@@ -760,12 +782,16 @@ class LogWindow:
     def evt_set_level(self, event: tk.Event) -> None:
         """Set the level of the log window."""
         level = BOX_LEVELS[self.level_selector.current()]
-        self.pipe.send(('level', level))
+        self.queue.put(('level', level))
 
     def evt_close(self) -> None:
         """Called when the window close button is pressed."""
-        self.pipe.send(('visible', False))
-        self.win.withdraw()
+        try:
+            self.queue.put(('visible', False))
+        except ValueError:  # Lost connection, completely quit.
+            TK_ROOT.quit()
+        else:
+            self.win.withdraw()
 
     def evt_copy(self) -> None:
         """Copy the selected text, or the whole console."""
@@ -783,82 +809,122 @@ class LogWindow:
         self.has_text = False
         self.text['state'] = "disabled"
 
-    def handle(self, msg: tuple) -> None:
+    def handle(self, msg: ARGS_SEND_LOGGING) -> None:
         """Handle messages from the main app."""
-        operation, parm1, parm2 = msg
-        if operation == 'log':
-            self.log(parm1, parm2)
-        elif operation == 'visible':
-            if parm1:
-                self.win.deiconify()
-            else:
-                self.win.withdraw()
-        elif operation == 'level':
-            self.level_selector.current(BOX_LEVELS.index(parm1))
-        else:
-            raise ValueError(f'Bad command {operation!r}({parm1!r}, {parm2!r})!')
+        match msg:
+            case ['log', str() as level, str() as message]:
+                self.log(level, message)
+            case ['visible', bool() as visible]:
+                if visible:
+                    self.win.deiconify()
+                else:
+                    self.win.withdraw()
+            case ['level', str() as level]:
+                self.level_selector.current(BOX_LEVELS.index(level))
+            case _:
+                raise ValueError(f'Bad command: {msg!r}!')
+
+
+def handle_load_cmd(op: ARGS_SEND_LOAD, log_window: LogWindow, force_ontop: bool) -> bool:
+    """Process an IPC command sent to loading screens."""
+    match op:
+        case ipc_types.Load2Daemon_Init():
+            # Create a new loadscreen.
+            screen = (SplashScreen if op.is_splash else LoadScreen)(
+                op.scr_id, op.title, force_ontop, op.stages,
+            )
+            SCREENS[op.scr_id] = screen
+        case ipc_types.Load2Daemon_UpdateTranslations():
+            TRANSLATION.update(op.translations)
+            log_window.update_translations()
+            for screen in SCREENS.values():
+                if isinstance(screen, LoadScreen):
+                    screen.update_translations()
+        case ipc_types.Load2Daemon_SetForceOnTop():
+            for screen in SCREENS.values():
+                screen.win.attributes('-topmost', op.on_top)
+            return op.on_top
+        case ipc_types.ScreenOp():
+            try:
+                screen = SCREENS[op.screen]
+            except KeyError:
+                return force_ontop
+            match op:
+                case ipc_types.Load2Daemon_Show():
+                    screen.op_show(op.title, op.stages)
+                case ipc_types.Load2Daemon_Hide():
+                    screen.op_hide()
+                case ipc_types.Load2Daemon_Reset():
+                    screen.op_reset()
+                case ipc_types.Load2Daemon_Destroy():
+                    screen.op_destroy()
+                case ipc_types.Load2Daemon_SetLength():
+                    screen.op_set_length(op.stage, op.size)
+                case ipc_types.Load2Daemon_Set():
+                    screen.op_set_value(op.stage, op.value)
+                case ipc_types.Load2Daemon_Skip():
+                    screen.op_skip_stage(op.stage)
+                case ipc_types.Load2Daemon_SetIsCompact():
+                    if isinstance(screen, SplashScreen):
+                        screen.op_set_is_compact(op.compact)
+                    else:
+                        print('Called set_is_compact() on regular loadscreen?')
+                case _:
+                    assert_never(op)
+        case _:
+            assert_never(op)
+    return force_ontop
 
 
 def run_background(
-    pipe_send: multiprocessing.connection.Connection,
-    pipe_rec: multiprocessing.connection.Connection,
-    log_pipe_send: multiprocessing.connection.Connection,
-    log_pipe_rec: multiprocessing.connection.Connection,
+    queue_rec_load: multiprocessing.Queue[ARGS_SEND_LOAD],
+    queue_reply_load: multiprocessing.Queue[ARGS_REPLY_LOAD],
+    queue_rec_log: multiprocessing.Queue[ARGS_SEND_LOGGING],
+    queue_reply_log: multiprocessing.Queue[ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
-    translations: dict,
+    translations: dict[str, str],
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
-    global PIPE_REC, PIPE_SEND
-    PIPE_SEND = pipe_send
-    PIPE_REC = pipe_rec
+    global QUEUE_REPLY_LOAD
+    QUEUE_REPLY_LOAD = queue_reply_load
     TRANSLATION.update(translations)
 
     force_ontop = True
 
-    log_window = LogWindow(log_pipe_send)
+    log_window = LogWindow(queue_reply_log)
 
     def check_queue() -> None:
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
+        cur_time = time.monotonic()
         try:
-            while PIPE_REC.poll():  # Pop off all the values.
+            while True:  # Pop off all the values.
+                try:
+                    op = queue_rec_load.get_nowait()
+                except queue.Empty:
+                    break
+                except ValueError as exc:
+                    raise BrokenPipeError from exc
                 had_values = True
-                operation, scr_id, args = PIPE_REC.recv()
-                if operation == 'init':
-                    # Create a new loadscreen.
-                    is_main, title, stages = args
-                    screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
-                    SCREENS[scr_id] = screen
-                elif operation == 'quit_daemon':
-                    # Shutdown.
-                    log_pipe_send.send('quit')
-                    TK_ROOT.quit()
-                    return
-                elif operation == 'update_translations':
-                    TRANSLATION.update(args)
-                    log_window.update_translations()
-                    for screen in SCREENS.values():
-                        if isinstance(screen, LoadScreen):
-                            screen.update_translations()
-                elif operation == 'set_force_ontop':
-                    for screen in SCREENS.values():
-                        screen.win.attributes('-topmost', args)
-                else:
-                    try:
-                        func = getattr(SCREENS[scr_id], 'op_' + operation)
-                    except AttributeError as exc:
-                        raise ValueError(f'Bad command "{operation}"!') from exc
-                    try:
-                        func(*args)
-                    except Exception as e:  # Note which function caused the problem.
-                        if sys.version_info >= (3, 11):
-                            e.add_note(f'Function: {func!r}')  # noqa
-                            raise
-                        else:
-                            raise TypeError(func) from e
-            while log_pipe_rec.poll():
-                log_window.handle(log_pipe_rec.recv())
+                if time.monotonic() - cur_time > TIMEOUT:
+                    # ensure we do run the logs too if we time out, but if we don't share the same timeout.
+                    cur_time = time.monotonic()
+                    break
+                force_ontop = handle_load_cmd(op, log_window, force_ontop)
+            while True:  # Pop off all the values.
+                try:
+                    rec_args = queue_rec_log.get_nowait()
+                except queue.Empty:
+                    break
+                except ValueError as exc:
+                    raise BrokenPipeError from exc
+                if time.monotonic() - cur_time > TIMEOUT:
+                    break
+
+                had_values = True
+                log_window.handle(rec_args)
+
         except BrokenPipeError:
             # A pipe failed, means the main app quit. Terminate ourselves.
             print('BG: Lost pipe!')
@@ -866,7 +932,7 @@ def run_background(
             return
 
         # Continually re-run this function in the TK loop.
-        # If we didn't find anything in the pipe, wait longer.
+        # If we didn't find anything in the queues, wait longer.
         # Otherwise, we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
 

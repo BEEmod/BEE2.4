@@ -15,8 +15,27 @@
 		{% if context %}
 			<aside>{{ context }}</aside>
 		{% endif %}
+		<aside>
+			{{ trans_archive_info }}
+			<button type=button id="archive-btn">{{ trans_archive_btn }}</button>
+		</aside>
 	</article>
-	<section id="render"></section>
+	<details{{ " open" if start_render_open else "" }} id="render-details">
+		<summary>{{ trans_title_preview }}</summary>
+		<section id="render"></section>
+	</details>
+	{% if log_vbsp %}
+	<details>
+		<summary>{{ trans_title_vbsp }}</summary>
+		<pre>{{ log_vbsp }}</pre>
+	</details>
+	{% endif %}
+	{% if log_vrad %}
+	<details>
+		<summary>{{ trans_title_vrad }}</summary>
+		<pre>{{ log_vrad }}</pre>
+	</details>
+	{% endif %}
 </main>
 </body>
 </html>

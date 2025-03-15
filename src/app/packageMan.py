@@ -1,22 +1,24 @@
 """Allows enabling and disabling individual packages.
 """
-from __future__ import annotations
-from typing import Iterable
+from collections.abc import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import TK_ROOT, localisation, tk_tools
-
-from app.CheckDetails import CheckDetails, Item as CheckItem
+from app import background_run, restart as restart_app
+from app.dialogs import Dialogs
 from transtoken import TransToken
+from ui_tk import TK_ROOT, tk_tools
+from ui_tk.check_table import CheckDetails, Item as CheckItem
+from ui_tk.dialogs import TkDialogs
+from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
-import utils
+
 
 window = tk.Toplevel(TK_ROOT, name='packagesWin')
 window.withdraw()
 
-list_widget: CheckDetails
-pack_items: list[tuple[packages.Package, CheckItem]] = []
+list_widget: CheckDetails[None]
+pack_items: list[tuple[packages.Package, CheckItem[None]]] = []
 
 
 def show() -> None:
@@ -29,22 +31,22 @@ def show() -> None:
     list_widget.refresh()
 
 
-def make_packitems() -> Iterable[CheckItem]:
+def make_packitems() -> Iterable[CheckItem[None]]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
     for pack in packages.get_loaded_packages().packages.values():
         item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc,
-            # The clean package can't be disabled!
-            lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
-            state=pack.enabled
+            # These packages can't be disabled!
+            lock_check=pack.id in packages.MANDATORY_PACKAGES,
+            state=pack.enabled,
         )
         pack_items.append((pack, item))
         yield item
 
 
-def apply_changes() -> None:
+async def apply_changes(dialog: Dialogs) -> None:
     """Enable/disable the new packages."""
     values_changed = any(
         pack.enabled != item.state
@@ -57,18 +59,17 @@ def apply_changes() -> None:
         window.grab_release()
         return
 
-    if tk_tools.askokcancel(
+    if await dialog.ask_ok_cancel(
         title=TransToken.ui('BEE2 - Restart Required!'),
         message=TransToken.ui('Changing enabled packages requires a restart.\nContinue?'),
-        parent=window,
     ):
         window.withdraw()
         window.grab_release()
         for pack, item in pack_items:
-            if pack.id.casefold() != packages.CLEAN_PACKAGE:
+            if pack.id not in packages.MANDATORY_PACKAGES:
                 pack.enabled = item.state
         packages.PACK_CONFIG.save_check()
-        utils.restart_app()
+        restart_app()
 
 
 def cancel() -> None:
@@ -76,14 +77,15 @@ def cancel() -> None:
     window.withdraw()
     window.grab_release()
     list_widget.remove_all()
-    list_widget.add_items(*make_packitems())
+    list_widget.add_items(make_packitems())
 
 
 def make_window() -> None:
     """Initialise the window."""
     global list_widget
+    dialog = TkDialogs(window)
     window.transient(TK_ROOT)
-    localisation.set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
+    set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -96,19 +98,19 @@ def make_window() -> None:
     list_widget = CheckDetails(
         frame,
         headers=[TransToken.ui('Name')],
-        items=make_packitems(),
     )
+    list_widget.add_items(make_packitems())
 
     list_widget.grid(row=0, column=0, columnspan=2, sticky='NSEW')
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    localisation.set_text(
-        ttk.Button(frame, command=apply_changes),
+    set_text(
+        ttk.Button(frame, command=lambda: background_run(apply_changes, dialog)),
         TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frame, command=cancel),
         TransToken.ui('Cancel'),
     ).grid(row=1, column=1, sticky='E')

@@ -1,20 +1,23 @@
-from typing import Dict, Union
+from __future__ import annotations
+from typing import override
 
 from srctools import Keyvalues
 from srctools.dmx import Element
 import attrs
 
 import config
+import utils
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     """Used for several general items, specifies the last selected one for restoration."""
-    id: Union[str, None] = None
+    id: utils.SpecialID
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'LastSelected']:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, LastSelected]:
         """Parse legacy config data."""
         result = {}
         last_sel = conf.find_key('LastSelected', or_blank=True)
@@ -35,40 +38,38 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
             except LookupError:
                 continue
 
-            if value.casefold() == '<none>':
-                result[new] = cls(None)
-            else:
-                result[new] = cls(value)
+            result[new] = cls(utils.special_id(value))
         return result
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'LastSelected':
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> LastSelected:
         """Parse Keyvalues data."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if data.has_children():
             raise ValueError(f'LastSelected cannot be a block: {data!r}')
-        if data.value.casefold() == '<none>':
-            return cls(None)
-        return cls(data.value)
+        return cls(utils.special_id(data.value))
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export to a property block."""
-        return Keyvalues('', '<NONE>' if self.id is None else self.id)
+        return Keyvalues('', self.id)
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'LastSelected':
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> LastSelected:
         """Parse DMX elements."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if 'selected_none' in data and data['selected_none'].val_bool:
-            return cls(None)
+            return cls(utils.ID_NONE)
         else:
-            return cls(data['selected'].val_str)
+            return cls(utils.special_id(data['selected'].val_str))
 
+    @override
     def export_dmx(self) -> Element:
         """Export to a DMX element."""
         elem = Element('LastSelected', 'DMElement')
-        if self.id is None:
-            elem['selected_none'] = True
-        else:
-            elem['selected'] = self.id
+        elem['selected'] = self.id
         return elem

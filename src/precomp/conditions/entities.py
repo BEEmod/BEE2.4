@@ -1,12 +1,12 @@
 """Conditions related to specific kinds of entities."""
-from typing import Dict, List
-
 from srctools import Matrix, Keyvalues, Vec, VMF, Entity, Angle
 import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
+from precomp.lazy_value import LazyValue
 from precomp.template_brush import TEMP_TYPES
+
 
 COND_MOD_NAME = 'Entities'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
@@ -24,29 +24,28 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     - Normal: The direction of the brush face.
     - Offset: An offset to move the overlays by.
     """
-    orig_temp_id = res['id'].casefold()
+    conf_temp_id = LazyValue.parse(res['id']).casefold()
+    face_str = LazyValue.parse(res['face_pos', '0 0 -64']).as_offset()
+    conf_norm = LazyValue.parse(res['normal', '0 0 1']).as_vec(0, 0, 1)
 
-    face_str = res['face_pos', '0 0 -64']
-    orig_norm = Vec.from_str(res['normal', '0 0 1'])
-
-    replace_tex: Dict[str, List[str]] = {}
+    replace_tex: dict[str, list[str]] = {}
     for prop in res.find_children('replace'):
         replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 
-    offset = Vec.from_str(res['offset', '0 0 0'])
+    conf_offset = LazyValue.parse(res['offset', '0 0 0']).as_vec()
 
     def insert_over(inst: Entity) -> None:
         """Apply the result."""
-        temp_id = inst.fixup.substitute(orig_temp_id)
+        temp_id = conf_temp_id(inst)
 
         origin = Vec.from_str(inst['origin'])
         angles = Angle.from_str(inst['angles', '0 0 0'])
 
-        face_pos = conditions.resolve_offset(inst, face_str)
-        normal = orig_norm @ angles
+        face_pos = face_str(inst)
+        normal = conf_norm(inst) @ angles
 
         # Don't make offset change the face_pos value..
-        origin += offset @ angles
+        origin += conf_offset(inst) @ angles
 
         for axis, norm in enumerate(normal):
             # Align to the center of the block grid. The normal direction is
@@ -88,11 +87,12 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
             if mat[:1] == '$':
                 mat = inst.fixup[mat]
-            if mat.startswith('<') or mat.endswith('>'):
+            if mat.startswith('<') and mat.endswith('>'):
                 # Lookup in the texture data.
                 gen, mat = texturing.parse_name(mat[1:-1])
-                mat = gen.get(pos, mat)
-            over['material'] = mat
+                gen.get(pos, mat).apply_over(over)
+            else:
+                over['material'] = mat
             tiledef.bind_overlay(over)
 
         # Wipe the brushes from the map.
@@ -181,7 +181,7 @@ def res_water_splash(vmf: VMF,  res: Keyvalues) -> conditions.ResultCallable:
             LOGGER.info('Bottom: {}, top: {}', bottom_pos, top_pos)
         else:
             # Directly from the given value.
-            pos2 = Vec.from_str(conditions.resolve_value(inst, conf_pos2))
+            pos2 = Vec.from_str(inst.fixup.substitute(conf_pos2))
 
         origin = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])

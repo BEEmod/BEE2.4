@@ -1,36 +1,45 @@
 """Handles displaying errors to the user that occur during operations."""
-from __future__ import annotations
-from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, final
+from typing import ClassVar, Protocol, Self, final
+
+from collections.abc import Awaitable, Generator, Iterator
 from contextlib import contextmanager
-from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+from enum import Enum, auto
 import types
 
-import attrs
+
 import srctools.logger
+import trio
 
 from transtoken import TransToken
+from transtoken import AppError as AppError  # TODO: Move back to this module, once app no longer imports tk.
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 DEFAULT_TITLE = TransToken.ui("BEEmod Error")
-DEFAULT_DESC = TransToken.ui_plural(
+DEFAULT_ERROR_DESC = TransToken.ui_plural(
     "An error occurred while performing this task:",
     "Multiple errors occurred while performing this task:",
 )
+DEFAULT_WARN_DESC = TransToken.ui_plural(
+    "An error occurred while performing this task, but it was partially successful:",
+    "Multiple errors occurred while performing this task, but it was partially successful:",
+)
 
 
-@final
-@attrs.define(init=False)
-class AppError(Exception):
-    """An error that occurs when using the app, that should be displayed to the user."""
-    message: TransToken
+class Result(Enum):
+    """Represents the result of the operation."""
+    SUCCEEDED = auto()  # No errors at all.
+    PARTIAL = auto()  # add() was called, no exceptions = was partially successful.
+    FAILED = auto()  # An exception was raised, complete failure.
+    CANCELLED = auto()  # User aborted, not an error but not success.
 
-    def __init__(self, message: TransToken) -> None:
-        super().__init__(message)
-        self.message = message
+    @property
+    def failed(self) -> bool:
+        """Check if it failed."""
+        return self.name in ['PARTIAL', 'FAILED']
 
-    def __str__(self) -> str:
-        return f"AppError: {self.message}"
+
+type WarningExc = AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]
 
 
 class Handler(Protocol):
@@ -39,24 +48,39 @@ class Handler(Protocol):
         ...
 
 
-def _collapse_excgroup(group: BaseExceptionGroup[AppError]) -> Iterator[AppError]:
-    """Extract all the AppErrors from this group.
+def _collapse_excgroup(group: BaseExceptionGroup[AppError], fatal: bool) -> Iterator[AppError]:
+    """Extract all the ``AppError``s from this group.
 
-    BaseExceptionGroup.subgroup() preserves the original structure, but we don't really care.
+    ``BaseExceptionGroup.subgroup()`` preserves the original structure, but we don't really care.
+    ``fatal`` is applied to all yielded ``AppError``s.
     """
     for exc in group.exceptions:
         if isinstance(exc, BaseExceptionGroup):
-            yield from _collapse_excgroup(exc)
+            yield from _collapse_excgroup(exc, fatal)
         else:
+            exc.fatal |= fatal
             yield exc
+
+
+async def console_handler(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+    """Implements an error handler which logs to the console. Useful for testing code."""
+    LOGGER.error(
+        '{!s}: {!s}',
+        title, desc,
+        exc_info=ExceptionGroup('', errors),
+    )
+    await trio.lowlevel.checkpoint()
 
 
 @final
 class ErrorUI:
     """A context manager which handles processing the errors."""
     title: TransToken
-    desc: TransToken
+    error_desc: TransToken
+    warn_desc: TransToken
     _errors: list[AppError]
+    _fatal_error: bool  # If set, error was caught in __aexit__
+    _cancelled: bool  # If set, we observed a Cancelled exception passing through the block.
 
     _handler: ClassVar[Handler | None] = None
 
@@ -75,40 +99,57 @@ class ErrorUI:
             cls._handler = None
 
     def __init__(
-        self,
+        self, *,
         title: TransToken = DEFAULT_TITLE,
-        desc: TransToken = DEFAULT_DESC,
+        error_desc: TransToken = DEFAULT_ERROR_DESC,
+        warn_desc: TransToken = DEFAULT_WARN_DESC,
     ) -> None:
         """Create a UI handler. install_handler() must already be running."""
         if self._handler is None:
             LOGGER.warning("ErrorUI initialised with no handler running!")
         self.title = title
-        self.desc = desc
+        self.error_desc = error_desc
+        self.warn_desc = warn_desc
         self._errors = []
+        self._cancelled = False
+        self._fatal_error = False
 
     def __repr__(self) -> str:
         return f"<ErrorUI, title={self.title}, {len(self._errors)} errors>"
 
     @property
-    def failed(self) -> bool:
-        """Check if the operation has failed."""
-        return bool(self._errors)
+    def result(self) -> Result:
+        """Check the result of the operation."""
+        if self._fatal_error:
+            return Result.FAILED
+        if self._errors:
+            return Result.PARTIAL
+        if self._cancelled:
+            # Overrides fatal.
+            return Result.CANCELLED
+        return Result.SUCCEEDED
 
-    def add(self, error: AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]) -> None:
-        """Log an error having occurred, while still running code.
+    def add(self, error: WarningExc | TransToken) -> None:
+        """Log an error having occurred, while still continuing to run.
 
+        The result will be PARTIAL at best.
         If an exception group is passed, this will extract the AppErrors, reraising others.
+        A TransToken can be supplied for convenience, which is wrapped in an AppError.
         """
-        if isinstance(error, AppError):
-            self._errors.append(error)
-        else:
-            matching, rest = error.split(AppError)
-            if matching is not None:
-                self._errors.extend(_collapse_excgroup(matching))
-            if rest is not None:
-                raise rest
+        match error:
+            case TransToken():
+                self._errors.append(AppError(error))
+            case AppError():
+                self._errors.append(error)
+            case _:
+                matching, rest = error.split(AppError)
+                if matching is not None:
+                    self._errors.extend(_collapse_excgroup(matching, False))
+                if rest is not None:
+                    raise rest
 
-    async def __aenter__(self) -> ErrorUI:
+    async def __aenter__(self) -> Self:
+        await trio.lowlevel.checkpoint()
         return self
 
     async def __aexit__(
@@ -117,33 +158,47 @@ class ErrorUI:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> bool:
-        if isinstance(exc_val, AppError):
-            self._errors.append(exc_val)
-            exc_val = None
-        elif isinstance(exc_val, BaseExceptionGroup):
+        exc_wrapped = False
+        if exc_val is not None:
+            if not isinstance(exc_val, BaseExceptionGroup):
+                # For simplicity, wrap so we can treat them the same.
+                exc_val = BaseExceptionGroup('', [exc_val])
+                exc_wrapped = True
+
             matching, rest = exc_val.split(AppError)
-            # We only handle if it's all AppError. If not, re-raise it unchanged.
+
+            # We only suppress if it's all AppError. If not, re-raise it unchanged.
             if rest is None:
-                # Swallow.
-                exc_val = None
                 # Matching may be recursively nested exceptions, collapse all that.
                 if matching is not None:
-                    self._errors.extend(_collapse_excgroup(matching))
+                    self._errors.extend(_collapse_excgroup(matching, True))
+                    self._fatal_error = True
+            else:
+                # Check what we got.
+                # If only trio.Cancelled is present, we were cancelled,
+                # otherwise a fatal error occurred. We still need to re-raise these.
+                cancels, errors = rest.split(trio.Cancelled)
 
-        if exc_val is not None:
-            # Caught something else, don't suppress.
-            if self._errors:
-                # Combine both in an exception group.
-                raise BaseExceptionGroup(
-                    "ErrorUI block raised",
-                    [*self._errors, exc_val],
-                )
-
-            # Just some other exception, leave it unaltered.
-            return False
+                if errors is not None:
+                    self._fatal_error = True
+                elif cancels is not None:
+                    self._cancelled = True
+                # Now, re-raise.
+                if self._errors:
+                    # Raise any errors in add(), so they get preserved in traceback.
+                    to_raise: list[BaseException] = list(self._errors)
+                    if exc_wrapped:  # Unwrap, we added the group.
+                        to_raise.extend(exc_val.exceptions)
+                    else:
+                        to_raise.append(exc_val)
+                    raise BaseExceptionGroup("ErrorUI block raised", to_raise)
+                else:
+                    # We do have an error, don't change the exceptions.
+                    return False
 
         if self._errors:
-            desc = self.desc.format(n=len(self._errors))
+            desc = self.error_desc if self._fatal_error else self.warn_desc
+            desc = desc.format(n=len(self._errors))
             # We had an error.
             if ErrorUI._handler is None:
                 LOGGER.error(
@@ -159,6 +214,6 @@ class ErrorUI:
                     desc,
                     "\n".join([str(err.message) for err in self._errors]),
                 )
-                # Use class, do not pass self!
+                # This is a class-level callable, do not pass self.
                 await ErrorUI._handler(self.title, desc, self._errors)
         return True

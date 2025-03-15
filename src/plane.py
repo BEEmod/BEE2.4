@@ -2,23 +2,103 @@
 
 """
 from __future__ import annotations
-from typing import (
-    Any, Generic, ItemsView, Iterable, Iterator, Mapping, MutableMapping,
-    Optional, Tuple, Type, TypeVar, Union, ValuesView, overload,
+from typing import Any, Final, overload
+
+from collections.abc import (
+    ItemsView, Iterable, Iterator, Mapping, MutableMapping, ValuesView,
 )
 import copy
 
+from srctools.math import AnyVec, FrozenMatrix, FrozenVec, Vec
+import attrs
 
-ValT = TypeVar('ValT')
-DefaultT = TypeVar('DefaultT')
+
 # Sentinel object for empty slots and parameter defaults.
 _UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
-class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
-    """An adaptive 2D matrix holding arbitary values.
+# The 6 possible normal vectors for the plane.
+# Reuse the same instance for the vector, and precompute the hash.
+_NORMALS: Final[Mapping[FrozenVec, tuple[FrozenVec, int]]] = {
+    FrozenVec.N: (FrozenVec.N, hash(b'n')),
+    FrozenVec.S: (FrozenVec.S, hash(b's')),
+    FrozenVec.E: (FrozenVec.E, hash(b'e')),
+    FrozenVec.W: (FrozenVec.W, hash(b'w')),
+    FrozenVec.T: (FrozenVec.T, hash(b't')),
+    FrozenVec.B: (FrozenVec.B, hash(b'b')),
+}
+# The orientation points Z = normal, X = sideways, Y = upward.
+_ORIENTS: Final[Mapping[FrozenVec, FrozenMatrix]] = {
+    FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
+    FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
+    FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+    FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
+    FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
+    FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
+}
+_INV_ORIENTS: Final[Mapping[FrozenVec, FrozenMatrix]] = {
+    norm: orient.transpose()
+    for norm, orient in _ORIENTS.items()
+}
 
-    Note that None is considered empty / lack of a value.
+
+@attrs.frozen(eq=False, hash=False, init=False)
+class PlaneKey:
+    """A hashable key used to identify 2-dimensional plane slices."""
+
+    normal: FrozenVec
+    distance: float
+    _hash: int = attrs.field(repr=False)
+
+    def __init__(self, normal: AnyVec, dist: AnyVec | float) -> None:
+        try:
+            norm, norm_hash = _NORMALS[FrozenVec(normal)]
+        except KeyError:
+            raise ValueError(f'{normal!r} is not an on-axis normal!') from None
+        if not isinstance(dist, int | float):
+            dist = norm.dot(dist)
+
+        self.__attrs_init__(norm, dist, hash(dist) ^ norm_hash)
+
+    @property
+    def is_horizontal(self) -> bool:
+        """Return whether this is pointing up or down."""
+        # We reuse one of the preset vectors, so direct comparison is all that's required.
+        return self.normal.z != 0.0
+
+    @property
+    def orient(self) -> FrozenMatrix:
+        """Return a matrix with the +Z direction facing along the slice."""
+        return _ORIENTS[self.normal]
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, PlaneKey):
+            return self.normal is other.normal and self.distance == other.distance
+        else:
+            return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(other, PlaneKey):
+            return self.normal is not other.normal or self.distance != other.distance
+        else:
+            return NotImplemented
+
+    def plane_to_world(self, x: float, y: float, z: float = 0.0) -> Vec:
+        """Return a position relative to this plane."""
+        orient = _ORIENTS[self.normal]
+        return Vec(x, y, z) @ orient + self.normal * self.distance
+
+    def world_to_plane(self, pos: AnyVec) -> Vec:
+        """Take a world position and return the location relative to this plane."""
+        orient = _INV_ORIENTS[self.normal]
+        return (Vec(pos) - self.normal * self.distance) @ orient
+
+
+class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
+    """An adaptive 2D matrix holding arbitary values.
 
     This is implemented with a list of lists, with an offset value for all.
     An (x, y) value is located at data[y - yoff][x - xoff[y - yoff]]
@@ -27,21 +107,21 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         self,
         contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
         *,
-        default: ValT=_UNSET,
+        default: ValT = _UNSET,
     ) -> None:
         """Initalises the plane with the provided values."""
         # Track the minimum/maximum position found
         self._min_x = self._min_y = self._max_x = self._max_y = 0
         self._yoff = 0
         self._xoffs: list[int] = []
-        self._data: list[Optional[list[ValT]]] = []
+        self._data: list[list[ValT] | None] = []
         self._used = 0
         self.default = default
         if contents:
             self.update(contents)
 
     @property
-    def mins(self) -> Tuple[int, int]:
+    def mins(self) -> tuple[int, int]:
         """Return the minimum bounding point ever set."""
         return self._min_x, self._min_y
 
@@ -50,6 +130,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         """Return the maximum bounding point ever set."""
         return self._max_x, self._max_y
 
+    @property
+    def dimensions(self) -> tuple[int, int]:
+        """Return the difference between the mins and maxes."""
+        return self._max_x - self._min_x, self._max_y - self._min_y
+
     def __len__(self) -> int:
         """The length is the number of used slots."""
         return self._used
@@ -57,15 +142,26 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
 
+    def range_x(self) -> range:
+        """Iterate over all valid X positions."""
+        return range(self._min_x, self._max_x + 1)
+
+    def range_y(self) -> range:
+        """Iterate over all valid Y positions."""
+        return range(self._min_y, self._max_y + 1)
+
+    range_u = range_x
+    range_v = range_y
+
     @classmethod
     def fromkeys(
-        cls: Type[Plane[ValT]],
-        source: Union[Plane[Any], Iterable[Tuple[int, int]]],
+        cls: type[PlaneGrid[ValT]],
+        source: PlaneGrid[Any] | Iterable[tuple[int, int]],
         value: ValT,
-    ) -> Plane[ValT]:
+    ) -> PlaneGrid[ValT]:
         """Create a plane from an existing set of keys, setting all values to a specific value."""
-        if isinstance(source, Plane):
-            res: Plane[ValT] = cls.__new__(cls)
+        if isinstance(source, PlaneGrid):
+            res: PlaneGrid[ValT] = cls.__new__(cls)
             res.__dict__.update(source.__dict__)  # Immutables
             res._xoffs = source._xoffs.copy()
             res._data = [
@@ -74,14 +170,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             ]
             return res
         else:
-            res = Plane()
+            res = PlaneGrid()
             for xy in source:
                 res[xy] = value
             return res
 
-    def copy(self) -> Plane[ValT]:
+    def copy(self) -> PlaneGrid[ValT]:
         """Shallow-copy the plane."""
-        cpy = Plane.__new__(Plane)
+        cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__)  # Immutables
         cpy._xoffs = self._xoffs.copy()
         cpy._data = [
@@ -92,10 +188,10 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> Plane[ValT]:
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> PlaneGrid[ValT]:
         """Deep-copy the plane."""
-        cpy = Plane.__new__(Plane)
-        cpy.__dict__.update(self.__dict__) # Immutables
+        cpy = PlaneGrid.__new__(PlaneGrid)
+        cpy.__dict__.update(self.__dict__)  # Immutables
         cpy._xoffs = self._xoffs.copy()
         cpy._data = copy.deepcopy(self._data, memodict)
         return cpy
@@ -104,12 +200,30 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         """Return the value at a given position."""
         return self.get(pos, self.default)
 
-    @overload
-    def get(self, __key: tuple[float, float]) -> Optional[ValT]: ...
-    @overload
-    def get(self, __key: tuple[float, float], __default: ValT | DefaultT) -> ValT | DefaultT: ...
+    def __contains__(self, pos: tuple[float, float] | object) -> bool:
+        """Check if a value is set at the given location."""
+        try:
+            x, y = map(int, pos)  # type: ignore
+        except (ValueError, TypeError):
+            return False
 
-    def get(self, pos: tuple[float, float], default: DefaultT | None = None) -> DefaultT | ValT | None:
+        y += self._yoff
+        if y < 0:
+            return False
+        try:
+            x += self._xoffs[y]
+            if x < 0:
+                return False
+            return (row := self._data[y]) is not None and row[x] is not _UNSET
+        except IndexError:
+            return False
+
+    @overload
+    def get(self, key: tuple[float, float], /) -> ValT | None: ...
+    @overload
+    def get[DefaultT](self, key: tuple[float, float], default: ValT | DefaultT, /) -> ValT | DefaultT: ...
+
+    def get[DefaultT](self, pos: tuple[float, float], default: DefaultT | None = None) -> DefaultT | ValT | None:
         """Return the value at a given position, or a default if not present."""
         try:
             x, y = map(int, pos)
@@ -207,14 +321,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def __iter__(self) -> Iterator[tuple[int, int]]:
         """Return all used keys."""
-        for y, (xoff, row) in enumerate(zip(self._xoffs, self._data), start=-self._yoff):
+        for y, (xoff, row) in enumerate(zip(self._xoffs, self._data, strict=True), start=-self._yoff):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
                 if data is not _UNSET:
                     yield (x, y)
 
-    def __delitem__(self, pos: Tuple[float, float]) -> None:
+    def __delitem__(self, pos: tuple[float, float]) -> None:
         """Remove the value at a given position, doing nothing if not set."""
         try:
             x, y = map(int, pos)
@@ -222,8 +336,12 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             raise KeyError(pos) from None
 
         y += self._yoff
+        if y < 0:
+            return
         try:
             x += self._xoffs[y]
+            if x < 0:
+                return
             if (row := self._data[y]) is not None and row[x] is not _UNSET:
                 self._used -= 1
                 row[x] = _UNSET
@@ -239,18 +357,38 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def values(self) -> ValuesView[ValT]:
         """D.values() -> a set-like object providing a view on D's values"""
-        return PlaneValues(self)
+        return GridValues(self)
 
-    def items(self) -> ItemsView[Tuple[int, int], ValT]:
+    def items(self) -> ItemsView[tuple[int, int], ValT]:
         """D.items() -> a set-like object providing a view on D's items"""
-        return PlaneItems(self)
+        return GridItems(self)
+
+    def largest_index(self) -> tuple[int, int, ValT]:
+        """Find a high index position, then return it plus the value.
+
+        For iterating through the grid in an arbitary order, this is the cheapest to pop.
+        """
+        # Skip past empty rows/columns. We'll pop them to save memory while we're here.
+        while self._data:
+            if not (row := self._data[-1]):
+                self._data.pop()
+                self._xoffs.pop()
+                continue
+            if (value := row[-1]) is _UNSET:
+                row.pop()
+                continue
+            y_ind = len(self._data) - 1
+            x = len(row) - 1 - self._xoffs[y_ind]
+            y = y_ind - self._yoff
+            return x, y, value
+        raise KeyError('Empty grid!')
 
 
 # noinspection PyProtectedMember
-class PlaneValues(ValuesView[ValT]):
-    """Implementation of Plane.values()."""
+class GridValues[ValT](ValuesView[ValT]):
+    """Implementation of PlaneGrid.values()."""
     __slots__ = ()
-    _mapping: Plane[ValT]  # Defined in superclass.
+    _mapping: PlaneGrid[ValT]  # Defined in superclass.
 
     def __contains__(self, item: object) -> bool:
         """Check if the provided item is a value."""
@@ -272,14 +410,10 @@ class PlaneValues(ValuesView[ValT]):
 
 
 # noinspection PyProtectedMember
-class PlaneItems(ItemsView[Tuple[int, int], ValT]):
-    """Implementation of Plane.items()."""
+class GridItems[ValT](ItemsView[tuple[int, int], ValT]):
+    """Implementation of PlaneGrid.items()."""
     __slots__ = ()
-    _mapping: Plane[ValT]  # Defined in superclass.
-
-    def __init__(self, plane: Plane[ValT]) -> None:
-        self._mapping = plane
-        super().__init__(plane)
+    _mapping: PlaneGrid[ValT]  # Defined in superclass.
 
     def __contains__(self, item: object) -> bool:
         """Check if the provided pos/value pair is present."""
@@ -293,10 +427,10 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
         except KeyError:  # Not present
             return False
 
-    def __iter__(self) -> Iterator[Tuple[Tuple[int, int], ValT]]:
+    def __iter__(self) -> Iterator[tuple[tuple[int, int], ValT]]:
         """Produce all coord, value pairs in the plane."""
         for y, (xoff, row) in enumerate(
-            zip(self._mapping._xoffs, self._mapping._data),
+            zip(self._mapping._xoffs, self._mapping._data, strict=True),
             start=-self._mapping._yoff,
         ):
             if row is None:

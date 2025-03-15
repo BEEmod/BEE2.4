@@ -32,6 +32,7 @@ from packages import (
     get_loaded_packages, find_packages,
     LOGGER as packages_logger
 )
+from app.errors import ErrorUI, console_handler
 import utils
 
 # If true, user said * for packages - use last for all.
@@ -49,9 +50,9 @@ def get_package(file: Path) -> RawFileSystem:
     global PACKAGE_REPEAT
     try:
         with CONF.open() as f:
-            last_package = f.read().strip()
+            last_package = utils.obj_id(f.read().strip())
     except FileNotFoundError:
-        last_package = ''
+        last_package = None
 
     if last_package:
         if PACKAGE_REPEAT is not None:
@@ -86,7 +87,7 @@ def get_package(file: Path) -> RawFileSystem:
             pack_id = last_package
 
         try:
-            fsys = get_loaded_packages().packages[pack_id.casefold()].fsys
+            fsys = get_loaded_packages().packages[utils.obj_id(pack_id)].fsys
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
@@ -203,16 +204,22 @@ async def main(files: List[str]) -> int:
 
     # Disable logging of package info.
     packages_logger.setLevel(logging.ERROR)
-    async with trio.open_nursery() as nursery:
-        for loc in get_package_locs():
-            await find_packages(nursery, get_loaded_packages(), loc)
+    with ErrorUI.install_handler(console_handler):
+        async with ErrorUI() as errors, trio.open_nursery() as nursery:
+            for loc in get_package_locs():
+                nursery.start_soon(
+                    find_packages,
+                    errors,
+                    get_loaded_packages(),
+                    loc,
+                )
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
 
     print_package_ids()
 
-    package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
+    package_loc = Path('..', GEN_OPTS['Directories']['package']).resolve()
 
     file_list: List[Path] = []
 

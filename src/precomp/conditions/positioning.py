@@ -1,5 +1,5 @@
 """Various conditions related to the position/orientation of items."""
-from typing import Iterable, Tuple, Dict, Set
+from collections.abc import Iterable
 import math
 
 from editoritems_props import PanelAnimation
@@ -7,13 +7,23 @@ from precomp import conditions, tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
 
+from precomp.lazy_value import LazyValue
+
 
 COND_MOD_NAME = 'Positioning'
 LOGGER = get_logger(__name__, alias='cond.positioning')
 
 # Predicates for tiles.
 # We optimise to a lookup table.
-TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
+TILE_PREDICATES: dict[str, set[tiling.TileType]] = {}
+
+
+def parse_orient(direction: str) -> FrozenVec:
+    """Parse a FrozenVec, allowing DIRECTIONS constants also."""
+    try:
+        return conditions.DIRECTIONS[direction.casefold()]
+    except KeyError:
+        return FrozenVec.from_str(direction, 0, 0, 1)
 
 
 @conditions.make_test(
@@ -41,22 +51,21 @@ def check_angles(kv: Keyvalues) -> conditions.TestCallable:
 
     if kv.has_children():
         targ_angle = kv['direction', '0 0 0']
-        from_dir_str = kv['from_dir', '0 0 1']
-        try:
-            from_dir = conditions.DIRECTIONS[from_dir_str.casefold()]
-        except KeyError:
-            from_dir = FrozenVec.from_str(from_dir_str, 0, 0, 1)
-        allow_inverse = kv.bool('allow_inverse')
+        from_dir = LazyValue.parse(kv['from_dir', '0 0 1']).map(parse_orient)
+        allow_inverse = LazyValue.parse(kv['allow_inverse', '']).as_bool()
     else:
         targ_angle = kv.value
-        from_dir = FrozenVec(0, 0, 1)
-        allow_inverse = False
+        from_dir = LazyValue.make(FrozenVec(0, 0, 1))
+        allow_inverse = LazyValue.make(False)
+
+    if '$' in targ_angle:
+        raise ValueError('Cannot use $var in "direction" key for Angles/Orient/Dir test!')
 
     targ_angle = targ_angle.casefold()
     if targ_angle in ('wall', 'walls'):
         def check_orient(inst: Entity) -> bool:
             """Check if the instance is facing any wall."""
-            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
+            inst_normal = from_dir(inst) @ Matrix.from_angstr(inst['angles'])
             return abs(inst_normal.z) < 1e-6
     else:
         try:
@@ -66,17 +75,17 @@ def check_angles(kv: Keyvalues) -> conditions.TestCallable:
 
         def check_orient(inst: Entity) -> bool:
             """Check the orientation against the instance."""
-            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
+            inst_normal = from_dir(inst) @ Matrix.from_angstr(inst['angles'])
 
             dot = inst_normal.dot(normal)
-            return dot > 0.99 or (allow_inverse and dot < -0.99)
+            return dot > 0.99 or (allow_inverse(inst) and dot < -0.99)
     return check_orient
 
 
 def brush_at_loc(
     inst: Entity,
     kv: Keyvalues,
-) -> Tuple[tiling.TileType, bool, Set[tiling.TileType]]:
+) -> tuple[tiling.TileType, bool, set[tiling.TileType]]:
     """Common code for posIsSolid and ReadSurfType.
 
     This returns the average tiletype, if both colors were found,
@@ -104,7 +113,7 @@ def brush_at_loc(
     # RemoveBrush is the pre-tiling name.
     should_remove = kv.bool('RemoveTile', kv.bool('RemoveBrush', False))
 
-    tile_types: Set[tiling.TileType] = set()
+    tile_types: set[tiling.TileType] = set()
     both_colors = False
 
     # Place info_targets to mark where we're checking.
@@ -311,7 +320,7 @@ def _fill_predicates() -> None:
     for name, func in list(locals().items()):
         if name.startswith('pred_'):
             # Collapse it down into a lookup table.
-            TILE_PREDICATES[name[5:]] = set(filter(
+            TILE_PREDICATES[name.removeprefix('pred_')] = set(filter(
                 func, tiling.TileType.__members__.values()
             ))
 
@@ -398,8 +407,11 @@ def check_blockpos_type(inst: Entity, kv: Keyvalues) -> bool:
     else:
         bbox = [pos1]
 
+    add_debug = conditions.fetch_debug_visgroup(inst.map, 'get_blocktype')
+
     for pos in bbox:
         block = brushLoc.POS.lookup_world(pos)
+        add_debug('info_target', origin=pos, comment=block.name)
         for block_type in types:
             try:
                 allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
@@ -597,4 +609,4 @@ def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
         origin = Vec.from_str(inst['origin'])
         inst['origin'] = origin + (-offset @ orient + offset) @ angles
 
-    inst['angles'] = (orient @ angles).to_angle()
+    inst['angles'] = orient @ angles

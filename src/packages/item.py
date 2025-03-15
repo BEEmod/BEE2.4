@@ -2,41 +2,49 @@
 
 A system is provided so configurations can be shared and partially modified
 as required.
+
+Unparsed style IDs can be <special>, used usually for unstyled items.
+Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
-import operator
-import re
-import copy
-from enum import Enum
-from typing import Iterable, Iterator, Mapping, Match
-from pathlib import PurePosixPath as FSPath
+from typing import Final, Self, override
 
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from enum import Enum
+from pathlib import PurePosixPath as FSPath
+import copy
+import re
+
+from aioresult import ResultCapture
+from srctools import VMF, FileSystem, Keyvalues, logger
+from srctools.tokenizer import Token, Tokenizer
 import attrs
 import trio
-from srctools import FileSystem, Keyvalues, VMF, logger, EmptyMapping
-from srctools.tokenizer import Tokenizer, Token
-from typing_extensions import Self
 
-import config.gen_opts
-from app import tkMarkdown, img, lazy_conf, DEV_MODE
-import config
-from transtoken import TransToken, TransTokenSource
+from app import DEV_MODE, img, lazy_conf, paletteLoader
+from app.mdown import MarkdownData
+from config.gen_opts import GenOptions
+from config.item_defaults import DEFAULT_VERSION, ItemDefault
+from connections import Config as ConnConfig
+from editoritems import InstCount, Item as EditorItem
 from packages import (
-    PackagesSet, PakObject, ParseData, ExportData, Style,
-    sep_values, desc_parse, get_config,
+    ExportKey, PackagesSet, PakObject, PakRef, ParseData, Style, desc_parse,
+    get_config, sep_values,
 )
-from config.item_defaults import ItemDefault, DEFAULT_VERSION
-from editoritems import Item as EditorItem, InstCount
-from connections import Config as ConnConfig, INDICATOR_CHECK_ID
-import editoritems_vmf
+from transtoken import TransToken, TransTokenSource
+import async_util
 import collisions
+import config
+import editoritems_vmf
 import utils
 
 
 LOGGER = logger.get_logger(__name__)
 
-# Finds names surrounded by %s
-RE_PERCENT_VAR = re.compile(r'%(\w*)%')
+TRANS_EXTRA_PALETTES = TransToken.untranslated(
+    '"{filename}" has palette set for extra item blocks. Deleting.'
+)
+TRANS_INCOMPLETE_GROUPING = TransToken.untranslated('"{filename}" has incomplete grouping icon definition!')
 
 
 class InheritKind(Enum):
@@ -51,10 +59,11 @@ class InheritKind(Enum):
 @attrs.frozen
 class UnParsedItemVariant:
     """The desired variant for an item, before we've figured out the dependencies."""
-    pak_id: str  # The package that defined this variant.
+    pak_id: utils.ObjectID  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
     folder: str | None  # If set, use the given folder from our package.
-    style: str | None  # Inherit from a specific style (implies folder is None)
+    # If non-None, either a single style ID, or version + style ID.
+    style: utils.SpecialID | tuple[str, utils.ObjectID] | None
     config: Keyvalues | None  # Config for editing
 
 
@@ -68,8 +77,8 @@ class UnParsedVersion:
     name: str
     id: str
     isolate: bool
-    styles: dict[str, UnParsedItemVariant | ItemVariant]
-    def_style: str
+    styles: dict[utils.SpecialID, UnParsedItemVariant | ItemVariant]
+    def_style: utils.SpecialID
     inherit_kind: dict[str, InheritKind]
 
 
@@ -78,19 +87,19 @@ class ItemVariant:
 
     def __init__(
         self,
-        pak_id: str,
+        pak_id: utils.ObjectID,
         editoritems: EditorItem,
         vbsp_config: lazy_conf.LazyConf,
         editor_extra: list[EditorItem],
         authors: list[str],
         tags: list[str],
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         icons: dict[str, img.Handle],
-        ent_count: str='',
-        url: str = None,
-        all_name: TransToken=None,
-        all_icon: FSPath=None,
-        source: str='',
+        ent_count: str = '',
+        url: str | None = None,
+        all_name: TransToken = TransToken.BLANK,
+        all_icon: FSPath | None = None,
+        source: str = '',
     ) -> None:
         self.editor = editoritems
         self.editor_extra = editor_extra
@@ -108,6 +117,9 @@ class ItemVariant:
         # The name and VTF for grouped items
         self.all_name = all_name
         self.all_icon = all_icon
+
+        # Cached Markdown data with a representation of the instances used.
+        self._inst_desc: MarkdownData | None = None
 
     def copy(self) -> ItemVariant:
         """Make a copy of all the data."""
@@ -129,19 +141,22 @@ class ItemVariant:
 
     def can_group(self) -> bool:
         """Does this variant have the data needed to group?"""
-        return (
-            self.all_icon is not None and
-            self.all_name is not None
-        )
+        return self.all_icon is not None and bool(self.all_name)
 
     def override_from_folder(self, other: ItemVariant) -> None:
         """Perform the override from another item folder."""
         self.authors.extend(other.authors)
         self.tags.extend(self.tags)
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
-        self.desc = tkMarkdown.join(self.desc, other.desc)
+        self.desc += other.desc
 
-    async def modify(self, pak_id: str, kv: Keyvalues, source: str) -> ItemVariant:
+    async def modify(
+        self,
+        packset: PackagesSet,
+        pak_id: utils.ObjectID,
+        kv: Keyvalues,
+        source: str,
+    ) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -150,7 +165,8 @@ class ItemVariant:
         vbsp_config: lazy_conf.LazyConf
         if 'config' in kv:
             # Item.parse() has resolved this to the actual config.
-            vbsp_config = get_config(
+            vbsp_config = await get_config(
+                packset,
                 kv,
                 'items',
                 pak_id,
@@ -167,7 +183,8 @@ class ItemVariant:
                 kv.find_children('Replace')
             ])
 
-        vbsp_config = lazy_conf.concat(vbsp_config, get_config(
+        vbsp_config = lazy_conf.concat(vbsp_config, await get_config(
+            packset,
             kv,
             'items',
             pak_id,
@@ -181,10 +198,7 @@ class ItemVariant:
             desc = self.desc
 
         if 'appenddesc' in kv:
-            desc = tkMarkdown.join(
-                desc,
-                desc_parse(kv, source, pak_id, prop_name='appenddesc'),
-            )
+            desc += desc_parse(kv, source, pak_id, prop_name='appenddesc')
 
         if 'authors' in kv:
             authors = sep_values(kv['authors', ''])
@@ -233,17 +247,43 @@ class ItemVariant:
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Iterate over the tokens in this item variant."""
         yield from self.editor.iter_trans_tokens(source)
-        if self.all_name is not None:
+        if self.all_name:
             yield self.all_name, source + '.all_name'
-        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        yield from self.desc.iter_tokens(source + '.desc')
         for item in self.editor_extra:
             yield from item.iter_trans_tokens(f'{source}:{item.id}')
+
+    def instance_desc(self) -> MarkdownData:
+        """Produce a description of the instances used by this item."""
+        if self._inst_desc is not None:
+            return self._inst_desc
+        inst_desc = []
+        for editor in [self.editor] + self.editor_extra:
+            if editor is self.editor:
+                inst_desc.append('\n\n**Instances:**\n')
+            else:
+                inst_desc.append(f'\n**Instances ({editor.id}):**\n')
+            for ind, inst in enumerate(editor.instances):
+                inst_desc.append(f'* {ind}: ')
+                inst_desc.append(
+                    f'"`{inst.inst}`"\n'
+                    if inst.inst != FSPath() else '""\n'
+                )
+            for name, inst_path in editor.cust_instances.items():
+                inst_desc.append(f'* "{name}": ')
+                inst_desc.append(
+                    f'"`{inst_path}`"\n'
+                    if inst_path != FSPath() else '""\n'
+                )
+        LOGGER.info('Desc: {}', repr(''.join(inst_desc)))
+        self._inst_desc = desc = MarkdownData(TransToken.untranslated(''.join(inst_desc)), None)
+        return desc
 
     def _modify_editoritems(
         self,
         kv: Keyvalues,
         editor: list[EditorItem],
-        pak_id: str,
+        pak_id: utils.ObjectID,
         source: str,
         is_extra: bool,
     ) -> list[EditorItem]:
@@ -395,9 +435,7 @@ class ItemVariant:
                     ) from None
                 editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
-                inst_name = inst.name
-                if inst_name.startswith('bee2_'):
-                    inst_name = inst_name[5:]
+                inst_name = inst.name.removeprefix('bee2_')
                 editor[0].cust_instances[inst_name] = inst_data.inst
 
         # Override IO commands.
@@ -422,28 +460,49 @@ class ItemVariant:
         return editor
 
 
+def style_with_version(style_id: str) -> utils.SpecialID | tuple[str, utils.ObjectID]:
+    """Parse either a bare ID or an ID plus style."""
+    if ':' in style_id:
+        version, style = style_id.split(':', 1)
+        # This looks up elsewhere, we can't support version IDs here yet....
+        return version, utils.obj_id(style, 'Style')
+    else:
+        return utils.special_id(style_id, 'style')
+
+
 @attrs.define(repr=False)
 class Version:
     """Versions are a set of styles defined for an item."""
     name: str  # Todo: Translation token?
     id: str
-    styles: dict[str, ItemVariant] = attrs.field(repr=False)  # Repr would be absolutely massive.
+    styles: dict[utils.ObjectID, ItemVariant] = attrs.field(repr=False)  # Repr would be absolutely massive.
     def_style: ItemVariant = attrs.field(repr=False)
     inherit_kind: dict[str, InheritKind]
 
+    def get(self, style: PakRef[Style]) -> ItemVariant:
+        """Fetch the variant for this style."""
+        return self.styles.get(style.id, self.def_style)
 
-class Item(PakObject, needs_foreground=True, export_priority=-10):
+
+class Item(PakObject, needs_foreground=True):
     """An item in the editor..."""
     __slots__ = [
         'id',
-        '_unparsed_versions', 'versions',
+        '_unparsed_versions', 'versions', 'version_id_order',
         '_unparsed_def_ver', 'def_ver',
         'needs_unlock', 'all_conf', 'isolate_versions',
         'unstyled', 'folders', 'glob_desc', 'glob_desc_last',
     ]
     # These aren't initialised to start - we do that in assign_styled_items().
     versions: dict[str, Version]
+    version_id_order: Sequence[str]  # IDs in the order to show in UI.
     def_ver: Version
+    # Subtypes which have palette icons, and therefore should be shown in the UI.
+    visual_subtypes: Sequence[int]
+
+    # The type required to export items.
+    type ExportInfo = Mapping[str, Mapping[int, tuple[paletteLoader.HorizInd, paletteLoader.VertInd]]]
+    export_info: Final[ExportKey[ExportInfo]] = ExportKey()
 
     def __init__(
         self,
@@ -455,7 +514,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         all_conf: lazy_conf.LazyConf,
         unstyled: bool,
         isolate_versions: bool,
-        glob_desc: tkMarkdown.MarkdownData,
+        glob_desc: MarkdownData,
         desc_last: bool,
         folders: dict[tuple[FileSystem, str], ItemVariant],
     ) -> None:
@@ -473,8 +532,11 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         self.glob_desc_last = desc_last
         # Dict of folders we need to have decoded.
         self.folders = folders
+        self.version_id_order = ()
+        self.visual_subtypes = ()
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Self:
         """Parse an item definition."""
         versions: dict[str, UnParsedVersion] = {}
@@ -487,8 +549,8 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         glob_desc = desc_parse(data.info, 'global:' + data.id, data.pak_id)
         desc_last = data.info.bool('AllDescLast')
 
-        all_config = get_config(
-            data.info,
+        all_config = await get_config(
+            data.packset, data.info,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -498,32 +560,37 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         for ver in data.info.find_all('version'):
             ver_name = ver['name', 'Regular']
             ver_id = ver['ID', DEFAULT_VERSION]
-            styles: dict[str, UnParsedItemVariant | ItemVariant] = {}
+            styles: dict[utils.SpecialID, UnParsedItemVariant | ItemVariant] = {}
             inherit_kind: dict[str, InheritKind] = {}
             ver_isolate = ver.bool('isolated')
-            def_style = None
+            def_style: utils.SpecialID | None = None
 
             for style in ver.find_children('styles'):
+                targ_style = utils.special_id(style.real_name, 'Style')
                 if style.has_children():
+                    if 'base' in style:
+                        sty_id = style_with_version(style['Base'])
+                    else:
+                        sty_id = None
                     folder = UnParsedItemVariant(
                         data.pak_id,
                         data.fsys,
                         folder=style['folder', None],
-                        style=style['Base', ''],
+                        style=sty_id,
                         config=style,
                     )
-                    inherit_kind[style.real_name] = InheritKind.MODIFIED
+                    inherit_kind[targ_style] = InheritKind.MODIFIED
 
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
                     folder = UnParsedItemVariant(
                         data.pak_id,
                         data.fsys,
-                        style=style.value[1:-1],
+                        style=style_with_version(style.value[1:-1]),
                         folder=None,
                         config=None,
                     )
-                    inherit_kind[style.real_name] = InheritKind.REUSED
+                    inherit_kind[targ_style] = InheritKind.REUSED
                 else:
                     # Reference to the actual folder...
                     folder = UnParsedItemVariant(
@@ -533,7 +600,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                         style=None,
                         config=None,
                     )
-                    inherit_kind[style.real_name] = InheritKind.DEFINED
+                    inherit_kind[targ_style] = InheritKind.DEFINED
                 # We need to parse the folder now if set.
                 if folder.folder:
                     folders_to_parse.add(folder.folder)
@@ -542,15 +609,17 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                 # if not otherwise present.
                 # We set it to the name, then lookup later in setup_style_tree()
                 if def_style is None:
-                    def_style = style.real_name
+                    def_style = targ_style
                 # It'll only be UnParsed during our parsing.
-                styles[style.real_name] = folder
+                styles[targ_style] = folder
 
-                if style.real_name == folder.style:
+                if targ_style == folder.style:
                     raise ValueError(
                         f'Item "{data.id}"\'s "{style.real_name}" style '
                         "can't inherit from itself!"
                     )
+            if def_style is None:
+                raise ValueError(f'Item "{data.id}" has version section with no styles defined!')
             versions[ver_id] = version = UnParsedVersion(
                 id=ver_id,
                 name=ver_name,
@@ -572,21 +641,21 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
 
         # Parse all the folders for an item.
         async with trio.open_nursery() as nursery:
-            parsed_folders: dict[str, utils.Result[ItemVariant]] = {
-                folder: utils.Result(
+            parsed_folders: dict[str, ResultCapture[ItemVariant]] = {
+                folder: ResultCapture.start_soon(
                     nursery, parse_item_folder,
-                    folder, data.fsys, data.id, data.pak_id,
+                    data, folder,
                 )
                 for folder in folders_to_parse
             }
 
         # We want to ensure the number of visible subtypes doesn't change.
         subtype_counts = {
-            tuple([
-                i for i, subtype in enumerate(item_variant_result().editor.subtypes, 1)
+            tuple(
+                i for i, subtype in enumerate(item_variant.result().editor.subtypes, 1)
                 if subtype.pal_pos or subtype.pal_name
-            ])
-            for item_variant_result in parsed_folders.values()
+            )
+            for item_variant in parsed_folders.values()
         }
         if len(subtype_counts) > 1:
             raise ValueError(
@@ -606,12 +675,13 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             desc_last=desc_last,
             # Add filesystem to individualise this to the package.
             folders={
-                (data.fsys, folder): item_variant_result()
-                for folder, item_variant_result in
+                (data.fsys, folder): item_variant.result()
+                for folder, item_variant in
                 parsed_folders.items()
             }
         )
 
+    @override
     def add_over(self, override: Self) -> None:
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
@@ -639,17 +709,20 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                         )
                         # our_style.override_from_folder(style)
 
+    @override
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this item."""
-        yield from tkMarkdown.iter_tokens(self.glob_desc, f'items/{self.id}.desc')
+        yield from self.glob_desc.iter_tokens(f'items/{self.id}.desc')
         for version in self.versions.values():
             for style_id, variant in version.styles.items():
                 yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
 
     @classmethod
+    @override
     async def post_parse(cls, packset: PackagesSet) -> None:
         """After styles and items are done, assign all the versions."""
         # This has to be done after styles.
@@ -658,123 +731,106 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         styles = packset.all_obj(Style)
         async with trio.open_nursery() as nursery:
             for item_to_style in packset.all_obj(Item):
-                nursery.start_soon(assign_styled_items, styles, item_to_style)
+                nursery.start_soon(assign_styled_items, packset, styles, item_to_style)
 
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export all items into the configs.
-
-        For the selected attribute, this is a list of (item, subitem) tuples representing the
-        palette.
-        """
-        vbsp_config = exp_data.vbsp_conf
-        pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected
-
-        style_id = exp_data.selected_style.id
-        item: Item
-        default_conf = ItemDefault()
-        for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
-            prop_conf = config.APP.get_cur_conf(ItemDefault, item.id, default_conf)
-
-            (items, config_part) = item._get_export_data(pal_list, style_id, prop_conf)
-
-            exp_data.all_items.extend(items)
-            vbsp_config.extend(apply_replacements(await config_part(), item.id))
-
-            # Add auxiliary configs as well.
-            try:
-                aux_conf = exp_data.packset.obj_by_id(ItemConfig, item.id)
-            except KeyError:
-                pass
-            else:
-                vbsp_config.extend(apply_replacements(await aux_conf.all_conf(), item.id + ':aux_all'))
-                try:
-                    version_data = aux_conf.versions[prop_conf.version]
-                except KeyError:
-                    pass  # No override.
-                else:
-                    # Find the first style definition for the selected one
-                    # that's defined for this config
-                    for poss_style in exp_data.selected_style.bases:
-                        if poss_style.id in version_data:
-                            vbsp_config.extend(apply_replacements(
-                                await version_data[poss_style.id](),
-                                item.id + ':aux'
-                            ))
-                            break
-
-            # Special case - if this is the indicator panel item, extract and apply the configured
-            # instances.
-            if item.id == INDICATOR_CHECK_ID:
-                [check_item, timer_item] = items
-                for ant_conf in vbsp_config.find_all('Textures', 'Antlines'):
-                    if 'check' in ant_conf:
-                        try:
-                            check_item.instances = [
-                                InstCount(FSPath(ant_conf.find_block('check')['inst']))
-                            ]
-                        except LookupError:
-                            raise ValueError('No "inst" defined for checkmarks in antline configuration!') from None
-                    if 'timer' in ant_conf:
-                        try:
-                            timer_item.instances = [
-                                InstCount(FSPath(ant_conf.find_block('timer')['inst']))
-                            ]
-                        except LookupError:
-                            raise ValueError('No "inst" defined for timers in antline configuration!') from None
-
-    def _get_export_data(
-        self,
-        pal_list: dict[str, dict[int, tuple[int, int]]],
-        style_id: str,
-        prop_conf: ItemDefault,
-    ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
-        """Get the data for an exported item."""
-
-        # Build a dictionary of this item's palette positions,
-        # if any exist.
-        palette_items: Mapping[int, tuple[int, int]] = pal_list.get(self.id.casefold(), EmptyMapping)
-
+    def selected_version(self) -> Version:
+        """Fetch the selected version for this item."""
+        conf = config.APP.get_cur_conf(ItemDefault, self.id)
         try:
-            sel_version = self.versions[prop_conf.version]
+            return self.versions[conf.version]
         except KeyError:
-            LOGGER.warning('Version ID {} is not valid for item {}', prop_conf.version, self.id)
-            sel_version = self.def_ver
-        item_data = sel_version.styles[style_id]
+            LOGGER.warning('Version ID {} is not valid for item {}', conf.version, self.id)
+            config.APP.store_conf(attrs.evolve(conf, version=self.def_ver.id), self.id)
+            return self.def_ver
 
-        new_item = copy.deepcopy(item_data.editor)
-        new_item.id = self.id  # Set the item ID to match our item
-        # This allows the folders to be reused for different items if needed.
+    def get_tags(self, style: PakRef[Style], subtype: int) -> Iterator[str]:
+        """Return all the search keywords for this subtype and style."""
+        variant = self.selected_version().get(style)
+        yield self.pak_name
+        yield from variant.tags
+        yield from variant.authors
+        try:
+            name = variant.editor.subtypes[subtype].name
+        except IndexError:
+            LOGGER.warning(
+                'No subtype number {} for {} in {} style!',
+                subtype, self.id, style,
+            )
+        else:  # Include both the original and translated versions.
+            if not name.is_game:
+                yield name.token
+            yield str(name)
 
-        for index, subtype in enumerate(new_item.subtypes):
-            if index in palette_items:
-                if len(palette_items) == 1:
-                    # Switch to the 'Grouped' icon and name
-                    if item_data.all_name is not None:
-                        subtype.pal_name = item_data.all_name
+    def get_version_names(self, cur_style: PakRef[Style]) -> tuple[list[str], list[str]]:
+        """Get a list of the names and corresponding IDs for the item."""
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.versions[ver_id].styles[cur_style.id])
+            for ver_id in self.version_id_order
+        }
+        versions = list(self.version_id_order)
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = versions[:1]
 
-                    if item_data.all_icon is not None:
-                        subtype.pal_icon = item_data.all_icon
+        return versions, [
+            self.versions[ver_id].name
+            for ver_id in versions
+        ]
 
-                subtype.pal_pos = palette_items[index]
-            else:
-                # This subtype isn't on the palette.
-                subtype.pal_icon = None
-                subtype.pal_name = None
-                subtype.pal_pos = None
+    def _inherit_overlay(self, style: PakRef[Style], icon: img.Handle) -> img.Handle:
+        """Add the inheritance overlay, if enabled."""
+        if self.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
+            return icon
+        inherit_kind = self.selected_version().inherit_kind.get(style.id, InheritKind.UNSTYLED)
+        if inherit_kind is not InheritKind.DEFINED:
+            icon = icon.overlay_text(inherit_kind.value.title(), 12)
+        return icon
 
-        # Apply configured default values to this item
-        for prop in new_item.properties.values():
-            if prop.allow_user_default:
-                try:
-                    prop.default = prop.parse_value(prop_conf.defaults[prop.kind])
-                except KeyError:
-                    pass
-        return (
-            [new_item] + item_data.editor_extra,
-            # Add all_conf first so it's conditions run first by default
-            lazy_conf.concat(self.all_conf, item_data.vbsp_config),
-        )
+    def get_icon(self, style: PakRef[Style], sub_key: int) -> img.Handle:
+        """Get an icon for the given subkey."""
+        return self._inherit_overlay(style, self._get_icon(style, sub_key))
+
+    def get_all_icon(self, style: PakRef[Style]) -> img.Handle | None:
+        """Get the 'all' group icon for the specified style."""
+        variant = self.selected_version().get(style)
+        if not variant.can_group():
+            return None
+        try:
+            icon = variant.icons['all']
+        except KeyError:
+            icon = img.Handle.file(utils.PackagePath(
+                variant.pak_id, str(variant.all_icon)
+            ), 64, 64)
+        return self._inherit_overlay(style, icon)
+
+    def _get_icon(self, style: PakRef[Style], subKey: int) -> img.Handle:
+        """Get the raw icon, which may be overlaid if required."""
+        variant = self.selected_version().get(style)
+        try:
+            return variant.icons[str(subKey)]
+        except KeyError:
+            # Read from editoritems.
+            pass
+        try:
+            subtype = variant.editor.subtypes[subKey]
+        except IndexError:
+            LOGGER.warning(
+                'No subtype number {} for {} in {} style!',
+                subKey, self.id, style,
+            )
+            return img.Handle.error(64, 64)
+        if subtype.pal_icon is None:
+            LOGGER.warning(
+                'No palette icon for {} subtype {} in {} style!',
+                self.id, subKey, style,
+            )
+            return img.Handle.error(64, 64)
+
+        return img.Handle.file(utils.PackagePath(
+            variant.pak_id, str(subtype.pal_icon)
+        ), 64, 64)
 
 
 class ItemConfig(PakObject, allow_mult=True):
@@ -793,12 +849,14 @@ class ItemConfig(PakObject, allow_mult=True):
         self.all_conf = all_conf
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> ItemConfig:
         """Parse from config files."""
         vers: dict[str, dict[str, lazy_conf.LazyConf]] = {}
         styles: dict[str, lazy_conf.LazyConf]
 
-        all_config = get_config(
+        all_config = await get_config(
+            data.packset,
             data.info,
             'items',
             pak_id=data.pak_id,
@@ -811,7 +869,8 @@ class ItemConfig(PakObject, allow_mult=True):
             vers[ver_id] = styles = {}
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:
-                    styles[style.real_name] = lazy_conf.from_file(
+                    styles[style.real_name] = await lazy_conf.from_file(
+                        data.packset,
                         utils.PackagePath(data.pak_id, f'items/{style.value}.cfg'),
                         source=f'<ItemConfig {data.pak_id}:{data.id} in "{style.real_name}">',
                     )
@@ -822,6 +881,7 @@ class ItemConfig(PakObject, allow_mult=True):
             vers,
         )
 
+    @override
     def add_over(self, override: ItemConfig) -> None:
         """Add additional style configs to the original config."""
         self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)
@@ -834,20 +894,30 @@ class ItemConfig(PakObject, allow_mult=True):
                 else:
                     our_styles[sty_id] = lazy_conf.concat(our_styles[sty_id], style)
 
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """This export is done in Item.export().
 
-        Here we don't know the version set for each item.
-        """
-        pass
+def _conv_pakref_item(value: PakRef[Item] | utils.ObjectID) -> PakRef[Item]:
+    """Allow passing a PakRef, or a raw ID."""
+    return value if isinstance(value, PakRef) else PakRef(Item, value)
+
+
+@attrs.frozen
+class SubItemRef:
+    """Represents an item with a specific subtype."""
+    item: PakRef[Item] = attrs.field(converter=_conv_pakref_item)
+    subtype: int = 0
+
+    def __str__(self) -> str:
+        """Convert this to a compact ID."""
+        return f'{self.item.id}:{self.subtype}'
+
+    def with_subtype(self, ind: int) -> SubItemRef:
+        """Return the same item, but with a different subtype."""
+        return SubItemRef(self.item, ind)
 
 
 async def parse_item_folder(
+    data: ParseData,
     fold: str,
-    filesystem: FileSystem,
-    item_id: str,
-    pak_id: str,
 ) -> ItemVariant:
     """Parse through data in item/ folders, and return the result."""
     prop_path = f'items/{fold}/properties.txt'
@@ -859,16 +929,16 @@ async def parse_item_folder(
         """Parse the editoritems in order in a file."""
         items: list[EditorItem] = []
         try:
-            f = filesystem[path].open_str()
+            f = data.fsys[path].open_str()
         except FileNotFoundError as err:
-            raise OSError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+            raise OSError(f'"{data.pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
         with f:
             tok = Tokenizer(f, path)
             for tok_type, tok_value in tok:
                 if tok_type is Token.STRING:
                     if tok_value.casefold() != 'item':
                         raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok, pak_id))
+                    items.append(EditorItem.parse_one(tok, data.pak_id))
                 elif tok_type is not Token.NEWLINE:
                     raise tok.error(tok_type)
         return items
@@ -876,7 +946,7 @@ async def parse_item_folder(
     def parse_vmf(path: str) -> VMF | None:
         """Parse the VMF portion."""
         try:
-            vmf_keyvalues = filesystem.read_kv1(path)
+            vmf_keyvalues = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return None
         else:
@@ -885,36 +955,45 @@ async def parse_item_folder(
     def parse_props(path: str) -> Keyvalues:
         """Parse the keyvalues file containing extra metadata."""
         try:
-            prop = filesystem.read_kv1(path)
+            prop = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return Keyvalues('Properties', [])
         else:
             return prop.find_key('Properties', or_blank=True)
 
     async with trio.open_nursery() as nursery:
-        props_res = utils.Result.sync(nursery, parse_props, prop_path, cancellable=True)
-        all_items = utils.Result.sync(nursery, parse_items, editor_path, cancellable=True)
-        editor_vmf = utils.Result.sync(nursery, parse_vmf, vmf_path, cancellable=True)
-    props = props_res()
+        props_res = async_util.sync_result(nursery, parse_props, prop_path, abandon_on_cancel=True)
+        all_items = async_util.sync_result(nursery, parse_items, editor_path, abandon_on_cancel=True)
+        editor_vmf_res = async_util.sync_result(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
+    props = props_res.result()
 
     try:
-        first_item, *extra_items = all_items()
+        first_item, *extra_items = all_items.result()
     except ValueError:
         raise ValueError(
-            f'"{pak_id}:items/{fold}/editoritems.txt has no '
+            f'"{data.pak_id}:items/{fold}/editoritems.txt has no '
             '"Item" block!'
         ) from None
 
-    if first_item.id.casefold() != item_id.casefold():
+    if first_item.id.casefold() != data.id.casefold():
         LOGGER.warning(
             'Item ID "{}" does not match "{}" in "{}:items/{}/editoritems.txt"! '
             'Info.txt ID will override, update editoritems!',
-            item_id, first_item.id, pak_id, fold,
+            data.id, first_item.id, data.pak_id, fold,
         )
 
-    if editor_vmf() is not None:
-        editoritems_vmf.load(first_item, editor_vmf())
-        del editor_vmf
+    editor_vmf = editor_vmf_res.result()
+    if editor_vmf is not None:
+        editoritems_vmf.load(first_item, editor_vmf)
+    # elif isinstance(filesystem, RawFileSystem):
+    #     # Write out editoritems.vmf.
+    #     editor_vmf = editoritems_vmf.save(first_item)
+    #     with Path(filesystem.path, vmf_path).open('w') as f:
+    #         LOGGER.info('Writing {}', f.name)
+    #         await trio.to_thread.run_sync(editor_vmf.export, f)
+
+    del editor_vmf, editor_vmf_res
+
     first_item.generate_collisions()
 
     # extra_items is any extra blocks (offset catchers, extent items).
@@ -924,11 +1003,11 @@ async def parse_item_folder(
         extra_item.generate_collisions()
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:
-                LOGGER.warning(
-                    f'"{pak_id}:items/{fold}/editoritems.txt has '
-                    f'palette set for extra item blocks. Deleting.'
-                )
-                subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
+                data.warn_auth(data.pak_id, TRANS_EXTRA_PALETTES.format(
+                    filename=f'{data.pak_id}:items/{fold}/editoritems.txt'
+                ))
+                subtype.pal_icon = subtype.pal_pos = None
+                subtype.pal_name = TransToken.BLANK
 
     # In files this is specified as PNG, but it's always really VTF.
     try:
@@ -937,104 +1016,73 @@ async def parse_item_folder(
         all_icon = None
 
     try:
-        all_name = TransToken.parse(pak_id, props['all_name'])
+        all_name = TransToken.parse(data.pak_id, props['all_name'])
     except LookupError:
-        all_name = None
+        all_name = TransToken.BLANK
+
+    icons: dict[str, img.Handle] = {}
+    for ico_kv in props.find_all('icon'):
+        if ico_kv.has_children():
+            for child in ico_kv:
+                icons[child.name] = img.Handle.parse(
+                    child, data.pak_id,
+                    64, 64,
+                    subfolder='items',
+                )
+        else:
+            # Put it as the first/only icon.
+            icons["0"] = img.Handle.parse(
+                ico_kv, data.pak_id,
+                64, 64,
+                subfolder='items',
+            )
 
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
-    source = f'<{pak_id}>/items/{fold}'
+    source = f'<{data.pak_id}>/items/{fold}'
 
     variant = ItemVariant(
         editoritems=first_item,
         editor_extra=extra_items,
 
-        pak_id=pak_id,
+        pak_id=data.pak_id,
         source=source,
         authors=sep_values(props['authors', '']),
         tags=sep_values(props['tags', '']),
-        desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
+        desc=desc_parse(props, f'{data.pak_id}:{prop_path}', data.pak_id),
         ent_count=props['ent_count', ''],
         url=props['infoURL', None],
-        icons={
-            prop.name: img.Handle.parse(
-                prop, pak_id,
-                64, 64,
-                subfolder='items',
-            )
-            for prop in
-            props.find_children('icon')
-        },
+        icons=icons,
         all_name=all_name,
         all_icon=all_icon,
-        vbsp_config=lazy_conf.from_file(
-            utils.PackagePath(pak_id, config_path),
+        vbsp_config=await lazy_conf.from_file(
+            data.packset,
+            utils.PackagePath(data.pak_id, config_path),
             missing_ok=True,
             source=source,
         ),
     )
 
-    if not variant.ent_count and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_missing_ent_count:
+    if not variant.ent_count and config.APP.get_cur_conf(GenOptions).log_missing_ent_count:
         LOGGER.warning(
             '"{}:{}" has missing entity count!',
-            pak_id,
+            data.pak_id,
             prop_path,
         )
 
     # If we have one of the grouping icon definitions but not both required
     # ones then notify the author.
-    has_name = variant.all_name is not None
+    has_name = bool(variant.all_name)
     has_icon = variant.all_icon is not None
     if (has_name or has_icon or 'all' in variant.icons) and (not has_name or not has_icon):
-        LOGGER.warning(
-            'Warning: "{}:{}" has incomplete grouping icon '
-            'definition!',
-            pak_id,
-            prop_path,
-        )
+        data.warn_auth(data.pak_id, TRANS_INCOMPLETE_GROUPING.format(
+            filename=f'{data.pak_id}:{prop_path}'
+        ))
     return variant
 
 
-def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
-    """Apply a set of replacement values to a config file, returning a new copy.
-
-    The replacements are found in a 'Replacements' block in the property.
-    These replace %values% starting and ending with percents. A double-percent
-    allows literal percents. Unassigned values are an error.
-    """
-    replace: dict[str, str] = {}
-    new_conf = Keyvalues.root() if conf.is_root() else Keyvalues(conf.real_name, [])
-
-    # Strip the replacement blocks from the config, and save the values.
-    for kv in conf:
-        if kv.name == 'replacements':
-            for rep_prop in kv:
-                replace[rep_prop.name.strip('%')] = rep_prop.value
-        else:
-            new_conf.append(kv)
-
-    def rep_func(match: Match) -> str:
-        """Does the replacement."""
-        var = match.group(1)
-        if not var:  # %% becomes %.
-            return '%'
-        try:
-            return replace[var.casefold()]
-        except KeyError:
-            raise ValueError(
-                f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}'
-            ) from None
-
-    for kv in new_conf.iter_tree(blocks=True):
-        kv.name = RE_PERCENT_VAR.sub(rep_func, kv.real_name)
-        if not kv.has_children():
-            kv.value = RE_PERCENT_VAR.sub(rep_func, kv.value)
-
-    return new_conf
-
-
 # noinspection PyProtectedMember
-async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
+async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style], item: Item) -> None:
     """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
@@ -1058,9 +1106,9 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
     for vers in all_ver:
         # We need to repeatedly loop to handle the chains of
         # dependencies. This is a list of (style_id, UnParsed).
-        to_change: list[tuple[str, UnParsedItemVariant]] = []
+        to_change: list[tuple[utils.SpecialID, UnParsedItemVariant]] = []
         # The finished styles.
-        styles: dict[str, ItemVariant | None] = {}
+        styles: dict[utils.SpecialID, ItemVariant] = {}
         for sty_id, conf in vers.styles.items():
             if isinstance(conf, UnParsedItemVariant):
                 to_change.append((sty_id, conf))
@@ -1073,13 +1121,13 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
         # Evaluate style lookups and modifications
         while to_change:
             # Needs to be done next loop.
-            deferred: list[tuple[str, UnParsedItemVariant]] = []
+            deferred: list[tuple[utils.SpecialID, UnParsedItemVariant]] = []
             start_data: ItemVariant
             for sty_id, conf in to_change:
                 if conf.style:  # Based on another styled version.
-                    if ':' in conf.style:  # Both version and style specified.
+                    if isinstance(conf.style, tuple):  # Both version and style specified.
                         try:
-                            ver_id, base_style_id = conf.style.split(':', 1)
+                            ver_id, base_style_id = conf.style
                             start_data = item.versions[ver_id].styles[base_style_id]
                             # TODO: This will fail if ver_id is after us in the all_ver list.
                             #       We need to do all the versions and styles together!
@@ -1126,7 +1174,8 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     styles[sty_id] = start_data.copy()
                 else:
                     styles[sty_id] = await start_data.modify(
-                        conf.pak_id, conf.config,f'<{item.id}:{vers.id}.{sty_id}>'
+                        packset, conf.pak_id, conf.config,
+                        f'<{item.id}:{vers.id}.{sty_id}>',
                     )
 
             # If we defer all the styles, there must be a loop somewhere.
@@ -1144,7 +1193,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
 
         default_style = styles[vers.def_style]
 
-        if DEV_MODE.get():
+        if DEV_MODE.value:
             # Check each editoritem definition for some known issues.
             for sty_id, variant in styles.items():
                 assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'
@@ -1155,15 +1204,17 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                         extra.validate()
 
         for style in all_styles:
-            if style.id in styles:
+            sty_id = utils.obj_id(style.id)
+            if sty_id in styles:
                 continue  # We already have a definition
             for base_style in style.bases:
-                if base_style.id in styles:
+                base_style_id = utils.obj_id(base_style.id)
+                if base_style_id in styles:
                     # Copy the values for the parent to the child style
-                    styles[style.id] = styles[base_style.id]
-                    vers.inherit_kind[style.id] = InheritKind.INHERIT
+                    styles[sty_id] = styles[base_style_id]
+                    vers.inherit_kind[sty_id] = InheritKind.INHERIT
                     # If requested, log this.
-                    if not item.unstyled and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_item_fallbacks:
+                    if not item.unstyled and config.APP.get_cur_conf(GenOptions).log_item_fallbacks:
                         LOGGER.warning(
                             'Item "{}" using parent "{}" for "{}"!',
                             item.id, base_style.id, style.id,
@@ -1171,13 +1222,13 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     break
             else:
                 # No parent matches!
-                if not item.unstyled and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_missing_styles:
+                if not item.unstyled and config.APP.get_cur_conf(GenOptions).log_missing_styles:
                     LOGGER.warning(
                         'Item "{}"{} using inappropriate style for "{}"!',
                         item.id, vers_desc, style.id,
                     )
                 # Unstyled elements allow inheriting anyway.
-                vers.inherit_kind[style.id] = InheritKind.INHERIT if item.unstyled else InheritKind.UNSTYLED
+                vers.inherit_kind[sty_id] = InheritKind.INHERIT if item.unstyled else InheritKind.UNSTYLED
                 # If 'isolate versions' is set on the item,
                 # we never consult other versions for matching styles.
                 # There we just use our first style (Clean usually).
@@ -1185,20 +1236,33 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                 # If not isolated, we get the version from the default
                 # version. Note the default one is computed first,
                 # so it's guaranteed to have a value.
-                styles[style.id] = (
+                styles[sty_id] = (
                     default_style if
                     item.isolate_versions or vers.isolate
-                    else item.def_ver.styles[style.id]
+                    else item.def_ver.styles[sty_id]
                 )
 
         # Build the actual version object now we're complete.
         item.versions[vers.id] = real_version = Version(
             name=vers.name,
             id=vers.id,
-            styles=styles,
+            # Strip out <LOGIC> or the like, those can only end up in defaults.
+            styles={
+                sty_id: style
+                for (sty_id, style) in styles.items()
+                if utils.not_special_id(sty_id)
+            },
             inherit_kind=vers.inherit_kind,
             def_style=default_style,
         )
         if item._unparsed_def_ver is vers:
             item.def_ver = real_version
+
+    # Set these, now that everything is assigned.
+    item.version_id_order = sorted(item.versions.keys())
+    item.visual_subtypes = [
+        ind
+        for ind, sub in enumerate(item.def_ver.def_style.editor.subtypes)
+        if sub.pal_name or sub.pal_icon
+    ]
     assert hasattr(item, 'def_ver'), vars(item)

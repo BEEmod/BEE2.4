@@ -1,222 +1,195 @@
-from typing import Callable, Any, Optional, Union
+"""Implements a sub-window which follows the main, saves state and can be hidden/shown."""
+from contextlib import aclosing
+import abc
 
-import tkinter as tk
-from tkinter import ttk
+from srctools.logger import get_logger
+from trio_util import AsyncBool
+import attrs
+import trio
 
-from app import localisation, tooltip, tk_tools, sound
-from app.img import Handle as ImgHandle
-from ui_tk.img import TKImages
-from transtoken import TransToken
+from app import sound
 from config.windows import WindowState
-import utils
+from transtoken import TransToken
+from ui_tk import tk_tools
 import config
 
-
-# This is a bit of an ugly hack. On OSX the buttons are set to have
-# default padding on the left and right, spreading out the toolbar
-# icons too much. This retracts the padding so they are more square
-# around the images instead of wasting space.
-style = ttk.Style()
-style.configure('Toolbar.TButton', padding='-20',)
-
 TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
+LOGGER = get_logger(__name__)
 
 
-def make_tool_button(
-    frame: tk.Misc, tk_img: TKImages,
-    img: str,
-    command: Callable[[], Any],
-) -> ttk.Button:
-    """Make a toolbar icon."""
-    button = ttk.Button(
-        frame,
-        style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
-        command=command,
-    )
-    tk_img.apply(button, ImgHandle.builtin(img, 16, 16))
-
-    return button
+@attrs.frozen(kw_only=True)
+class PaneConf:
+    """Configuration for a pane."""
+    tool_img: str
+    tool_col: int
+    title: TransToken
+    resize_x: bool = False
+    resize_y: bool = False
+    name: str = ''
+    legacy_name: str = ''
 
 
-class SubPane(tk.Toplevel):
-    """A Toplevel window that can be shown/hidden.
+CONF_PALETTE = PaneConf(
+    title=TransToken.ui('Palettes'),
+    name='pal',
+    resize_x=True,
+    resize_y=True,
+    tool_img='icons/win_palette',
+    tool_col=10,
+)
+
+CONF_EXPORT_OPTS = PaneConf(
+    title=TransToken.ui('Export Options'),
+    name='opt',
+    resize_x=True,
+    tool_img='icons/win_options',
+    tool_col=11,
+)
+
+CONF_ITEMCONFIG = PaneConf(
+    title=TransToken.ui('Style/Item Properties'),
+    name='item',
+    legacy_name='style',
+    resize_x=False,
+    resize_y=True,
+    tool_img='icons/win_itemvar',
+    tool_col=12,
+)
+
+CONF_COMPILER = PaneConf(
+    title=TransToken.ui('Compile Options'),
+    name='compiler',
+    resize_x=True,
+    resize_y=False,
+    tool_img='icons/win_compiler',
+    tool_col=13,
+)
+
+
+class SubPaneBase:
+    """A sub-window that can be shown/hidden.
 
      This follows the main window when moved.
     """
-    def __init__(
-        self,
-        parent: Union[tk.Toplevel, tk.Tk],
-        tk_img: TKImages,
-        *,
-        tool_frame: Union[tk.Frame, ttk.Frame],
-        tool_img: str,
-        menu_bar: tk.Menu,
-        tool_col: int,
-        title: TransToken,
-        resize_x: bool=False,
-        resize_y: bool=False,
-        name: str='',
-        legacy_name: str='',
-    ) -> None:
-        self.visible = tk.BooleanVar(parent, True)
-        self.win_name = name
-        self.legacy_name = legacy_name
+    def __init__(self, conf: PaneConf) -> None:
+        self.visible = AsyncBool(True)
+        self.win_name = conf.name
+        self.legacy_name = conf.legacy_name
         self.allow_snap = False
         self.can_save = False
-        self.parent = parent
-        self.relX = 0
-        self.relY = 0
-        self.can_resize_x = resize_x
-        self.can_resize_y = resize_y
-        super().__init__(parent, name='pane_' + name)
-        self.withdraw()  # Hide by default
+        self._rel_x = 0
+        self._rel_y = 0
+        self.can_resize_x = conf.resize_x
+        self.can_resize_y = conf.resize_y
 
-        self.tool_button = make_tool_button(
-            tool_frame, tk_img,
-            img=tool_img,
-            command=self._toggle_win,
-        )
-        self.tool_button.state(('pressed',))
-        self.tool_button.grid(
-            row=0,
-            column=tool_col,
-            # Contract the spacing to allow the icons to fit.
-            padx=(2 if utils.MAC else (5, 2)),
-        )
-        tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
-
-        menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
-        localisation.set_menu_text(menu_bar, title)
-
-        self.transient(master=parent)
-        self.resizable(resize_x, resize_y)
-        localisation.set_win_title(self, title)
-        tk_tools.set_window_icon(self)
-
-        self.protocol("WM_DELETE_WINDOW", self.hide_win)
-        parent.bind('<Configure>', self.follow_main, add=True)
-        self.bind('<Configure>', self.snap_win)
-        self.bind('<FocusIn>', self.enable_snap)
-
-    def hide_win(self, play_snd: bool=True) -> None:
-        """Hide the window."""
-        if play_snd:
-            sound.fx('config')
-        self.withdraw()
-        self.visible.set(False)
-        self.save_conf()
-        self.tool_button.state(('!pressed',))
-
-    def show_win(self, play_snd: bool=True) -> None:
-        """Show the window."""
-        if play_snd:
-            sound.fx('config')
-        self.deiconify()
-        self.visible.set(True)
-        self.save_conf()
-        self.tool_button.state(('pressed',))
-        self.follow_main()
+    async def task(self) -> None:
+        """Show/hide the window when the value changes."""
+        async with aclosing(self.visible.eventual_values()) as agen:
+            async for visible in agen:
+                if visible:
+                    self._ui_show()
+                    self.follow_main()
+                else:
+                    self._ui_hide()
+                self.save_conf()
 
     def _toggle_win(self) -> None:
         """Toggle the window between shown and hidden."""
-        if self.visible.get():
-            self.hide_win()
-        else:
-            self.show_win()
+        sound.fx('config')
+        self.visible.value = not self.visible.value
 
-    def _set_state_from_menu(self) -> None:
-        """Called when the menu bar button is pressed.
+    def evt_window_closed(self, _: object = None, /) -> None:
+        """Window was closed, update."""
+        sound.fx('config')
+        self.visible.value = False
 
-        This has already toggled the variable, so we just need to read
-        from it.
-        """
-        if self.visible.get():
-            self.show_win()
-        else:
-            self.hide_win()
-
-    def move(self, x: int=None, y: int=None, width: int=None, height: int=None) -> None:
-        """Move the window to the specified position.
-
-        Effectively an easier-to-use form of Toplevel.geometry(), that
-        also updates relX and relY.
-        """
-        # If we're resizable, keep the current size. Otherwise autosize to
-        # contents.
-        if width is None:
-            width = self.winfo_width() if self.can_resize_x else self.winfo_reqwidth()
-        if height is None:
-            height = self.winfo_height() if self.can_resize_y else self.winfo_reqheight()
-        if x is None:
-            x = self.winfo_x()
-        if y is None:
-            y = self.winfo_y()
-
-        x, y = tk_tools.adjust_inside_screen(x, y, win=self)
-        self.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
-
-        self.relX = x - self.parent.winfo_x()
-        self.relY = y - self.parent.winfo_y()
-        self.save_conf()
-
-    def enable_snap(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+    def evt_window_focused(self, _: object = None, /) -> None:
         """Allow the window to snap."""
         self.allow_snap = True
 
-    def snap_win(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+    def evt_window_moved(self, _: object = None, /) -> None:
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
         """
         # TODO: Actually snap to edges of main window
         if self.allow_snap:
-            self.relX = self.winfo_x() - self.parent.winfo_x()
-            self.relY = self.winfo_y() - self.parent.winfo_y()
+            self._rel_x, self._rel_y = self._ui_get_pos()
             self.save_conf()
 
-    def follow_main(self, e: object = None) -> None:
+    def follow_main(self, _: object = None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
-        x, y = tk_tools.adjust_inside_screen(
-            x=self.parent.winfo_x()+self.relX,
-            y=self.parent.winfo_y()+self.relY,
-            win=self,
-        )
-        self.geometry(f'+{x}+{y}')
-        self.parent.focus()
+        self._ui_apply_relative()
 
     def save_conf(self) -> None:
         """Write configuration to the config file."""
         if self.can_save:
+            width, height = self._ui_get_size()
             config.APP.store_conf(WindowState(
-                visible=self.visible.get(),
-                x=self.relX,
-                y=self.relY,
-                width=self.winfo_width() if self.can_resize_x else -1,
-                height=self.winfo_height() if self.can_resize_y else -1,
+                visible=self.visible.value,
+                x=self._rel_x,
+                y=self._rel_y,
+                width=width if self.can_resize_x else -1,
+                height=height if self.can_resize_y else -1,
             ), self.win_name)
 
-    def load_conf(self) -> None:
+    async def load_conf(self) -> None:
         """Load configuration from our config file."""
+        hide = False
         try:
             state = config.APP.get_cur_conf(WindowState, self.win_name, legacy_id=self.legacy_name)
         except KeyError:
             pass  # No configured state.
         else:
-            width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
-            height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
-            self.deiconify()
+            width = state.width if self.can_resize_x and state.width > 0 else None
+            height = state.height if self.can_resize_y and state.height > 0 else None
+            self._ui_show()
+            await tk_tools.wait_eventloop()
 
-            self.geometry(f'{width}x{height}')
-            self.sizefrom('user')
+            self._ui_set_size(width, height)
 
-            self.relX, self.relY = state.x, state.y
+            self._rel_x, self._rel_y = state.x, state.y
 
             self.follow_main()
-            self.positionfrom('user')
+            self._ui_bind_parent()
             if not state.visible:
-                self.after(150, self.hide_win)
+                hide = True
 
-        # Prevent this until here, so the <config> event won't erase our
-        #  settings
+        # Only allow saving after the window has stabilised in its position.
+        await trio.sleep(0.15)
         self.can_save = True
+        if hide:
+            self._ui_hide()
+
+    @abc.abstractmethod
+    def _ui_show(self) -> None:
+        """Show the window, and press in the button."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_hide(self) -> None:
+        """Hide the window, and unpress the button."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_get_pos(self) -> tuple[int, int]:
+        """Return the window's position relative to the parent."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_apply_relative(self) -> None:
+        """Apply rel_x/rel_y."""
+        raise NotImplementedError
+
+    def _ui_get_size(self) -> tuple[int, int]:
+        """Get the size of the window."""
+        raise NotImplementedError
+
+    def _ui_set_size(self, width: int | None, height: int | None) -> None:
+        """Set the size of the window, or None to leave unchanged."""
+        raise NotImplementedError
+
+    def _ui_bind_parent(self) -> None:
+        """Bind follow-main on the parent."""
+        raise NotImplementedError

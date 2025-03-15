@@ -1,29 +1,27 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-from typing import Callable, Dict, Generic, Optional, Tuple, Union
-from typing_extensions import Concatenate, Literal, ParamSpec, override
+from typing import Unpack, assert_never, override
+
 from tkinter import ttk
 import tkinter as tk
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 from enum import Enum
 
 import attrs
 
-from app import img, localisation, tk_tools
-# noinspection PyProtectedMember
+from app import img
 from app.dragdrop import (
-    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
-    Slot, in_bbox,
-    # Re-exports.
-    DragInfo as DragInfo, ItemT as ItemT,
+    SLOT_DRAG, DragInfo, DragWin, FlexiCB, InfoCB, ManagerBase, Slot, in_bbox,
 )
 from transtoken import TransToken
-from ui_tk.img import TK_IMG
 import utils
 
+from . import tk_tools
+from .img import TK_IMG
+from .wid_transtoken import set_text
 
-__all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "ItemT", "InfoCB", "Slot"]
-ArgsT = ParamSpec('ArgsT')
+
+__all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "InfoCB", "Slot"]
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
@@ -33,71 +31,83 @@ class GeoManager(Enum):
     """Kind of geometry manager used for a slot."""
     GRID = 'grid'
     PLACE = 'place'
-    PACK = 'pack'
     CANVAS = 'canvas'
 
 
-def _make_placer(
-    func: Callable[Concatenate[ttk.Label, ArgsT], object],
-    kind: GeoManager,
-) -> Callable[Concatenate[DragDrop[ItemT], Slot[ItemT], ArgsT], None]:
-    """Calls the original place/pack/grid method, telling the slot which was used.
+class CanvasPositioner[T]:
+    """Positions slots on a canvas.
 
-    This allows propagating the original method args and types.
+    - spacing is the amount added on each side of each slot.
+    - yoff is the offset from the top.
+    T is the slot object, but it can be anything as long as the place_func matches.
     """
-    def placer(
-        self: DragDrop[ItemT], slot: Slot[ItemT], /,
-        *args: ArgsT.args, **kwargs: ArgsT.kwargs,
-    ) -> None:
-        """Call place/pack/grid on the label."""
-        slot_ui = self._slot_ui[slot]
-        slot_ui.pos_type = kind
-        slot_ui.canv_info = None
-        func(slot_ui.lbl, *args, **kwargs)
-    return placer
-
-
-# Functions which remove a label from the parent.
-_FORGETTER: Dict[
-    Literal[GeoManager.PACK, GeoManager.PLACE, GeoManager.GRID],
-    Callable[[ttk.Label], object]
-] = {
-    GeoManager.PLACE: ttk.Label.place_forget,
-    GeoManager.GRID: ttk.Label.grid_forget,
-    GeoManager.PACK: ttk.Label.pack_forget,
-}
-
-
-class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
-    """Positions slots on a canvas."""
     canvas: tk.Canvas
-    manager: DragDrop[ItemT]
 
     def __init__(
         self,
-        manager: DragDrop[ItemT],
+        place_func: Callable[[tk.Canvas, T, int, int, str], object],
         canvas: tk.Canvas,
         item_width: int,
         item_height: int,
         spacing: int = -1,
         yoff: int = 0,
-    ):
+    ) -> None:
         self.canvas = canvas
-        super().__init__(
-            manager,
-            canvas.winfo_width(), canvas.winfo_height(),
-            item_width, item_height, spacing, yoff
-        )
+        self._place_func = place_func
+        if spacing <= 0:
+            spacing = 16 if utils.MAC else 8
+
+        self.spacing = spacing
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
+
+        self.item_width = item_width + spacing * 2
+        self.item_height = item_height + spacing * 2
+
+        self.width = 0
+        self.columns = self.calc_columns()
+
+    def calc_columns(self) -> int:
+        """Recalcuate the required number of columns."""
+        self.width = self.canvas.winfo_width()
+        self.columns = (self.width - self.spacing) // self.item_width
+        if self.columns < 1:
+            # Can't fit, they're going to stick out.
+            self.columns = 1
+        return self.columns
+
+    def reset(self, yoff: int = 0) -> None:
+        """Reset back to the start."""
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
+
+    def advance_row(self) -> None:
+        """Advance to the next row."""
+        self.current = 0
+        self.yoff += self.item_height
 
     def resize_canvas(self) -> None:
         """Set the scroll region of the canvas to fit items."""
-        width, height = self.get_size()
+        width = self.columns * self.item_width + self.spacing
+        height = self.yoff
+        if self.current != 0:
+            height += self.item_height
         self.canvas['scrollregion'] = (0, 0, width, height)
 
-    def place_slots(self, slots: Iterable[Slot[ItemT]], tag: str, xoff: int = 0) -> None:
+    def place_slots(self, slots: Iterable[T], tag: str, xoff: int = 0) -> None:
         """Place slots onto the canvas."""
-        for slot, x, y in self._get_positions(slots, xoff):
-            self.manager.slot_canvas(slot, self.canvas, x, y, tag)
+        for slot in slots:
+            x = xoff + self.spacing + self.current * self.item_width
+            self._place_func(self.canvas, slot, x, self.yoff, tag)
+            self.current += 1
+            if self.current >= self.columns:
+                self.advance_row()
+
+    def remainder(self, xoff: int = 0) -> Iterator[tuple[int, int]]:
+        """If the current row is incomplete, yield any remaining positions."""
+        for pos in range(self.current, self.columns):
+            x = xoff + self.spacing + pos * self.item_width
+            yield x, self.yoff
 
 
 @attrs.define
@@ -106,25 +116,32 @@ class SlotUI:
     # Our main widget.
     lbl: ttk.Label
     # The two widgets shown at the bottom when moused over.
-    text_lbl: Optional[tk.Label]
-    info_btn: Optional[tk.Label]
+    text_lbl: tk.Label | None
+    info_btn: tk.Label | None
 
     # The geometry manager used to position this.
-    pos_type: Optional[GeoManager] = None
-    # If canvas, the tag and x/y coords.
-    canv_info: Optional[Tuple[int, int, int]] = None
+    pos_type: GeoManager | None = None
+    # If a canvas, the tag and x/y coords.
+    canv_info: tuple[int, int, int] | None = None
 
 
-class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
+class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
     """Implements UI functionality for the dragdrop module."""
+    # Widgets comprising items attached to the cursor.
+    _drag_win: tk.Toplevel
+    _drag_lbl: tk.Label
+
+    # Maps slots to the Tk implementation.
+    _slot_ui: dict[Slot[ItemT], SlotUI]
+
     def __init__(
         self,
-        parent: Union[tk.Tk, tk.Toplevel],
+        parent: tk.Tk | tk.Toplevel,
         *,
         info_cb: InfoCB[ItemT],
-        size: Tuple[int, int]=(64, 64),
-        config_icon: bool=False,
-        pick_flexi_group: Optional[FlexiCB]=None,
+        size: tuple[int, int] = (64, 64),
+        config_icon: bool = False,
+        pick_flexi_group: FlexiCB | None = None,
     ) -> None:
         super().__init__(
             info_cb=info_cb,
@@ -132,11 +149,12 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             config_icon=config_icon,
             pick_flexi_group=pick_flexi_group,
         )
-        self.parent = parent
 
         self._drag_win = drag_win = tk.Toplevel(parent, name='drag_icon')
         drag_win.withdraw()
         drag_win.transient(master=parent)
+        if utils.LINUX:
+            drag_win.wm_attributes('-type', 'dnd')
         drag_win.wm_overrideredirect(True)
 
         self._drag_lbl = tk.Label(drag_win)
@@ -144,7 +162,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
         drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_move)
         
-        self._slot_ui: dict[Slot[ItemT], SlotUI] = {}
+        self._slot_ui = {}
 
     @override
     def _ui_set_icon(self, slot: Slot[ItemT] | DragWin, icon: img.Handle) -> None:
@@ -167,6 +185,13 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             slot_ui.lbl.winfo_width(),
             slot_ui.lbl.winfo_height(),
         )
+
+    @override
+    def _ui_slot_coords(self, slot: Slot[ItemT]) -> tuple[int, int]:
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.pos_type is None:
+            raise ValueError('Slot not positioned!')
+        return slot_ui.lbl.winfo_rootx(), slot_ui.lbl.winfo_rooty()
 
     @override
     def _ui_slot_create(
@@ -193,7 +218,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
                 bg=img.PETI_ITEM_BG_HEX,
                 name="text",
             )
-            localisation.set_text(text_lbl, title)
+            set_text(text_lbl, title)
         else:
             text_lbl = None
 
@@ -228,6 +253,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         # Add border, but only if either icon exists or we contain an item.
         if slot_ui.text_lbl is not None or slot.contents is not None:
             slot_ui.lbl['relief'] = 'ridge'
+            # Lift above neighbours.
+            slot_ui.lbl.lift()
 
         # Show configure icon for items.
         if slot_ui.info_btn is not None and slot.contents is not None:
@@ -256,12 +283,6 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             slot_ui.text_lbl.place_forget()
 
     @override
-    def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
-        """Apply the highlighted state."""
-        slot_ui = self._slot_ui[slot]
-        slot_ui.lbl['background'] = '#5AD2D2' if highlight else ''
-
-    @override
     def _ui_dragwin_show(self, x: float, y: float) -> None:
         """Show the drag window."""
         self._drag_win.deiconify()
@@ -283,6 +304,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     @override
     def _ui_dragwin_update(self, x: float, y: float) -> None:
         """Move the drag window to this position."""
+        if self._cur_slot is None:
+            return
         self._drag_win.geometry(f'+{round(x - self.width // 2)}+{round(y - self.height // 2)}')
 
         dest = self._pos_slot(x, y)
@@ -304,13 +327,27 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         """Event fired when dragging should stop."""
         self._on_stop(evt.x_root, evt.y_root)
 
-    # These call the method on the label, setting our attrs.
-    # Type-ignore because these are defined on Grid/Place/Pack, not Label...
-    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)
-    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)
-    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)
+    def slot_grid(
+        self: DragDrop[ItemT], slot: Slot[ItemT],
+        /, **kwargs: Unpack[tk_tools.GridArgs],
+    ) -> None:
+        """Position the slot via the grid() manager."""
+        slot_ui = self._slot_ui[slot]
+        slot_ui.pos_type = GeoManager.GRID
+        slot_ui.canv_info = None
+        slot_ui.lbl.grid(**kwargs)
 
-    def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
+    def slot_place(
+        self: DragDrop[ItemT], slot: Slot[ItemT],
+        /, **kwargs: Unpack[tk_tools.PlaceArgs],
+    ) -> None:
+        """Position the slot via the place() manager."""
+        slot_ui = self._slot_ui[slot]
+        slot_ui.pos_type = GeoManager.PLACE
+        slot_ui.canv_info = None
+        slot_ui.lbl.place(**kwargs)
+
+    def slot_canvas(self, canv: tk.Canvas, slot: Slot[ItemT], x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""
         slot_ui = self._slot_ui[slot]
         if slot_ui.pos_type is not None and slot_ui.pos_type is not GeoManager.CANVAS:
@@ -326,7 +363,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         slot_ui.pos_type = GeoManager.CANVAS
         slot_ui.canv_info = (obj_id, x, y)
 
-    def get_slot_canvas_pos(self, slot: Slot[ItemT], canv: tk.Canvas) -> Tuple[int, int]:
+    def get_slot_canvas_pos(self, slot: Slot[ItemT], canv: tk.Canvas) -> tuple[int, int]:
         """If on a canvas, fetch the current x/y position."""
         slot_ui = self._slot_ui[slot]
         if slot_ui.canv_info is not None:
@@ -338,7 +375,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         """Remove this slot from the set position manager."""
         slot_ui = self._slot_ui[slot]
         if slot_ui.pos_type is None:
-            raise ValueError('Not added to a geometry manager yet!')
+            return  # Already hidden.
         elif slot_ui.pos_type is GeoManager.CANVAS:
             # Attached via canvas, with an ID as suffix.
             canv = slot_ui.lbl.nametowidget(slot_ui.lbl.winfo_parent())
@@ -346,8 +383,12 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             assert slot_ui.canv_info is not None
             obj_id, _, _ = slot_ui.canv_info
             canv.delete(obj_id)
+        elif slot_ui.pos_type is GeoManager.GRID:
+            slot_ui.lbl.grid_forget()
+        elif slot_ui.pos_type is GeoManager.PLACE:
+            slot_ui.lbl.place_forget()
         else:
-            _FORGETTER[slot_ui.pos_type](slot_ui.lbl)
+            assert_never(slot_ui.pos_type)
         slot_ui.pos_type = None
         slot_ui.canv_info = None
 
@@ -355,9 +396,9 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self,
         canv: tk.Canvas,
         slots: Iterable[Slot[ItemT]],
-        spacing: int=16 if utils.MAC else 8,
-        yoff: int=0,
-        tag: str=_CANV_TAG,
+        spacing: int = 16 if utils.MAC else 8,
+        yoff: int = 0,
+        tag: str = _CANV_TAG,
     ) -> int:
         """Place all the slots in a grid on the provided canvas.
 
@@ -366,7 +407,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         - yoff is the offset from the top, the new height is then returned to allow chaining.
         """
         canv.delete(tag)
-        pos = CanvasPositioner(self, canv, self.width, self.height, spacing, yoff)
+        pos = CanvasPositioner(self.slot_canvas, canv, self.width, self.height, spacing, yoff)
         pos.place_slots(slots, tag)
         pos.resize_canvas()
         return pos.yoff

@@ -1,22 +1,24 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
-from __future__ import annotations
+from typing import Literal
+
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, Union
+
 import attrs
+import srctools.logger
+from srctools import FrozenVec, VMF, Keyvalues, Output, Vec, Entity, Matrix
 
 from precomp import instanceLocs, connections, conditions, antlines
-import srctools.logger
-from precomp.conditions import make_result
-from srctools import VMF, Keyvalues, Output, Vec, Entity, Matrix
+import user_errors
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
 # Antlasers have their own visuals, so they need an item to stay.
 CONFIG_ANTLASER = connections.Config(
-    '<ANTLASER>',
+    connections.ID_ANTLASER,
     input_type=connections.InputType.OR,
     output_act=(None, 'OnUser2'),
     output_deact=(None, 'OnUser1'),
@@ -27,10 +29,14 @@ CONFIG_ANTLINE = connections.Config(
     input_type=connections.InputType.OR_LOGIC,
 )
 
-NAME_SPR: Callable[[str, int], str] = '{}-fx_sp_{}'.format
+# Preconfigured format strings for all the names we generate. Centralises the naming format.
+NAME_SPR: Callable[[str, int | Literal['*']], str] = '{}-fx_sp_{}'.format
 NAME_BEAM_LOW: Callable[[str, int], str] = '{}-fx_b_low_{}'.format
 NAME_BEAM_CONN: Callable[[str, int], str] = '{}-fx_b_conn_{}'.format
+NAME_ALL_FX: Callable[[str], str] = '{}-fx_*'.format
+NAME_ALL_BEAM: Callable[[str], str] = '{}-fx_b_*'.format
 NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
+NAME_MODEL: Callable[[str], str] = '{}-mdl'.format
 
 
 # The corner offset in the model for each timer delay value. This starts at delay=3.
@@ -78,10 +84,7 @@ class RopeState(Enum):
     LINKED = 'linked'  # Rope ent, with target already.
 
     @staticmethod
-    def from_node(
-        points: dict[Node, Union[Entity, str]],
-        node: Node,
-    ) -> tuple[RopeState, Union[Entity, str]]:
+    def from_node(points: dict[Node, Entity | str], node: Node) -> tuple['RopeState', Entity | str]:
         """Compute the state and ent/name from the points data."""
         try:
             ent = points[node]
@@ -103,10 +106,7 @@ class Group:
         self.links: set[frozenset[Node]] = set()
 
         # For antline corners, each endpoint + normal -> the segment
-        self.ant_seg: dict[tuple[
-            tuple[float, float, float],
-            tuple[float, float, float],
-        ], antlines.Segment] = {}
+        self.ant_seg: dict[tuple[FrozenVec, FrozenVec], antlines.Segment] = {}
 
         # Create a comp_relay to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
@@ -145,9 +145,9 @@ class Group:
             round(normal, 3),
             pos1, pos2,
         )
-        norm_key = seg.normal.as_tuple()
-        k1 = pos1.as_tuple(), norm_key
-        k2 = pos2.as_tuple(), norm_key
+        norm_key = seg.normal.freeze()
+        k1 = pos1.freeze(), norm_key
+        k2 = pos2.freeze(), norm_key
         if k1 in self.ant_seg:
             LOGGER.warning('Antline segment overlap: {}', k1)
         if k2 in self.ant_seg:
@@ -155,34 +155,43 @@ class Group:
         self.ant_seg[k1] = seg
         self.ant_seg[k2] = seg
 
-    def rem_ant_straight(self, norm: tuple[float, float, float], endpoint: Vec) -> Vec:
+    def rem_ant_straight(self, norm: FrozenVec, endpoint: Vec) -> Vec:
         """Remove an antline segment with this enpoint, and return its other.
 
         This is used for merging corners. We already checked it's valid.
         """
-        seg = self.ant_seg.pop((endpoint.as_tuple(), norm))
+        seg = self.ant_seg.pop((endpoint.freeze(), norm))
         if seg.start == endpoint:
-            del self.ant_seg[seg.end.as_tuple(), norm]
+            del self.ant_seg[seg.end.freeze(), norm]
             return seg.end
         elif seg.end == endpoint:
-            del self.ant_seg[seg.start.as_tuple(), norm]
+            del self.ant_seg[seg.start.freeze(), norm]
             return seg.start
         else:
             raise ValueError(f'Antline {seg} has no endpoint {endpoint}!')
 
 
-@make_result('AntLaser')
+@conditions.make_result('AntLaser', valid_before=conditions.MetaCond.Connections)
 def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     """The condition to generate AntLasers and Antline Corners.
 
     This is executed once to modify all instances.
+    Parameters are all for antlasers, the corner follows the style definition:
+    * GlowKeys: Keyvalues for a glow env_sprite generated at each node. If absent, none are added.
+    * GlowHeight: Distance above the floor to generate the glow sprite, if present.
+    * BeamKeys: Keyvalues for the env_beams generated to connect nodes. If absent, none are added.
+    * LasStart: Distance above the floor to position each beam, if present.
+    * CableKeys: Keyvalues for the move_ropes generated to connect nodes. If absent, none are added.
+    * RopePos: Instance-local offset for each rope.
+    * on_state, off_state: Antline states (except for tex_frame), used to specify the default behaviours.
+
+    In the instance, the emitter model must be named `mdl`, and have `$skin`/`$skinset` fixups.
     """
     conf_inst_corner = instanceLocs.resolve_filter('<item_bee2_antline_corner>', silent=True)
     conf_inst_laser = instanceLocs.resolve_filter(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')
-    conf_toggle_targ = res['toggleTarg', '']
 
     beam_conf = res.find_key('BeamKeys', or_blank=True)
     glow_conf = res.find_key('GlowKeys', or_blank=True)
@@ -201,19 +210,24 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             | 16  # StartSparks
             | 32  # EndSparks
             | 64  # Decal End
-            #| 128  # Shade Start
-            #| 256  # Shade End
-            #| 512  # Taper Out
+            # 128 - Shade Start
+            # 256 - Shade End
+            # 512 - Taper Out
         )
     else:
         conf_beam_flags = 0
 
-    conf_outputs = [
-        Output.parse(kv)
-        for kv in res
-        if kv.name in ('onenabled', 'ondisabled')
+    # State configurations used when no custom ones are defined.
+    # Initial state (off) must be first!
+    default_off_state = attrs.evolve(
+        antlines.State.parse(res.find_block('off_state')),
+        name='off_rl',
+    )
+    default_states = [default_off_state, attrs.evolve(
+            antlines.State.parse(res.find_block('on_state')),
+            name='on_rl',
+        )
     ]
-
     # Find all the markers.
     nodes: dict[str, Node] = {}
 
@@ -239,7 +253,17 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             timer_delay = item.inst.fixup.int('$timer_delay')
             # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not
             # being selectable issue.
-            pos = CORNER_POS[max(0, timer_delay - 3) % 8] @ orient + pos
+            offset = max(0, item.inst.fixup.int('$timer_delay') - 3)
+            try:
+                pos = CORNER_POS[timer_delay] @ orient + pos
+            except IndexError:
+                raise user_errors.UserError(
+                    user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
+                        value=timer_delay,
+                        corrected=offset % 8 + 3,
+                    ),
+                    points=[(point @ orient + pos) for point in CORNER_POS],
+                )
         nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:
@@ -265,7 +289,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             for conn in list(node.item.outputs):
                 neighbour = conn.to_item
                 neigh_node = nodes.get(neighbour.name, None)
-                todo.discard(neigh_node)
+                if neigh_node is not None:
+                    todo.discard(neigh_node)
                 if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
@@ -292,7 +317,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             for conn in list(node.item.inputs):
                 neighbour = conn.from_item
                 neigh_node = nodes.get(neighbour.name, None)
-                todo.discard(neigh_node)
+                if neigh_node is not None:
+                    todo.discard(neigh_node)
                 if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
@@ -317,23 +343,82 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         # Choose a random item name to use for our group.
         base_name = group.nodes[0].item.name
 
+        inp_styles = {conn.from_item.ind_style for conn in group.item.inputs}
+        if len(inp_styles) == 1:  # Common style, switch to that.
+            [group.item.ind_style] = inp_styles
+
+        states = group.item.ind_style.states or default_states
+        initial_state = group.item.ind_style.initial_state
+
+        # These trigger the output when we activate.
         out_enable = [Output('', '', 'FireUser2')]
         out_disable = [Output('', '', 'FireUser1')]
-        if group.type is NodeType.LASER:
-            for output in conf_outputs:
-                if output.output.casefold() == 'onenabled':
-                    out_enable.append(output.copy())
-                else:
-                    out_disable.append(output.copy())
+        if states is default_states:
+            # Add in outputs to trigger default states.
+            out_enable.append(Output('', 'on_rl', 'Trigger'))
+            out_disable.append(Output('', 'off_rl', 'Trigger'))
+            inp_items = {group.item}
+            initial_state = default_off_state
+        else:
+            inp_items = {
+                conn.from_item for conn in group.item.inputs
+            }
+            assert initial_state is not None, "No initial state defined but states defined??"
+            # Single item with custom antlines, transfer it there so that handles them.
+            # Sorta a hack, but we only change indicators if the input is also common.
+            if len(inp_items) == 1:
+                [inp_item] = inp_items
+                group.item.transfer_antlines(inp_item)
 
         group.item.enable_cmd = tuple(out_enable)
         group.item.disable_cmd = tuple(out_disable)
 
-        if group.type is NodeType.LASER and conf_toggle_targ:
-            # Make the group info_target into a texturetoggle.
-            toggle = group.item.inst
-            toggle['classname'] = 'env_texturetoggle'
-            toggle['target'] = conditions.local_name(group.nodes[0].inst, conf_toggle_targ)
+        if group.type is NodeType.LASER:
+            skinset = set()
+            for state in states:
+                state_out = [
+                    Output('OnTrigger', NAME_MODEL(base_name), 'Skin', state.antlaser_skin),
+                ]
+                skinset.add(str(state.antlaser_skin))
+                # We have both and they're set to the same value, can fire all at once.
+                if beam_conf and glow_conf and state.beam_colour == state.glow_colour:
+                    state_out.append(Output(
+                        'OnTrigger', NAME_ALL_FX(base_name),
+                        'Color', state.beam_colour,
+                    ))
+                else:
+                    if beam_conf:
+                        state_out.append(Output(
+                            'OnTrigger', NAME_ALL_BEAM(base_name),
+                            'Color', state.beam_colour,
+                        ))
+                    if glow_conf:
+                        state_out.append(Output(
+                            'OnTrigger', NAME_SPR(base_name, '*'),
+                            'Color', state.beam_colour,
+                        ))
+                for item in inp_items:
+                    relay = item.get_ind_state_relay(state.name)
+                    for out in state_out:
+                        relay.add_out(out.copy())
+
+            model_name = group.item.ind_style.antlaser_model
+            if model_name:
+                vmf.create_ent(
+                    'comp_kv_setter',
+                    origin=group.nodes[0].inst['origin'],
+                    target=NAME_MODEL(base_name),
+                    mode='kv',
+                    kv_name='model',
+                    kv_value_global=model_name,
+                )
+            skinset_str = ' '.join(sorted(skinset))
+            for node in group.nodes:
+                # Skinset must be second, otherwise skin will substitute first.
+                node.inst.fixup['$skin'] = initial_state.antlaser_skin
+                node.inst.fixup['$skinset'] = skinset_str
+
+        # For corners, states are applied during regular connection generation.
 
         # Node -> index for targetnames.
         indexes: dict[Node, int] = {}
@@ -409,7 +494,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         # So this dict is either a targetname to indicate cables with an
         # outgoing connection, or the entity for endpoints without an outgoing
         # connection.
-        cable_points: dict[Node, Union[Entity, str]] = {}
+        cable_points: dict[Node, Entity | str] = {}
 
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i
@@ -422,14 +507,14 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 # always a corner. Otherwise, it's one if there's an L, T or X
                 # junction.
                 use_corner = True
-                norm = node.orient.up().as_tuple()
+                norm = node.orient.up().freeze()
                 if not node.had_input:
                     neighbors = [
                         mag * direction for direction in [
                             node.orient.forward(),
                             node.orient.left(),
                         ] for mag in [-8.0, 8.0]
-                        if ((node.pos + mag * direction).as_tuple(), norm) in group.ant_seg
+                        if ((node.pos + mag * direction).freeze(), norm) in group.ant_seg
                     ]
                     if len(neighbors) == 2:
                         [off1, off2] = neighbors
@@ -465,7 +550,9 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     # First add the sprite at the right height.
                     sprite = vmf.create_ent('env_sprite')
                     for kv in glow_conf:
-                        sprite[kv.name] = conditions.resolve_value(node.inst, kv.value)
+                        sprite[kv.name] = node.inst.fixup.substitute(kv.value)
+                    if initial_state.glow_colour:
+                        sprite['rendercolor'] = initial_state.glow_colour
 
                     sprite['origin'] = sprite_pos
                     sprite['targetname'] = NAME_SPR(base_name, i)
@@ -482,7 +569,9 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     beam_pos = node.pos + conf_las_start @ node.orient
                     beam = vmf.create_ent('env_beam')
                     for kv in beam_conf:
-                        beam[kv.name] = conditions.resolve_value(node.inst, kv.value)
+                        beam[kv.name] = node.inst.fixup.substitute(kv.value)
+                    if initial_state.beam_colour:
+                        beam['rendercolor'] = initial_state.glow_colour
 
                     beam['origin'] = beam['targetpoint'] = beam_pos
                     beam['targetname'] = NAME_BEAM_LOW(base_name, i)
@@ -503,6 +592,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 beam['LightningStart'] = NAME_SPR(base_name, indexes[node_a])
                 beam['LightningEnd'] = NAME_SPR(base_name, indexes[node_b])
                 beam['spawnflags'] = conf_beam_flags
+                if initial_state.beam_colour:
+                    beam['rendercolor'] = initial_state.glow_colour
 
         if group.type is NodeType.LASER and cable_conf:
             build_cables(
@@ -520,7 +611,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 def build_cables(
     vmf: VMF,
     group: Group,
-    cable_points: dict[Node, Union[Entity, str]],
+    cable_points: dict[Node, Entity | str],
     base_name: str,
     beam_conf: Keyvalues,
     conf_rope_off: Vec,
@@ -540,10 +631,7 @@ def build_cables(
     # LU | Flip, do UL
     # LL | Make A, link A to B. Both are linked.
     rope_ind = 0  # Uniqueness value.
-    node_a: Node
-    node_b: Node
-    rope_a: Entity
-    rope_b: Entity
+    name_b: str
     for node_a, node_b in group.links:
         state_a, ent_a = RopeState.from_node(cable_points, node_a)
         state_b, ent_b = RopeState.from_node(cable_points, node_b)

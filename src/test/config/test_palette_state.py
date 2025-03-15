@@ -6,6 +6,7 @@ import pytest
 
 from BEE2_config import GEN_OPTS
 from config.palette import PaletteState
+from config import UnknownVersion
 from consts import UUID_EXPORT, UUID_PORTAL2
 
 from . import isolate_conf
@@ -31,6 +32,15 @@ def test_parse_legacy() -> None:
         assert state.selected == some_uuid
         assert state.save_settings is True
         assert state.hidden_defaults == frozenset()
+
+
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        PaletteState.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        PaletteState.parse_dmx(Element('PaletteState', 'DMConfig'), 2)
 
 
 @pytest.mark.parametrize('save', [0, 1])

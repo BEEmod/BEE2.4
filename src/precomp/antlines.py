@@ -1,9 +1,9 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
-from typing import Callable, Dict, Mapping, final, List, Optional, Sequence
+from typing import final
 
+from collections.abc import Iterator, Callable, Mapping, Sequence
 from collections import defaultdict
-from collections.abc import Iterator, Container
 from enum import Enum
 import math
 
@@ -11,8 +11,9 @@ import attrs
 from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
+import utils
 from precomp import options, tiling, rand
-from connections import get_outputs, TimerModes
+from connections import get_outputs, TimerModes, INDICATOR_CHECK_ID, INDICATOR_TIMER_ID
 import consts
 import editoritems
 
@@ -60,43 +61,58 @@ class AntTex:
             scale = kv.float('scale', 0.25)
             static = kv.bool('static')
         else:
-            vals = kv.value.split('|')
-            opts: Container[str] = ()
-            scale_str = '0.25'
-
-            if len(vals) == 2:
-                scale_str, tex = vals
-            elif len(vals) > 2:
-                scale_str, tex, *opts = vals
-            else:
-                # Unpack to ensure it only has 1 section
-                [tex] = vals
-            scale = conv_float(scale_str, 0.25)
-            static = 'static' in opts
+            match kv.value.split('|'):
+                case [scale_str, tex]:
+                    scale = conv_float(scale_str, 0.25)
+                    static = False
+                case [scale_str, tex, 'static']:
+                    scale = conv_float(scale_str, 0.25)
+                    static = True
+                case [tex]:
+                    scale = 0.25
+                    static = False
+                case _:
+                    raise ValueError(
+                        f'''Invalid antline material config "{kv.value}"! Valid forms:
+- "antline_kind" "material"
+- "antline_kind" "<scale>|material"
+- "antline_kind" "<scale>|material|static"
+"antline_kind"
+    {{
+    "tex"    "<mat>"
+    "scale"  "<scale>"
+    "static" "<is_static>"
+    }}
+''')
 
         return cls(tex, scale, static)
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, kw_only=True)
 class AntType:
     """Defines the style of antline to use.
 
-    For broken antlines, 'broken_chance' is the percentage chance for brokenness
-    per dot.
-
     Corners can be omitted, if corner/straight antlines are the same.
+
+    broken_chance: percentage chance for brokenness per dot.
+    broken_min: Straight antlines must be at least this long to be eligable for brokenness.
+    broken_max_run: Force working antlines if this many broken ones are in a row.
     """
     tex_straight: list[AntTex]
     tex_corner: list[AntTex]
 
-    broken_straight: list[AntTex]
-    broken_corner: list[AntTex]
-    broken_chance: float
+    broken_straight: list[AntTex] = attrs.Factory(list)
+    broken_corner: list[AntTex] = attrs.Factory(list)
+    broken_chance: float = 0.0
+    broken_min: int = 0
+    broken_max_run: int = 1
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> AntType:
         """Parse this from a property block."""
-        broken_chance = kv.float('broken_chance')
+        broken_chance = kv.float('broken_chance', 0.0)
+        broken_min = kv.int('broken_min', 0)
+        broken_max_run = kv.int('broken_max_run', 1)
         tex_straight: list[AntTex] = []
         tex_corner: list[AntTex] = []
         brok_straight: list[AntTex] = []
@@ -104,6 +120,7 @@ class AntType:
         for ant_list, name in zip(
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
+            strict=True,
         ):
             for sub_prop in kv.find_all(name):
                 ant_list.append(AntTex.parse(sub_prop))
@@ -114,30 +131,66 @@ class AntType:
         if broken_chance > 100.0:
             LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', kv['broken_chance'])
             broken_chance = 100.0
+        if broken_min < 0:
+            LOGGER.warning('Antline broken minumum must be positive, got "{}"!', kv['broken_min'])
+            broken_min = 0
+        if broken_max_run < 1:
+            LOGGER.warning('Antline broken max run must be at least 1, got "{}"!', kv['broken_max_run'])
+            broken_max_run = 1
 
         if broken_chance == 0.0:
             brok_straight.clear()
             brok_corner.clear()
+            broken_min = 0
+            broken_max_run = 1
 
         # Cannot have broken corners if corners/straights are the same.
         if not tex_corner:
             brok_corner.clear()
 
         return cls(
-            tex_straight,
-            tex_corner,
-            brok_straight,
-            brok_corner,
-            broken_chance,
+            tex_straight=tex_straight, tex_corner=tex_corner,
+            broken_straight=brok_straight, broken_corner=brok_corner,
+            broken_chance=broken_chance,
+            broken_min=broken_min,
+            broken_max_run=broken_max_run,
         )
 
     @classmethod
     def default(cls) -> AntType:
         """Make a copy of the original PeTI antline config."""
         return AntType(
-            [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
-            [AntTex(consts.Antlines.CORNER, 1.0, False)],
-            [], [], 0.0,
+            tex_straight=[AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
+            tex_corner=[AntTex(consts.Antlines.CORNER, 1.0, False)],
+        )
+
+
+@attrs.frozen(eq=False)
+class State:
+    """A specific state to set a custom indicator to.
+
+    This decouples the item from setting skins, allowing it to work with antlasers as well as overlays.
+    """
+    name: str  # Name of relay to create.
+
+    frame: int  # Antline texture frame.
+    beam_colour: str  # Colour for beam, if present.
+    glow_colour: str  # Colour for glow sprite, if present.
+    antlaser_skin: int  # Model skin.
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> State:
+        """Parse from keyvalues."""
+        frame = kv.int('tex_frame')
+        beam_colour = kv['antlaser_beam_colour', kv['antlaser_beam_color', '255 255 255']]
+        glow_colour = kv['antlaser_glow_colour', kv['antlaser_glow_color', beam_colour]]
+        skin = kv.int('antlaser_skin')
+        return cls(
+            name=kv.name,
+            frame=frame,
+            beam_colour=beam_colour,
+            glow_colour=glow_colour,
+            antlaser_skin=skin,
         )
 
 
@@ -148,14 +201,14 @@ class IndicatorStyle:
     wall: AntType
     floor: AntType
 
-    # Instance to use for checkmark signs.
+    # Instance to use for checkmark signs, or blank if they should not be used.
     check_inst: str
     check_switching: PanelSwitchingStyle
     # Sign inputs to swap the two versions.
     check_cmd: Sequence[Output]
     cross_cmd: Sequence[Output]
 
-    # Instance to use for timer signs.
+    # Instance to use for timer signs, or blank if they should not be used.
     timer_inst: str
     timer_switching: PanelSwitchingStyle
     # Outputs to use for the advanced version to swap skins, and to control the indicator.
@@ -165,6 +218,18 @@ class IndicatorStyle:
     # And the simplified on/off inputs.
     timer_basic_start_cmd: Sequence[Output]
     timer_basic_stop_cmd: Sequence[Output]
+
+    # If set, the item has special antlines. This is a fixup var,
+    # which gets the antline name filled in for us.
+    # Deprecated, use the modes instead.
+    toggle_var: str
+    # A list of states that are available for this antline set. Each is generated as a comp_relay,
+    # overriding the default on/off behaviour.
+    states: Sequence[State]
+    # If states are defined, the initial one.
+    initial_state: State | None
+    # If not blank, override the antlaser model
+    antlaser_model: str
 
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
@@ -181,8 +246,8 @@ class IndicatorStyle:
         This parses immediately, then returns a callable to allows passing in the parent to inherit
         from later.
         """
-        wall: Optional[AntType] = None
-        floor: Optional[AntType] = None
+        wall: AntType | None = None
+        floor: AntType | None = None
         if 'floor' in kv:
             floor = AntType.parse(kv.find_key('floor'))
         if 'wall' in kv:
@@ -202,37 +267,58 @@ class IndicatorStyle:
         elif floor is None and wall is not None:
             floor = wall
 
-        check_inst: Optional[str] = None
-        timer_inst: Optional[str] = None
-        check_cmd: Optional[List[Output]] = None
-        cross_cmd: Optional[List[Output]] = None
-        timer_adv_cmds: Dict[TimerModes, Sequence[Output]] = {}
-        timer_blue_cmd: Optional[List[Output]] = None
-        timer_oran_cmd: Optional[List[Output]] = None
-        timer_basic_start_cmd: Optional[List[Output]] = None
-        timer_basic_stop_cmd: Optional[List[Output]] = None
+        timer_inst: str | None = None
+        check: tuple[str, list[Output], list[Output]] | None = None
+        timer_adv_cmds: dict[TimerModes, Sequence[Output]] = {}
+        timer_blue_cmd: list[Output] | None = None
+        timer_oran_cmd: list[Output] | None = None
+        timer_basic_start_cmd: list[Output] | None = None
+        timer_basic_stop_cmd: list[Output] | None = None
         check_switching = PanelSwitchingStyle.CUSTOM
         timer_switching = PanelSwitchingStyle.CUSTOM
 
+        toggle_var = kv['toggle_var', '']
+        if toggle_var:
+            LOGGER.warning(
+                'Antline toggle var "{}" for {} is deprecated, prefer state definitions '
+                'to allow compatibility with antlasers.',
+                toggle_var, desc,
+            )
+        states = [
+            State.parse(mode_kv)
+            for mode_kv in kv.find_children('states')
+        ]
+        initial_state: State | None
+        if states:
+            initial_state_name = kv['initial_state'].casefold()
+            for state in states:
+                if state.name.casefold() == initial_state_name:
+                    initial_state = state
+                    break
+            else:
+                raise ValueError(f'Initial state "{initial_state_name}" does not exist!')
+        else:
+            initial_state = None
+        antlaser_model = kv['antlaser_model', '']
+
         check_kv = kv.find_block('check', or_blank=True)
-        has_check = bool(check_kv)
-        if has_check:
+        if bool(check_kv):
             check_inst = check_kv['inst']
             try:
                 check_switching = PanelSwitchingStyle(check_kv['switching'])
             except (LookupError, ValueError):
-                check_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+                check_switching = PanelSwitchingStyle.CUSTOM  # Assume no optimisations
             check_cmd = get_outputs(check_kv, desc, 'check_cmd')
             cross_cmd = get_outputs(check_kv, desc, 'cross_cmd')
+            check = check_inst, check_cmd, cross_cmd
 
         timer_kv = kv.find_block('timer', or_blank=True)
-        has_timer = bool(timer_kv)
-        if has_timer:
+        if bool(timer_kv):
             timer_inst = timer_kv['inst']
             try:
                 timer_switching = PanelSwitchingStyle(timer_kv['switching'])
             except (LookupError, ValueError):
-                timer_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+                timer_switching = PanelSwitchingStyle.CUSTOM  # Assume no optimisations
             timer_blue_cmd = get_outputs(timer_kv, desc, 'blue_cmd')
             timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
             timer_basic_start_cmd = get_outputs(timer_kv, desc, 'basic_start_cmd')
@@ -248,8 +334,13 @@ class IndicatorStyle:
                 parent,
                 wall=wall or parent.wall,
                 floor=floor or parent.floor,
+                toggle_var=toggle_var,
+                states=states,
+                initial_state=initial_state,
+                antlaser_model=antlaser_model,
             )
-            if has_check:
+            if check is not None:
+                check_inst, check_cmd, cross_cmd = check
                 conf = attrs.evolve(
                     conf,
                     check_inst=check_inst,
@@ -257,7 +348,7 @@ class IndicatorStyle:
                     check_cmd=check_cmd,
                     cross_cmd=cross_cmd,
                 )
-            if has_timer:
+            if timer_inst is not None:
                 conf = attrs.evolve(
                     conf,
                     timer_inst=timer_inst,
@@ -272,27 +363,31 @@ class IndicatorStyle:
         return build
 
     @classmethod
-    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> IndicatorStyle:
+    def from_legacy(cls, id_to_item: dict[utils.ObjectID, editoritems.Item]) -> IndicatorStyle:
         """Produce the original legacy configs by reading from editoritems."""
-        check_item = id_to_item['item_indicator_panel']
-        timer_item = id_to_item['item_indicator_panel_timer']
+        check_item = id_to_item[INDICATOR_CHECK_ID]
+        timer_item = id_to_item[INDICATOR_TIMER_ID]
 
         return cls(
             wall=AntType.default(),
             floor=AntType.default(),
             check_inst=str(check_item.instances[0].inst) if check_item.instances else '',
-            check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            check_switching=options.IND_PAN_CHECK_SWITCHING.as_enum(PanelSwitchingStyle),
             check_cmd=check_item.conn_config.enable_cmd if check_item.conn_config is not None else (),
             cross_cmd=check_item.conn_config.disable_cmd if check_item.conn_config is not None else (),
 
             timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
-            timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+            timer_switching=options.IND_PAN_TIMER_SWITCHING.as_enum(PanelSwitchingStyle),
             timer_basic_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else (),
             timer_basic_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else (),
             # No advanced configs
             timer_adv_cmds=EmptyMapping,
             timer_blue_cmd=(),
             timer_oran_cmd=(),
+            toggle_var='',
+            states=(),
+            initial_state=None,
+            antlaser_model='',
         )
 
     def has_advanced_timer(self) -> bool:
@@ -318,34 +413,44 @@ class Segment:
         """Return if this segment is on the floor/wall."""
         return abs(self.normal.z) > 1e-6
 
-    def broken_iter(
-        self,
-        chance: float,
-    ) -> Iterator[tuple[Vec, Vec, bool]]:
+    @property
+    def count(self) -> int:
+        """Return the number of 'dots' in this segment."""
+        offset = self.end - self.start
+        return int(offset.mag() // 16)
+
+    def broken_iter(self, conf: AntType) -> Iterator[tuple[Vec, Vec, bool]]:
         """Iterator to compute positions for straight segments.
 
         This produces point pairs which fill the space from 0-dist.
         Neighbouring sections will be merged when they have the same
         type.
         """
+        chance = conf.broken_chance
         rng = rand.seed(b'ant_broken', self.start, self.end, float(chance))
         offset = self.end - self.start
         dist = offset.mag() // 16
-        norm = 16 * offset.norm()
+        forward = 16 * offset.norm()
 
-        if dist < 3 or chance == 0.0:
-            # Short antlines always are either on/off.
-            yield self.start, self.end, (rng.randrange(100) < chance)
+        if dist < conf.broken_min or chance == 0.0:
+            # Short antlines must always be on.
+            yield self.start, self.end, False
         else:
             run_start = self.start
-            last_type = rng.randrange(100) < chance
+            run_broken = rng.randrange(100) < chance
+            run_size = 0
             for i in range(1, int(dist)):
-                next_type = rng.randrange(100) < chance
-                if next_type != last_type:
-                    yield run_start, self.start + i * norm, last_type
-                    last_type = next_type
-                    run_start = self.start + i * norm
-            yield run_start, self.end, last_type
+                if run_broken and run_size >= conf.broken_max_run:
+                    next_broken = False
+                else:
+                    next_broken = rng.randrange(100) < chance
+                if next_broken is not run_broken:
+                    yield run_start, self.start + i * forward, run_broken
+                    run_broken = next_broken
+                    run_size = 0
+                    run_start = self.start + i * forward
+                run_size += 1
+            yield run_start, self.end, run_broken
 
 
 @attrs.define(eq=False)
@@ -403,7 +508,7 @@ class Antline:
             self.line[:] = [seg for seg in collapse_line if seg is not None]
             LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
 
-        for seg in self.line:
+        for neigh_prev, seg, neigh_next in utils.iter_neighbours(self.line):
             conf = style.floor if seg.on_floor else style.wall
             # Check tiledefs in the voxels, and assign just in case.
             # antline corner items don't have them defined, and some embed-faces don't work
@@ -425,7 +530,21 @@ class Antline:
             rng = rand.seed(b'antline', seg.start, seg.end)
             if seg.type is SegType.CORNER:
                 mat: AntTex
-                if rng.randrange(100) < conf.broken_chance:
+                # Corners can only break if a neighbour is a straight with the same normal
+                # and that matches the min length.
+                # That ensures a working antline should be visible near it.
+                allow_break = (
+                    neigh_prev is not None
+                    and neigh_prev.type is SegType.STRAIGHT
+                    and neigh_prev.count >= conf.broken_min
+                    and Vec.dot(neigh_prev.normal, seg.normal) > 0.9
+                ) or (
+                    neigh_next is not None
+                    and neigh_next.type is SegType.STRAIGHT
+                    and neigh_next.count >= conf.broken_min
+                    and Vec.dot(neigh_next.normal, seg.normal) > 0.9
+                )
+                if allow_break and rng.randrange(100) < conf.broken_chance:
                     mat = rng.choice(conf.broken_corner or conf.broken_straight)
                 else:
                     mat = rng.choice(conf.tex_corner or conf.tex_straight)
@@ -443,17 +562,15 @@ class Antline:
                     mat,
                 )
             else:  # Straight
-                # TODO: Break up these segments.
-                for a, b, is_broken in seg.broken_iter(conf.broken_chance):
-                    if is_broken:
-                        mat = rng.choice(conf.broken_straight)
-                    else:
-                        mat = rng.choice(conf.tex_straight)
-                    self._make_straight(
+                side = 16 * Vec.cross(seg.normal, seg.start - seg.end).norm()
+                for a, b, is_broken in seg.broken_iter(conf):
+                    mat = rng.choice(conf.broken_straight if is_broken else conf.tex_straight)
+                    self._make_overlay(
                         vmf,
                         seg,
-                        a,
-                        b,
+                        (a + b) / 2,
+                        a - b,
+                        side,
                         mat,
                     )
 
@@ -482,33 +599,6 @@ class Antline:
 
         for tile in segment.tiles:
             tile.bind_overlay(overlay)
-
-    def _make_straight(
-        self,
-        vmf: VMF,
-        segment: Segment,
-        start: Vec,
-        end: Vec,
-        mat: AntTex,
-    ) -> None:
-        """Construct a straight antline between two points.
-
-        The two points will be the end of the antlines.
-        """
-        offset = start - end
-        forward = offset.norm()
-        side = Vec.cross(segment.normal, forward).norm()
-
-        length = offset.mag()
-
-        self._make_overlay(
-            vmf,
-            segment,
-            (start + end) / 2,
-            length * forward,
-            16 * side,
-            mat,
-        )
 
 
 def parse_antlines(vmf: VMF) -> tuple[
@@ -639,7 +729,7 @@ def parse_antlines(vmf: VMF) -> tuple[
             # Except KeyError: this segment's already done??
             for neighbour in neighbours:
                 if neighbour not in segments:
-                    segments.append(neighbour)
+                    segments.append(neighbour)  # noqa: B909 - appending to our own loop var
 
         antlines.setdefault(over_name, []).append(Antline(over_name, segments))
 
@@ -656,7 +746,7 @@ def fix_single_straight(
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
     # sides. If there is that's the correct orientation.
-    orient = Matrix.from_angle(seg.normal.to_angle())
+    orient = Matrix.from_basis(x=seg.normal)
 
     center = seg.start
 
