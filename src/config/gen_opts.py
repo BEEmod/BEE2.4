@@ -53,6 +53,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     visualise_inheritance: bool = False
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    extend_chamber: bool = False
 
     language: str = ''
 
@@ -122,7 +123,8 @@ class GenOptions(config.Data, conf_name='Options', version=2):
             Keyvalues('after_export', str(self.after_export.value)),
             Keyvalues('log_win_level', self.log_win_level),
             Keyvalues('language', self.language),
-            Keyvalues('preserve_fgd', '1' if self.preserve_fgd else '0')
+            Keyvalues('preserve_fgd', '1' if self.preserve_fgd else '0'),
+            Keyvalues('extend_chamber', '1' if self.extend_chamber else '0')
         ])
         for field in gen_opts_bool:
             kv.append(Keyvalues(field.name, '1' if getattr(self, field.name) else '0'))
@@ -152,6 +154,10 @@ class GenOptions(config.Data, conf_name='Options', version=2):
             res['language'] = data['language'].val_str
         except KeyError:
             pass
+        try:
+            res['extend_chamber'] = data['extend_chamber'].val_bool
+        except KeyError:
+            pass
 
         for field in gen_opts_bool:
             try:
@@ -168,6 +174,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
         elem['language'] = self.language
         elem['preserve_fgd'] = self.preserve_fgd
         elem['log_win_level'] = self.log_win_level
+        elem['extend_chamber'] = self.extend_chamber
         for field in gen_opts_bool:
             elem[field.name] = getattr(self, field.name)
         return elem

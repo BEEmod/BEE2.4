@@ -66,7 +66,7 @@ INCLUDES = [
     'bisect', 'colorsys', 'collections', 'csv', 'datetime',
     'decimal', 'difflib', 'enum', 'fractions', 'functools',
     'io', 'itertools', 'json', 'math', 'random', 're',
-    'statistics', 'string', 'struct', 'attrs', 'attr',
+    'statistics', 'string', 'struct', 'attrs', 'attr', 'astar',
 
     # Might not be found?
     'rtree',

@@ -687,6 +687,11 @@ CAVE_PORT_SKIN = Opt.int_or_none(
     * 2: 70's Cave 
     * 3: 70's Cave with Caroline
     """)
+EXTEND_CHAMBER = Opt.boolean(
+    'extend_chamber', False,
+    """Do the thing with the skybox
+    and don't fuck it up.
+    """)
 
 
 _ALL_OPTIONS = [

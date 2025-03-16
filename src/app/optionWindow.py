@@ -601,6 +601,14 @@ async def init_dev_tab(
         ),
     ).grid(row=4, column=1, sticky='W')
 
+    make_checkbox(
+        frm_check, 'extend_chamber',
+        desc=TransToken.ui('Extend Chamber'),
+        tooltip=TransToken.ui(
+            'WIP'
+        ),
+    ).grid(row=4, column=0, sticky='W')
+
     await trio.lowlevel.checkpoint()
     frm_btn1 = ttk.Frame(f)
     frm_btn1.grid(row=2, column=0, sticky='ew')
