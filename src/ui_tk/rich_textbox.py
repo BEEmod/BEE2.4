@@ -239,9 +239,11 @@ class TKRenderer(base_renderer.BaseRenderer[list[Block]]):
     def render_line_break(self, token: stok.LineBreak) -> list[Block]:
         """Render a newline."""
         if token.soft:
-            return []
+            # Should not newline. If multiple characters etc `content` includes that,
+            # otherwise force at least one space.
+            return [TextSegment(token.content or ' ')]
         else:
-            return [TextSegment('\n')]
+            return [TextSegment(f'{token.content}\n')]
 
     def render_link(self, token: stok.Link) -> list[Block]:
         """Render links."""
