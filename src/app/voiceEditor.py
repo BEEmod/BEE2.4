@@ -71,7 +71,6 @@ class TabBase:
 
         return func
 
-    @abc.abstractmethod
     def reconfigure(
         self,
         kind: TabTypes,
