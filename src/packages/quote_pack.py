@@ -33,8 +33,6 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
 
-    data: QuoteInfo  # TODO remove
-
     def __init__(
         self,
         quote_id: str,
@@ -81,10 +79,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
             pak_id=data.pak_id,
             prop_name='file',
         )
-        result = cls(data.id, selitem_data, config, chars, port_skin, monitor)
-        # TODO: remove.
-        result.data, _ = await result.parse_conf()
-        return result
+        return cls(data.id, selitem_data, config, chars, port_skin, monitor)
 
     async def parse_conf(self) -> tuple[QuoteInfo, Keyvalues]:
         """Read and parse the config."""

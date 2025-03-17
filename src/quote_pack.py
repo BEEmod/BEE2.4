@@ -252,23 +252,29 @@ class Line:
                 LOGGER.warning('Choreo end commands should be set inside the choreo block!')
                 end_commands.append(parse_output(child))
             elif child.name == 'choreo':
-                scenes = []
-                for choreo_kv in child:
-                    if choreo_kv.name == 'name':
-                        cls._warn_if_vcd(choreo_kv.value, 'name override')
-                        if cur_choreo_name:
-                            raise ValueError(
-                                f'Duplicate choreo name override '
-                                f'"{cur_choreo_name}" and "{choreo_kv.value}"!'
-                            )
-                        cur_choreo_name = choreo_kv.value
-                    elif choreo_kv.name == 'endcommand' and choreo_kv.has_children():
-                        end_commands.append(parse_output(choreo_kv))
+                scene_files = []
+                if child.has_children():
+                    for choreo_kv in child:
+                        if choreo_kv.name == 'name':
+                            cls._warn_if_vcd(choreo_kv.value, 'name override')
+                            if cur_choreo_name:
+                                raise ValueError(
+                                    f'Duplicate choreo name override '
+                                    f'"{cur_choreo_name}" and "{choreo_kv.value}"!'
+                                )
+                            cur_choreo_name = choreo_kv.value
+                        elif choreo_kv.name == 'endcommand' and choreo_kv.has_children():
+                            end_commands.append(parse_output(choreo_kv))
+                        else:
+                            scene_files.append(choreo_kv.value)
 
-                if require_quote_name and not cur_choreo_name:
-                    LOGGER.warning('Quote Pack has no quote name for midchamber line!')
+                    if require_quote_name and not cur_choreo_name:
+                        LOGGER.warning('Quote Pack has no quote name for midchamber line!')
+                else:
+                    scene_files.append(child.value)
+
                 scenes.append(Choreo(
-                    child.as_array(),
+                    scene_files,
                     end_commands,
                     cur_choreo_name,
                 ))
