@@ -47,9 +47,9 @@ TRANS_TRANSCRIPT_TITLE = TransToken.ui('Transcript: ')
 
 class TabTypes(Enum):
     """Kinds of tabs."""
-    NORM = 0
-    MIDCHAMBER = MID = 1
-    RESPONSE = RESP = 2
+    NORMAL = 0
+    MIDCHAMBER = 1
+    RESPONSE = 2
 
 type TabContents = Iterable[tuple[TransToken, str, Iterable[Line]]]
 type Transcript = Sequence[tuple[str, TransToken]]
@@ -166,7 +166,7 @@ class VoiceEditorBase[Tab: TabBase]:
         for group in info.groups.values():
             tab = self.tabs.fetch()
             tab.reconfigure(
-                TabTypes.NORM,
+                TabTypes.NORMAL,
                 title=group.name,
                 desc=group.desc,
                 config=self.config,

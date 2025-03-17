@@ -226,14 +226,14 @@ class VoiceEditor(VoiceEditorBase[Tab]):
             # For the special tabs, we use a special image to make
             # sure they are well-distinguished from the other groups
             match tab.kind:
-                case TabTypes.MID | TabTypes.MIDCHAMBER:
+                case TabTypes.MIDCHAMBER:
                     self.wid_tabs.insert(
                         tk.END,
                         tab.frame,
                         compound='image',
                         image=TK_IMG.sync_load(IMG_MID),
                     )
-                case TabTypes.RESPONSE | TabTypes.RESP:
+                case TabTypes.RESPONSE:
                     self.wid_tabs.insert(
                         tk.END,
                         tab.frame,
@@ -241,7 +241,7 @@ class VoiceEditor(VoiceEditorBase[Tab]):
                         image=TK_IMG.sync_load(IMG_RESP),
                         text=str(TRANS_RESPONSE_SHORT),
                     )
-                case TabTypes.NORM:
+                case TabTypes.NORMAL:
                     self.wid_tabs.insert(
                         tk.END,
                         tab.frame,
