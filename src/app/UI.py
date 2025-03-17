@@ -53,7 +53,7 @@ from ui_tk.img import TKImages, TK_IMG
 from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
 from ui_tk.subpane import SubPane
-from app.voiceEditor import VoiceEditorBase
+from ui_tk.voice_editor import VoiceEditor
 import consts
 
 
@@ -81,7 +81,6 @@ suggest_windows: dict[type[packages.SelPakObject], SelectorWin] = {}
 context_win: ContextWin
 sign_ui: SignageUI
 item_picker: ItemPicker
-voice_editor: VoiceEditorBase
 
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
@@ -380,6 +379,7 @@ async def init_option(
     export: Callable[[], object],
     export_ready: trio_util.AsyncValue[bool],
     corridor: TkSelector,
+    voice_editor: VoiceEditor,
     task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise the export options pane."""
@@ -689,13 +689,21 @@ async def init_windows(
 
     await LOAD_UI.step('packageman')
 
+    voice_editor = VoiceEditor()
+    await LOAD_UI.step('voiceline')
+
     windows['opt'] = SubPane(
         TK_ROOT, tk_img, CONF_EXPORT_OPTS,
         menu_bar=menu_bar.view_menu,
         tool_frame=toolbar_frame,
     )
     corridor = TkSelector(tk_img, cur_style)
-    await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
+    await core_nursery.start(
+        init_option,
+        core_nursery, windows['opt'], tk_img,
+        export, export_trig.ready, corridor,
+        voice_editor,
+    )
     core_nursery.start_soon(corridor.task)
     await LOAD_UI.step('options')
 
@@ -744,9 +752,6 @@ async def init_windows(
     await trio.lowlevel.checkpoint()
     await core_nursery.start(backup_win.init_toplevel, tk_img)
     await LOAD_UI.step('backup')
-    voice_editor = VoiceEditorBase()
-    voice_editor.init_widgets()
-    await LOAD_UI.step('voiceline')
     context_win = ContextWin(item_picker, tk_img, cur_style)
     await core_nursery.start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
