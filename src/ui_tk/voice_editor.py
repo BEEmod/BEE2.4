@@ -3,16 +3,126 @@ from tkinter import ttk
 from tkinter.font import nametofont as tk_nametofont
 import tkinter as tk
 
-from app.voiceEditor import TRANS_TRANSCRIPT_TITLE, VoiceEditorBase
+import functools
+
+from BEE2_config import ConfigFile
+from app.voiceEditor import (
+    CRITERIA_ICONS, TRANS_TRANSCRIPT_TITLE, TabBase, TabContents, TabTypes,
+    VoiceEditorBase,
+)
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
+from ui_tk.img import TK_IMG
+from ui_tk.tooltip import add_tooltip
 from ui_tk.wid_transtoken import set_text
+
 
 ACTOR_FONT = tk_nametofont('TkDefaultFont').copy()
 ACTOR_FONT['weight'] = 'bold'
 
+QUOTE_FONT = tk_nametofont('TkHeadingFont').copy()
+QUOTE_FONT['weight'] = 'bold'
 
-class VoiceEditor(VoiceEditorBase):
+
+class Tab(TabBase):
+    """TK implementation of a tab."""
+    frame: ttk.Frame
+
+    def __init__(self, parent: ttk.Notebook) -> None:
+        """Create all the widgets for a tab."""
+        super().__init__()
+
+        # This is just to hold the canvas and scrollbar
+        self.frame = ttk.Frame(parent)
+        self.frame.columnconfigure(0, weight=1)
+        self.frame.rowconfigure(0, weight=1)
+
+        # We need a canvas to make the list scrollable.
+        self.canvas = canv = tk.Canvas(self.frame, highlightthickness=0)
+        scroll = tk_tools.HidingScroll(
+            self.frame,
+            orient='vertical',
+            command=canv.yview,
+            )
+        canv['yscrollcommand'] = scroll.set
+        canv.grid(row=0, column=0, sticky='NSEW')
+        scroll.grid(row=0, column=1, sticky='NS')
+
+        # This holds the actual elements
+        self.inner_frame = ttk.Frame(canv)
+        self.inner_frame.columnconfigure(0, weight=1)
+        canv.create_window(0, 0, window=self.inner_frame, anchor="nw")
+
+        self.wid_title = ttk.Label(self.inner_frame, anchor='center', font='tkHeadingFont')
+        self.wid_title.grid(row=0, column=0, sticky='EW')
+        self.wid_desc = ttk.Label(self.inner_frame)
+        self.wid_desc.grid(row=1, column=0, sticky='EW')
+
+        ttk.Separator(self.inner_frame, orient=tk.HORIZONTAL).grid(
+            row=2,
+            column=0,
+            sticky='EW',
+        )
+        canv.bind('<Configure>', self._configure_canv)
+
+    def _configure_canv(self, _: object) -> None:
+        """Allow resizing the windows."""
+        width = self.canvas.winfo_reqwidth()
+        self.canvas['scrollregion'] = (
+            0, 0,
+            width, self.inner_frame.winfo_reqheight(),
+        )
+        self.inner_frame['width'] = width
+
+    def reconfigure(
+        self,
+        kind: TabTypes,
+        config: ConfigFile,
+        title: TransToken,
+        desc: TransToken,
+        contents: TabContents,
+    ) -> None:
+        """Reconfigure the tab to display the specified lines."""
+        set_text(self.wid_title, title)
+        set_text(self.wid_desc, desc)
+
+        for name, conf_id, lines in contents:
+            set_text(ttk.Label(self.inner_frame, font=QUOTE_FONT), name).grid(column=0, sticky='W')
+
+            for line in lines:
+                line_frame = ttk.Frame(self.inner_frame)
+                line_frame.grid(
+                    column=0,
+                    padx=(10, 0),
+                    sticky='W',
+                )
+                x = 0
+                for x, criteria in enumerate(line.criterion):
+                    label = ttk.Label(line_frame, padding=0)
+                    TK_IMG.apply(label, CRITERIA_ICONS[criteria])
+                    label.grid(row=0, column=x)
+                    add_tooltip(label, criteria.tooltip)
+
+                x += 1  # Position after the badges
+                line_frame.columnconfigure(x, weight=1)
+
+                quote_var = tk.BooleanVar(value=config.get_bool(conf_id, line.id, True))
+                check = ttk.Checkbutton(
+                    line_frame,
+                    variable=quote_var,
+                    command=functools.partial(
+                        self.check_toggled,
+                        var=quote_var,
+                        config_section=config[conf_id],
+                        quote_id=line.id,
+                    )
+                )
+                set_text(check, line.name)
+                check.grid(row=0, column=x)
+                check.bind("<Enter>", functools.partial(self.show_trans, line.transcript))
+
+
+class VoiceEditor(VoiceEditorBase[Tab]):
     """TK implementation of the quote pack editor."""
     def __init__(self) -> None:
         """Create the editor."""
@@ -75,3 +185,11 @@ class VoiceEditor(VoiceEditorBase):
         # original size.
         trans_frame.update_idletasks()
         pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
+
+    def _ui_tab_create(self, index: int) -> Tab:
+        """Create a tab."""
+        return Tab(self.wid_tabs)
+
+    def _ui_tab_hide(self, tab: Tab) -> None:
+        """Hide a tab."""
+        self.wid_tabs.forget(tab.frame)

@@ -2,31 +2,26 @@
 from __future__ import annotations
 
 from tkinter import ttk
-from tkinter.font import nametofont as tk_nametofont
 import tkinter as tk
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from configparser import SectionProxy
 from enum import Enum
-import functools
+import abc
 
-import attrs
 import srctools.logger
 
-from app import img
+from app import WidgetCache, img
 from BEE2_config import ConfigFile
 from packages import QuotePack
 from quote_pack import Line, LineCriteria, QuoteInfo
 from transtoken import TransToken
+from trio_util import AsyncValue
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.img import TKImages
-from ui_tk.tooltip import add_tooltip
-from ui_tk.wid_transtoken import set_text, set_win_title
+from ui_tk.wid_transtoken import set_win_title
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-QUOTE_FONT = tk_nametofont('TkHeadingFont').copy()
-QUOTE_FONT['weight'] = 'bold'
 
 IMG_MID = img.Handle.builtin('icons/mid_quote', 32, 16)
 IMG_RESP = img.Handle.builtin('icons/resp_quote', 16, 16)
@@ -57,16 +52,39 @@ class TabTypes(Enum):
     MIDCHAMBER = MID = 1
     RESPONSE = RESP = 2
 
+type TabContents = Iterable[tuple[TransToken, str, Iterable[Line]]]
+type Transcript = Sequence[tuple[str, TransToken]]
 
-@attrs.define(eq=False)
-class Tab:
-    """Information for the tabs that are spawned."""
+
+class TabBase:
+    """Common implementation of the tabs spawned."""
     kind: TabTypes
-    frame: ttk.Frame
     title: TransToken
-    
-    
-class VoiceEditorBase:
+
+    def __init__(
+        self,
+        kind: TabTypes,
+        title: TransToken,
+        config: ConfigFile,
+    ) -> None:
+        self.kind = kind
+        self.title = title
+        self.config = config
+
+    @abc.abstractmethod
+    def reconfigure(
+        self,
+        kind: TabTypes,
+        config: ConfigFile,
+        title: TransToken,
+        desc: TransToken,
+        contents: TabContents,
+    ) -> None:
+        """Reconfigure the tab to display the specified lines."""
+        raise NotImplementedError
+
+
+class VoiceEditorBase[Tab: TabBase]:
     """Common implementation of the voice editor."""
     cur_item: QuotePack | None
 
@@ -74,16 +92,19 @@ class VoiceEditorBase:
     config_mid: ConfigFile | None = None
     config_resp: ConfigFile | None = None
     
-    tabs: list[Tab]
+    tabs: WidgetCache[Tab]
     wid_tabs: ttk.Notebook
     wid_trans: tk.Text
+
+    transcript: AsyncValue[Transcript]
     
     def __init__(self) -> None:
         self.win = tk.Toplevel(TK_ROOT, name='voiceEditor')
         self.win.withdraw()
         
         self.cur_item = None
-        self.tabs = []
+        self.tabs = WidgetCache(self._ui_tab_create, self._ui_tab_hide)
+        self.transcript = AsyncValue(())
 
     def close(self, _: object = None) -> None:
         """Close the window, discarding changes."""
@@ -129,7 +150,7 @@ class VoiceEditorBase:
             current_tab = None  # in that case abandon remembering the tab.
     
         # Add or remove tabs so only the correct mode is visible.
-        for tab in self.tabs:
+        for tab in self.tabs.placed:
             notebook.add(tab.frame)
             # For the special tabs, we use a special image to make
             # sure they are well-distinguished from the other groups
@@ -174,22 +195,14 @@ class VoiceEditorBase:
         text['state'] = 'normal'
         text.delete(1.0, 'end')
         text['state'] = 'disabled'
-    
-        # Destroy all the old tabs
-        for tab in self.tabs:
-            try:
-                notebook.forget(tab.frame)
-            except tk.TclError:
-                pass
-            tab.frame.destroy()
-    
-        self.tabs.clear()
+
+        self.tabs.hide_all()
     
         for group in info.groups.values():
-            self.make_tab(
-                tk_img,
+            tab = self.tabs.fetch()
+            tab.reconfigure(
                 TabTypes.NORM,
-                name=group.name,
+                title=group.name,
                 desc=group.desc,
                 config=self.config,
                 contents=(
@@ -197,12 +210,13 @@ class VoiceEditorBase:
                     for quote in sorted(group.quotes, key=lambda quote: quote.priority)
                 )
             )
+            self.wid_tabs.add(tab.frame)
     
         if info.midchamber:
-            self.make_tab(
-                tk_img,
+            tab = self.tabs.fetch()
+            tab.reconfigure(
                 TabTypes.MIDCHAMBER,
-                name=TRANS_MIDCHAMBER_TITLE,
+                title=TRANS_MIDCHAMBER_TITLE,
                 desc=TRANS_MIDCHAMBER_DESC,
                 config=self.config_mid,
                 contents=(
@@ -210,12 +224,13 @@ class VoiceEditorBase:
                     for quote in sorted(info.midchamber, key=lambda quote: quote.name.token)
                 )
             )
+            self.wid_tabs.add(tab.frame)
     
         if any(info.responses.values()):
-            self.make_tab(
-                tk_img,
+            tab = self.tabs.fetch()
+            tab.reconfigure(
                 TabTypes.RESPONSE,
-                name=TRANS_RESPONSE_TITLE,
+                title=TRANS_RESPONSE_TITLE,
                 desc=TRANS_RESPONSE_DESC,
                 config=self.config_resp,
                 contents=(
@@ -223,6 +238,7 @@ class VoiceEditorBase:
                     for resp, lines in info.responses.items()
                 )
             )
+            self.wid_tabs.add(tab.frame)
     
         self.config.save()
         self.config_mid.save()
@@ -234,97 +250,12 @@ class VoiceEditorBase:
         tk_tools.center_win(self.win)  # Center inside the parent
         self.win.lift()
 
-    def make_tab(
-        self, 
-        tk_img: TKImages,
-        tab_type: TabTypes,
-        name: TransToken,
-        desc: TransToken,
-        config: ConfigFile,
-        contents: Iterable[tuple[TransToken, str, Iterable[Line]]],
-    ) -> None:
-        """Create all the widgets for a tab."""
-        # This is just to hold the canvas and scrollbar
-        outer_frame = ttk.Frame(self.wid_tabs)
-        outer_frame.columnconfigure(0, weight=1)
-        outer_frame.rowconfigure(0, weight=1)
-    
-        self.tabs.append(Tab(tab_type, outer_frame, name))
-    
-        # We need a canvas to make the list scrollable.
-        canv = tk.Canvas(outer_frame, highlightthickness=0)
-        scroll = tk_tools.HidingScroll(
-            outer_frame,
-            orient='vertical',
-            command=canv.yview,
-            )
-        canv['yscrollcommand'] = scroll.set
-        canv.grid(row=0, column=0, sticky='NSEW')
-        scroll.grid(row=0, column=1, sticky='NS')
-    
-        self.wid_tabs.add(outer_frame)
-    
-        # This holds the actual elements
-        frame = ttk.Frame(canv)
-        frame.columnconfigure(0, weight=1)
-        canv.create_window(0, 0, window=frame, anchor="nw")
-    
-        set_text(
-            ttk.Label(frame, anchor='center', font='tkHeadingFont'),
-            name,
-        ).grid(row=0, column=0, sticky='EW')
-    
-        set_text(ttk.Label(frame), desc).grid(row=1, column=0, sticky='EW')
-    
-        ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
-            row=2,
-            column=0,
-            sticky='EW',
-        )
-    
-        for name, conf_id, lines in contents:
-            set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky='W')
-    
-            for line in lines:
-                line_frame = ttk.Frame(frame,)
-                line_frame.grid(
-                    column=0,
-                    padx=(10, 0),
-                    sticky='W',
-                )
-                x = 0
-                for x, criteria in enumerate(line.criterion):
-                    label = ttk.Label(line_frame, padding=0)
-                    tk_img.apply(label, CRITERIA_ICONS[criteria])
-                    label.grid(row=0, column=x)
-                    add_tooltip(label, criteria.tooltip)
-    
-                x += 1  # Position after the badges
-                line_frame.columnconfigure(x, weight=1)
-    
-                quote_var = tk.BooleanVar(value=config.get_bool(conf_id, line.id, True))
-                check = ttk.Checkbutton(
-                    line_frame,
-                    variable=quote_var,
-                    command=functools.partial(
-                        self.check_toggled,
-                        var=quote_var,
-                        config_section=config[conf_id],
-                        quote_id=line.id,
-                    )
-                )
-                set_text(check, line.name)
-                check.grid(row=0, column=x)
-                check.bind("<Enter>", functools.partial(self.show_trans, line.transcript))
+    @abc.abstractmethod
+    def _ui_tab_create(self, index: int) -> Tab:
+        """Create a tab."""
+        raise NotImplementedError
 
-        def configure_canv(_: object) -> None:
-            """Allow resizing the windows."""
-            canv['scrollregion'] = (
-                0,
-                0,
-                canv.winfo_reqwidth(),
-                frame.winfo_reqheight(),
-            )
-            frame['width'] = canv.winfo_reqwidth()
-    
-        canv.bind('<Configure>', configure_canv)
+    @abc.abstractmethod
+    def _ui_tab_hide(self, tab: Tab) -> None:
+        """Hide a tab."""
+        raise NotImplementedError
