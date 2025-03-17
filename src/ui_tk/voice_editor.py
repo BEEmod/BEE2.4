@@ -1,6 +1,6 @@
 """TK implementation of the quote pack editor."""
 from configparser import SectionProxy
-from typing import override
+from typing import assert_never, override
 
 from tkinter import ttk
 from tkinter.font import nametofont as tk_nametofont
@@ -12,14 +12,16 @@ import srctools
 
 from BEE2_config import ConfigFile
 from app.voiceEditor import (
-    CRITERIA_ICONS, TRANS_TRANSCRIPT_TITLE, TabBase, TabContents, TabTypes,
+    CRITERIA_ICONS, IMG_MID, IMG_RESP, TRANS_RESPONSE_SHORT, TRANS_TRANSCRIPT_TITLE, TabBase,
+    TabContents, TabTypes,
     Transcript, VoiceEditorBase,
 )
 from transtoken import TransToken
-from ui_tk import TK_ROOT, tk_tools
-from ui_tk.img import TK_IMG
-from ui_tk.tooltip import add_tooltip
-from ui_tk.wid_transtoken import set_text
+
+from . import TK_ROOT, tk_tools
+from .img import TK_IMG
+from .tooltip import add_tooltip
+from .wid_transtoken import set_text, set_win_title
 
 
 ACTOR_FONT = tk_nametofont('TkDefaultFont').copy()
@@ -154,6 +156,8 @@ class VoiceEditor(VoiceEditorBase[Tab]):
     def __init__(self) -> None:
         """Create the editor."""
         super().__init__()
+        self.win = tk.Toplevel(TK_ROOT, name='voiceEditor')
+        self.win.withdraw()
 
         self.win.columnconfigure(0, weight=1)
         self.win.transient(master=TK_ROOT)
@@ -213,6 +217,55 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         trans_frame.update_idletasks()
         pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
+    def _ui_win_show(self, title: TransToken) -> None:
+        # TODO: Does this work?
+        #     notebook: ttk.Notebook = self.wid_tabs
+        #     # Save the current tab index, so we can restore it after.
+        #     try:  # Currently typed as Any, hence the type-ignore.
+        #         current_tab = notebook.index(notebook.select())  # type: ignore[no-untyped-call]
+        #     except tk.TclError:  # .index() will fail if the voice is empty,
+        #         current_tab = None  # in that case abandon remembering the tab.
+        #
+
+        # Re-add all tabs, reordering if required.
+        for tab in self.tabs.placed:
+            # For the special tabs, we use a special image to make
+            # sure they are well-distinguished from the other groups
+            match tab.kind:
+                case TabTypes.MID | TabTypes.MIDCHAMBER:
+                    self.wid_tabs.insert(
+                        'END',
+                        tab.frame,
+                        compound='image',
+                        image=TK_IMG.sync_load(IMG_MID),
+                    )
+                case TabTypes.RESPONSE | TabTypes.RESP:
+                    self.wid_tabs.tab(
+                        'END',
+                        tab.frame,
+                        compound='right',
+                        image=TK_IMG.sync_load(IMG_RESP),
+                        text=str(TRANS_RESPONSE_SHORT),
+                    )
+                case TabTypes.NORM:
+                    self.wid_tabs.insert('END', tab.frame, text=str(tab.title))
+                case never:
+                    assert_never(never)
+
+        #     if current_tab is not None:
+        #         notebook.select(current_tab)
+
+        set_win_title(self.win, title)
+        self.win.grab_set()
+
+        self.win.deiconify()
+        tk_tools.center_win(self.win)  # Center inside the parent
+        self.win.lift()
+
+    def _ui_win_hide(self) -> None:
+        self.win.grab_release()
+        self.win.wm_withdraw()
+
     @override
     def _ui_show_transcript(self, transcript: Transcript) -> None:
         self.wid_trans['state'] = 'normal'
@@ -232,4 +285,8 @@ class VoiceEditor(VoiceEditorBase[Tab]):
     @override
     def _ui_tab_hide(self, tab: Tab) -> None:
         """Hide a tab."""
-        self.wid_tabs.forget(tab.frame)
+        self.wid_tabs.hide(tab.frame)
+        # Destroy the widgets specific to this iteration of tab.
+        for wid in tab.widgets:
+            wid.destroy()
+        tab.widgets.clear()

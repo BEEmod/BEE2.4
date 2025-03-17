@@ -2,26 +2,20 @@
 from __future__ import annotations
 
 from contextlib import aclosing
-from tkinter import ttk
-import tkinter as tk
 from collections.abc import Callable, Iterable, Sequence
-from configparser import SectionProxy
 from enum import Enum
 import abc
 
 import srctools.logger
+from trio_util import AsyncValue
 import trio
 
-from app import WidgetCache, img
 from BEE2_config import ConfigFile
 from packages import QuotePack
 from quote_pack import Line, LineCriteria, QuoteInfo
 from transtoken import TransToken
-from trio_util import AsyncValue
-from ui_tk import TK_ROOT, tk_tools
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_win_title
 
+from . import WidgetCache, img
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -96,14 +90,9 @@ class VoiceEditorBase[Tab: TabBase]:
     config_resp: ConfigFile | None = None
     
     tabs: WidgetCache[Tab]
-    wid_tabs: ttk.Notebook
-
     transcript: AsyncValue[Transcript]
     
     def __init__(self) -> None:
-        self.win = tk.Toplevel(TK_ROOT, name='voiceEditor')
-        self.win.withdraw()
-        
         self.cur_item = None
         self.tabs = WidgetCache(self._ui_tab_create, self._ui_tab_hide)
         self.transcript = AsyncValue(())
@@ -123,8 +112,7 @@ class VoiceEditorBase[Tab: TabBase]:
         """Close the window, discarding changes."""
         self.cur_item = self.config = self.config_mid = self.config_resp = None
         self.transcript.value = ()
-        self.win.grab_release()
-        self.win.wm_withdraw()
+        self._ui_win_hide()
     
     def save(self) -> None:
         """Save and close the window."""
@@ -137,53 +125,14 @@ class VoiceEditorBase[Tab: TabBase]:
             if self.config_resp is not None:
                 self.config_resp.save_check()
         self.close()
-    
-    def add_tabs(self, tk_img: TKImages) -> None:
-        """Add the tabs to the notebook."""
-        notebook: ttk.Notebook = self.wid_tabs
-        # Save the current tab index, so we can restore it after.
-        try:  # Currently typed as Any, hence the type-ignore.
-            current_tab = notebook.index(notebook.select())  # type: ignore[no-untyped-call]
-        except tk.TclError:  # .index() will fail if the voice is empty,
-            current_tab = None  # in that case abandon remembering the tab.
-    
-        # Add or remove tabs so only the correct mode is visible.
-        for tab in self.tabs.placed:
-            notebook.add(tab.frame)
-            # For the special tabs, we use a special image to make
-            # sure they are well-distinguished from the other groups
-            if tab.kind is TabTypes.MID:
-                notebook.tab(
-                    tab.frame,
-                    compound='image',
-                    image=tk_img.sync_load(IMG_MID),
-                    )
-            if tab.kind is TabTypes.RESPONSE:
-                notebook.tab(
-                    tab.frame,
-                    compound='right',
-                    image=tk_img.sync_load(IMG_RESP),
-                    text=str(TRANS_RESPONSE_SHORT),
-                )
-            else:
-                notebook.tab(tab.frame, text=str(tab.title))
-    
-        if current_tab is not None:
-            notebook.select(current_tab)
 
-    def show(self, tk_img: TKImages, quote_pack: QuotePack, info: QuoteInfo) -> None:
+    def show(self, quote_pack: QuotePack, info: QuoteInfo) -> None:
         """Display the editing window."""
         if self.cur_item is not None:
             return
     
         self.cur_item = quote_pack
-    
-        set_win_title(self.win, TransToken.ui(
-            'BEE2 - Configure "{item}"',
-        ).format(item=self.cur_item.selitem_data.name))
-        self.win.grab_set()
-        notebook = self.wid_tabs
-    
+
         self.config = ConfigFile('voice/' + quote_pack.id + '.cfg')
         self.config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
         self.config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')
@@ -202,7 +151,6 @@ class VoiceEditorBase[Tab: TabBase]:
                     for quote in sorted(group.quotes, key=lambda quote: quote.priority)
                 )
             )
-            self.wid_tabs.add(tab.frame)
     
         if info.midchamber:
             tab = self.tabs.fetch()
@@ -216,7 +164,6 @@ class VoiceEditorBase[Tab: TabBase]:
                     for quote in sorted(info.midchamber, key=lambda quote: quote.name.token)
                 )
             )
-            self.wid_tabs.add(tab.frame)
     
         if any(info.responses.values()):
             tab = self.tabs.fetch()
@@ -230,17 +177,23 @@ class VoiceEditorBase[Tab: TabBase]:
                     for resp, lines in info.responses.items()
                 )
             )
-            self.wid_tabs.add(tab.frame)
     
         self.config.save()
         self.config_mid.save()
         self.config_resp.save()
-    
-        self.add_tabs(tk_img)
-    
-        self.win.deiconify()
-        tk_tools.center_win(self.win)  # Center inside the parent
-        self.win.lift()
+        self._ui_win_show(TransToken.ui(
+            'BEE2 - Configure "{item}"',
+        ).format(item=self.cur_item.selitem_data.name))
+
+    @abc.abstractmethod
+    def _ui_win_show(self, title: TransToken) -> None:
+        """Recreate all tabs, then show the window."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_win_hide(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _ui_show_transcript(self, transcript: Transcript) -> None:

@@ -440,7 +440,7 @@ async def init_option(
         except KeyError:
             return
         info, _ = await chosen_voice.parse_conf()
-        voice_editor.show(tk_img, chosen_voice, info)
+        voice_editor.show(chosen_voice, info)
     for ind, name in enumerate([
         TransToken.ui("Style: "),
         None,
