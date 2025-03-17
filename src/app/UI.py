@@ -690,6 +690,7 @@ async def init_windows(
     await LOAD_UI.step('packageman')
 
     voice_editor = VoiceEditor()
+    core_nursery.start_soon(voice_editor.task)
     await LOAD_UI.step('voiceline')
 
     windows['opt'] = SubPane(

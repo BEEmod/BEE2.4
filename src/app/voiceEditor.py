@@ -1,14 +1,16 @@
 """Allows enabling and disabling specific voicelines."""
 from __future__ import annotations
 
+from contextlib import aclosing
 from tkinter import ttk
 import tkinter as tk
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from configparser import SectionProxy
 from enum import Enum
 import abc
 
 import srctools.logger
+import trio
 
 from app import WidgetCache, img
 from BEE2_config import ConfigFile
@@ -61,15 +63,16 @@ class TabBase:
     kind: TabTypes
     title: TransToken
 
-    def __init__(
-        self,
-        kind: TabTypes,
-        title: TransToken,
-        config: ConfigFile,
-    ) -> None:
-        self.kind = kind
-        self.title = title
-        self.config = config
+    def __init__(self, parent: VoiceEditorBase) -> None:
+        self.trans_value = parent.transcript
+
+    def evt_show_line_trans(self, line: Line) -> Callable[[object], None]:
+        """Make a function which displays the specified line."""
+        def func(_: object = None) -> None:
+            """Display a line."""
+            self.trans_value.value = line.transcript
+
+        return func
 
     @abc.abstractmethod
     def reconfigure(
@@ -94,7 +97,6 @@ class VoiceEditorBase[Tab: TabBase]:
     
     tabs: WidgetCache[Tab]
     wid_tabs: ttk.Notebook
-    wid_trans: tk.Text
 
     transcript: AsyncValue[Transcript]
     
@@ -106,27 +108,23 @@ class VoiceEditorBase[Tab: TabBase]:
         self.tabs = WidgetCache(self._ui_tab_create, self._ui_tab_hide)
         self.transcript = AsyncValue(())
 
+    async def _transcript_task(self) -> None:
+        """Display transcripts."""
+        async with aclosing(self.transcript.eventual_values()) as agen:
+            async for transcript in agen:
+                self._ui_show_transcript(transcript)
+
+    async def task(self) -> None:
+        """Operate the voice editor."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._transcript_task)
+
     def close(self, _: object = None) -> None:
         """Close the window, discarding changes."""
         self.cur_item = self.config = self.config_mid = self.config_resp = None
+        self.transcript.value = ()
         self.win.grab_release()
         self.win.wm_withdraw()
-
-    def show_trans(self, transcript: list[tuple[str, TransToken]], e: tk.Event) -> None:
-        """Add the transcript to the list."""
-        self.wid_trans['state'] = 'normal'
-        self.wid_trans.delete(1.0, tk.END)
-        for actor, line in transcript:
-            self.wid_trans.insert('end', actor, ('actor',))
-            self.wid_trans.insert('end', str(line) + '\n\n')
-        # Remove the trailing newlines
-        self.wid_trans.delete('end-2char', 'end')
-        self.wid_trans['state'] = 'disabled'
-
-    @staticmethod
-    def check_toggled(var: tk.BooleanVar, config_section: SectionProxy, quote_id: str) -> None:
-        """Update the config file to match the checkbox."""
-        config_section[quote_id] = srctools.bool_as_int(var.get())
     
     def save(self) -> None:
         """Save and close the window."""
@@ -189,12 +187,6 @@ class VoiceEditorBase[Tab: TabBase]:
         self.config = ConfigFile('voice/' + quote_pack.id + '.cfg')
         self.config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
         self.config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')
-    
-        # Clear the transcript textbox
-        text = self.wid_trans
-        text['state'] = 'normal'
-        text.delete(1.0, 'end')
-        text['state'] = 'disabled'
 
         self.tabs.hide_all()
     
@@ -249,6 +241,11 @@ class VoiceEditorBase[Tab: TabBase]:
         self.win.deiconify()
         tk_tools.center_win(self.win)  # Center inside the parent
         self.win.lift()
+
+    @abc.abstractmethod
+    def _ui_show_transcript(self, transcript: Transcript) -> None:
+        """Display the specified transcript."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _ui_tab_create(self, index: int) -> Tab:

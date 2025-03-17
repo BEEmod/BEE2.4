@@ -1,14 +1,19 @@
 """TK implementation of the quote pack editor."""
+from configparser import SectionProxy
+from typing import override
+
 from tkinter import ttk
 from tkinter.font import nametofont as tk_nametofont
 import tkinter as tk
 
 import functools
 
+import srctools
+
 from BEE2_config import ConfigFile
 from app.voiceEditor import (
     CRITERIA_ICONS, TRANS_TRANSCRIPT_TITLE, TabBase, TabContents, TabTypes,
-    VoiceEditorBase,
+    Transcript, VoiceEditorBase,
 )
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
@@ -27,13 +32,15 @@ QUOTE_FONT['weight'] = 'bold'
 class Tab(TabBase):
     """TK implementation of a tab."""
     frame: ttk.Frame
+    # Widgets for the contents of a tab, which all need to be destroyed next time.
+    widgets: list[tk.Widget]
 
-    def __init__(self, parent: ttk.Notebook) -> None:
+    def __init__(self, parent: 'VoiceEditor') -> None:
         """Create all the widgets for a tab."""
-        super().__init__()
+        super().__init__(parent)
 
         # This is just to hold the canvas and scrollbar
-        self.frame = ttk.Frame(parent)
+        self.frame = ttk.Frame(parent.wid_tabs)
         self.frame.columnconfigure(0, weight=1)
         self.frame.rowconfigure(0, weight=1)
 
@@ -65,6 +72,8 @@ class Tab(TabBase):
         )
         canv.bind('<Configure>', self._configure_canv)
 
+        self.widgets = []
+
     def _configure_canv(self, _: object) -> None:
         """Allow resizing the windows."""
         width = self.canvas.winfo_reqwidth()
@@ -74,6 +83,7 @@ class Tab(TabBase):
         )
         self.inner_frame['width'] = width
 
+    @override
     def reconfigure(
         self,
         kind: TabTypes,
@@ -85,17 +95,27 @@ class Tab(TabBase):
         """Reconfigure the tab to display the specified lines."""
         set_text(self.wid_title, title)
         set_text(self.wid_desc, desc)
+        for wid in self.widgets:
+            wid.destroy()
+        self.widgets.clear()
 
+        outer_row = 10
         for name, conf_id, lines in contents:
-            set_text(ttk.Label(self.inner_frame, font=QUOTE_FONT), name).grid(column=0, sticky='W')
+            heading_wid = set_text(ttk.Label(self.inner_frame, font=QUOTE_FONT), name)
+            self.widgets.append(heading_wid)
+            heading_wid.grid(row=outer_row, column=0, sticky='W')
+            outer_row += 1
 
             for line in lines:
                 line_frame = ttk.Frame(self.inner_frame)
                 line_frame.grid(
+                    row=outer_row,
                     column=0,
                     padx=(10, 0),
                     sticky='W',
                 )
+                outer_row += 1
+                self.widgets.append(line_frame)
                 x = 0
                 for x, criteria in enumerate(line.criterion):
                     label = ttk.Label(line_frame, padding=0)
@@ -119,11 +139,18 @@ class Tab(TabBase):
                 )
                 set_text(check, line.name)
                 check.grid(row=0, column=x)
-                check.bind("<Enter>", functools.partial(self.show_trans, line.transcript))
+                check.bind("<Enter>", self.evt_show_line_trans(line))
+
+    @staticmethod
+    def check_toggled(var: tk.BooleanVar, config_section: SectionProxy, quote_id: str) -> None:
+        """Update the config file to match the checkbox."""
+        config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
 class VoiceEditor(VoiceEditorBase[Tab]):
     """TK implementation of the quote pack editor."""
+    wid_trans: tk.Text
+
     def __init__(self) -> None:
         """Create the editor."""
         super().__init__()
@@ -186,10 +213,23 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         trans_frame.update_idletasks()
         pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
+    @override
+    def _ui_show_transcript(self, transcript: Transcript) -> None:
+        self.wid_trans['state'] = 'normal'
+        self.wid_trans.delete(1.0, tk.END)
+        for actor, line in transcript:
+            self.wid_trans.insert('end', actor, ('actor',))
+            self.wid_trans.insert('end', str(line) + '\n\n')
+        # Remove the trailing newlines
+        self.wid_trans.delete('end-2char', 'end')
+        self.wid_trans['state'] = 'disabled'
+
+    @override
     def _ui_tab_create(self, index: int) -> Tab:
         """Create a tab."""
-        return Tab(self.wid_tabs)
+        return Tab(self)
 
+    @override
     def _ui_tab_hide(self, tab: Tab) -> None:
         """Hide a tab."""
         self.wid_tabs.forget(tab.frame)
