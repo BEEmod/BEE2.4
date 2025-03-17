@@ -33,6 +33,8 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
 
+    data: QuoteInfo  # TODO remove
+
     def __init__(
         self,
         quote_id: str,

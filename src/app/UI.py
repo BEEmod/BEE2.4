@@ -30,7 +30,6 @@ from transtoken import TransToken
 from app import (
     img,
     itemconfig,
-    voiceEditor,
     gameMan,
     packageMan,
     StyleVarPane,
@@ -54,6 +53,7 @@ from ui_tk.img import TKImages, TK_IMG
 from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
 from ui_tk.subpane import SubPane
+from app.voiceEditor import VoiceEditorBase
 import consts
 
 
@@ -81,6 +81,7 @@ suggest_windows: dict[type[packages.SelPakObject], SelectorWin] = {}
 context_win: ContextWin
 sign_ui: SignageUI
 item_picker: ItemPicker
+voice_editor: VoiceEditorBase
 
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
@@ -439,15 +440,15 @@ async def init_option(
         except KeyError:
             return
         info, _ = await chosen_voice.parse_conf()
-        voiceEditor.show(tk_img, chosen_voice, info)
+        voice_editor.show(tk_img, chosen_voice, info)
     for ind, name in enumerate([
-            TransToken.ui("Style: "),
-            None,
-            TransToken.ui("Voice: "),
-            TransToken.ui("Skybox: "),
-            TransToken.ui("Elev Vid: "),
-            TransToken.ui("Corridor: "),
-            ]):
+        TransToken.ui("Style: "),
+        None,
+        TransToken.ui("Voice: "),
+        TransToken.ui("Skybox: "),
+        TransToken.ui("Elev Vid: "),
+        TransToken.ui("Corridor: "),
+    ]):
         if name is None:
             # This is the "Suggested" button!
             continue
@@ -497,7 +498,7 @@ async def init_option(
         async with aclosing(voice_win.chosen.eventual_values()) as agen:
             async for voice_id in agen:
                 # This might be open, so force-close it to ensure it isn't corrupt...
-                voiceEditor.save()
+                voice_editor.save()
                 if voice_id == utils.ID_NONE:
                     btn_conf_voice.state(['disabled'])
                     tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
@@ -743,7 +744,8 @@ async def init_windows(
     await trio.lowlevel.checkpoint()
     await core_nursery.start(backup_win.init_toplevel, tk_img)
     await LOAD_UI.step('backup')
-    voiceEditor.init_widgets()
+    voice_editor = VoiceEditorBase()
+    voice_editor.init_widgets()
     await LOAD_UI.step('voiceline')
     context_win = ContextWin(item_picker, tk_img, cur_style)
     await core_nursery.start(context_win.init_widgets, signage_trigger)
