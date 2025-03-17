@@ -78,6 +78,20 @@ class TabBase:
         contents: TabContents,
     ) -> None:
         """Reconfigure the tab to display the specified lines."""
+        self.kind = kind
+        self.title = title
+        self._ui_reconfigure(kind, config, title, desc, contents)
+
+    @abc.abstractmethod
+    def _ui_reconfigure(
+        self,
+        kind: TabTypes,
+        config: ConfigFile,
+        title: TransToken,
+        desc: TransToken,
+        contents: TabContents,
+    ) -> None:
+        """Reconfigure the tab to display the specified lines."""
         raise NotImplementedError
 
 

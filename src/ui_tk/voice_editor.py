@@ -86,7 +86,7 @@ class Tab(TabBase):
         self.inner_frame['width'] = width
 
     @override
-    def reconfigure(
+    def _ui_reconfigure(
         self,
         kind: TabTypes,
         config: ConfigFile,
@@ -94,7 +94,6 @@ class Tab(TabBase):
         desc: TransToken,
         contents: TabContents,
     ) -> None:
-        """Reconfigure the tab to display the specified lines."""
         set_text(self.wid_title, title)
         set_text(self.wid_desc, desc)
         for wid in self.widgets:
@@ -218,42 +217,42 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
     def _ui_win_show(self, title: TransToken) -> None:
-        # TODO: Does this work?
-        #     notebook: ttk.Notebook = self.wid_tabs
-        #     # Save the current tab index, so we can restore it after.
-        #     try:  # Currently typed as Any, hence the type-ignore.
-        #         current_tab = notebook.index(notebook.select())  # type: ignore[no-untyped-call]
-        #     except tk.TclError:  # .index() will fail if the voice is empty,
-        #         current_tab = None  # in that case abandon remembering the tab.
-        #
-
         # Re-add all tabs, reordering if required.
+        first_tab: ttk.Frame | None = None
         for tab in self.tabs.placed:
+            self.wid_tabs.add(tab.frame)
+            if first_tab is None:
+                first_tab = tab.frame
             # For the special tabs, we use a special image to make
             # sure they are well-distinguished from the other groups
             match tab.kind:
                 case TabTypes.MID | TabTypes.MIDCHAMBER:
                     self.wid_tabs.insert(
-                        'END',
+                        tk.END,
                         tab.frame,
                         compound='image',
                         image=TK_IMG.sync_load(IMG_MID),
                     )
                 case TabTypes.RESPONSE | TabTypes.RESP:
-                    self.wid_tabs.tab(
-                        'END',
+                    self.wid_tabs.insert(
+                        tk.END,
                         tab.frame,
                         compound='right',
                         image=TK_IMG.sync_load(IMG_RESP),
                         text=str(TRANS_RESPONSE_SHORT),
                     )
                 case TabTypes.NORM:
-                    self.wid_tabs.insert('END', tab.frame, text=str(tab.title))
+                    self.wid_tabs.insert(
+                        tk.END,
+                        tab.frame,
+                        compound='text',
+                        text=str(tab.title),
+                    )
                 case never:
                     assert_never(never)
 
-        #     if current_tab is not None:
-        #         notebook.select(current_tab)
+        if first_tab is not None:
+            self.wid_tabs.select(first_tab)
 
         set_win_title(self.win, title)
         self.win.grab_set()
