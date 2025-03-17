@@ -161,8 +161,8 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         self.win.columnconfigure(0, weight=1)
         self.win.transient(master=TK_ROOT)
         tk_tools.set_window_icon(self.win)
-        self.win.protocol("WM_DELETE_WINDOW", self.close)
-        self.win.bind("<Escape>", self.close)
+        self.win.protocol("WM_DELETE_WINDOW", self._evt_close)
+        self.win.bind("<Escape>", self._evt_close)
 
         pane = tk.PanedWindow(
             self.win,
@@ -209,7 +209,7 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         trans_scroll.grid(row=0, column=1, sticky='NS')
         self.wid_trans.grid(row=0, column=0, sticky='NSEW')
 
-        set_text(ttk.Button(self.win, command=self.save), TransToken.ui('Save')).grid(row=2, column=0)
+        set_text(ttk.Button(self.win, command=self._evt_save), TransToken.ui('Save')).grid(row=2, column=0)
 
         # Don't allow resizing the transcript box to be smaller than the
         # original size.

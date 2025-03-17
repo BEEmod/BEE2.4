@@ -430,17 +430,13 @@ async def init_option(
     sugg_btn.bind('<Enter>', suggested_style_mousein)
     sugg_btn.bind('<Leave>', suggested_style_mouseout)
 
-    async def configure_voice() -> None:
-        """Open the voiceEditor window to configure a Quote Pack.
-
-        TODO: Push parsing into editor code, make not async.
-        """
+    def configure_voice() -> None:
+        """Open the voiceEditor window to configure a Quote Pack."""
         try:
             chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value)
         except KeyError:
             return
-        info, _ = await chosen_voice.parse_conf()
-        voice_editor.show(chosen_voice, info)
+        voice_editor.evt_open.trigger(chosen_voice)
     for ind, name in enumerate([
         TransToken.ui("Style: "),
         None,
@@ -458,7 +454,7 @@ async def init_option(
     voice_frame.columnconfigure(1, weight=1)
     btn_conf_voice = ttk.Button(
         voice_frame,
-        command=lambda: core_nursery.start_soon(configure_voice),
+        command=configure_voice,
         width=8,
     )
     btn_conf_voice.grid(row=0, column=0, sticky='NS')
@@ -498,7 +494,7 @@ async def init_option(
         async with aclosing(voice_win.chosen.eventual_values()) as agen:
             async for voice_id in agen:
                 # This might be open, so force-close it to ensure it isn't corrupt...
-                voice_editor.save()
+                voice_editor.evt_close.set()
                 if voice_id == utils.ID_NONE:
                     btn_conf_voice.state(['disabled'])
                     tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
@@ -516,6 +512,7 @@ async def init_option(
     async with trio.open_nursery() as nursery:
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, export_ready, export_btn)
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
+        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, voice_editor.evt_open.ready, btn_conf_voice)
         nursery.start_soon(voice_conf_task)
         nursery.start_soon(export_btn_task)
         while True:

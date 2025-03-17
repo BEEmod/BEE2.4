@@ -7,6 +7,9 @@ from enum import Enum
 import abc
 
 import srctools.logger
+
+import trio_util
+from async_util import EdgeTrigger
 from trio_util import AsyncValue
 import trio
 
@@ -105,11 +108,20 @@ class VoiceEditorBase[Tab: TabBase]:
     
     tabs: WidgetCache[Tab]
     transcript: AsyncValue[Transcript]
+    evt_open: EdgeTrigger[QuotePack]
     
     def __init__(self) -> None:
         self.cur_item = None
         self.tabs = WidgetCache(self._ui_tab_create, self._ui_tab_hide)
         self.transcript = AsyncValue(())
+        self.evt_open = EdgeTrigger()
+        self.evt_close = trio.Event()
+
+    async def task(self) -> None:
+        """Operate the voice editor."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._transcript_task)
+            nursery.start_soon(self._lifecycle_task)
 
     async def _transcript_task(self) -> None:
         """Display transcripts."""
@@ -117,41 +129,40 @@ class VoiceEditorBase[Tab: TabBase]:
             async for transcript in agen:
                 self._ui_show_transcript(transcript)
 
-    async def task(self) -> None:
-        """Operate the voice editor."""
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(self._transcript_task)
+    async def _lifecycle_task(self) -> None:
+        """Handles opening/closing the window and reloading data."""
+        while True:
+            voice_item = await self.evt_open.wait()
+            self.evt_close = trio.Event()
+            async with trio_util.move_on_when(self.evt_close.wait):
+                info, _ = await voice_item.parse_conf()
+                self._show(voice_item, info)
+                await trio.sleep_forever()
+            self.config = self.config_mid = self.config_resp = None
+            self.transcript.value = ()
+            self._ui_win_hide()
 
-    def close(self, _: object = None) -> None:
-        """Close the window, discarding changes."""
-        self.cur_item = self.config = self.config_mid = self.config_resp = None
-        self.transcript.value = ()
-        self._ui_win_hide()
-    
-    def save(self) -> None:
+    def _evt_close(self, _: object = None) -> None:
+        """Close without saving."""
+        self.evt_close.set()
+
+    def _evt_save(self, _: object = None) -> None:
         """Save and close the window."""
-        if self.cur_item is not None:
-            LOGGER.info('Saving Configs!')
-            if self.config is not None:
-                self.config.save_check()
-            if self.config_mid is not None:
-                self.config_mid.save_check()
-            if self.config_resp is not None:
-                self.config_resp.save_check()
-        self.close()
+        if self.config is not None:
+            self.config.save_check()
+        if self.config_mid is not None:
+            self.config_mid.save_check()
+        if self.config_resp is not None:
+            self.config_resp.save_check()
+        self.evt_close.set()
 
-    def show(self, quote_pack: QuotePack, info: QuoteInfo) -> None:
-        """Display the editing window."""
-        if self.cur_item is not None:
-            return
-    
-        self.cur_item = quote_pack
-
+    def _show(self, quote_pack: QuotePack, info: QuoteInfo) -> None:
+        """Reconfigure to show the specified item, then show."""
         self.config = ConfigFile('voice/' + quote_pack.id + '.cfg')
         self.config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
         self.config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')
 
-        self.tabs.hide_all()
+        self.tabs.reset()
     
         for group in info.groups.values():
             tab = self.tabs.fetch()
@@ -191,13 +202,14 @@ class VoiceEditorBase[Tab: TabBase]:
                     for resp, lines in info.responses.items()
                 )
             )
+        self.tabs.hide_unused()
     
         self.config.save()
         self.config_mid.save()
         self.config_resp.save()
         self._ui_win_show(TransToken.ui(
             'BEE2 - Configure "{item}"',
-        ).format(item=self.cur_item.selitem_data.name))
+        ).format(item=quote_pack.selitem_data.name))
 
     @abc.abstractmethod
     def _ui_win_show(self, title: TransToken) -> None:
