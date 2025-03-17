@@ -10,6 +10,8 @@ import config
 import loadScreen
 import packages
 
+from ui_wx.voice_editor import VoiceEditor
+
 
 async def test(core_nursery: trio.Nursery) -> None:
     config.APP.read_file(config.APP_LOC)
@@ -20,8 +22,8 @@ async def test(core_nursery: trio.Nursery) -> None:
     core_nursery.start_soon(img.init, WX_IMG)
     loadScreen.main_loader.destroy()
 
-    # editor = VoiceEditor()
-    # core_nursery.start_soon(editor.task)
+    editor = VoiceEditor()
+    core_nursery.start_soon(editor.task)
 
     sizer = wx.WrapSizer()
 
@@ -35,5 +37,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     for voice in packset.all_obj(QuotePack):
         make_button(voice)
 
-    MAIN_WINDOW.SetSizerAndFit(sizer)
+    MAIN_WINDOW.SetMinSize((500, 200))
+    MAIN_WINDOW.SetSizer(sizer)
+    MAIN_WINDOW.Layout()
     await trio.sleep_forever()
