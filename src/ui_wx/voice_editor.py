@@ -8,13 +8,12 @@ import io
 
 import srctools
 import wx.html
-import wx.aui
+from wx.lib.agw import aui
 import wx
 
 from BEE2_config import ConfigFile
-from app import img
 from app.voiceEditor import (
-    CRITERIA_ICONS, IMG_MID, IMG_RESP, TRANS_RESPONSE_SHORT, TRANS_TRANSCRIPT_TITLE,
+    CRITERIA_ICONS, TAB_TITLES, TRANS_TRANSCRIPT_TITLE,
     TabBase, TabContents, TabTypes, Transcript, VoiceEditorBase,
 )
 from transtoken import TransToken
@@ -25,8 +24,7 @@ from ui_wx.wid_transtoken import set_text, set_tooltip, set_win_title
 
 FONT_TAB_TITLE = wx.Font(20, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
 FONT_QUOTE = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
-# Icon has to be on the left side, so flip to match.
-IMG_RESP_FLIP = IMG_RESP.transform(transpose=img.FLIP_LEFT_RIGHT)
+TAB_SPECIAL_COLOUR = wx.SystemSettings.GetColour(wx.SYS_COLOUR_MENUHILIGHT)
 
 
 class Tab(TabBase):
@@ -108,7 +106,8 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         self.wid_splitter.SetMinimumPaneSize(80)
         self.wid_splitter.SetSashGravity(0.0)
 
-        self.wid_notebook = wx.aui.AuiNotebook(self.wid_splitter, style=wx.aui.AUI_NB_TOP)
+        # This notebook version is written in Python, and allows setting text colours.
+        self.wid_notebook = aui.AuiNotebook(self.wid_splitter, agwStyle=aui.AUI_NB_TOP)
 
         pan_trans = wx.Panel(self.wid_splitter)
         sizer_trans = wx.BoxSizer(wx.VERTICAL)
@@ -127,41 +126,17 @@ class VoiceEditor(VoiceEditorBase[Tab]):
 
     def _ui_win_show(self, title: TransToken) -> None:
         # Re-add all tabs, reordering if required.
-        first_tab = True
-        self.wid_notebook.DeleteAllPages()
-        for tab in self.tabs.placed:
-            # For the special tabs, we use a special image to make
-            # sure they are well-distinguished from the other groups.
-            # Image 'ID's match SetImages() call above.
-            match tab.kind:
-                case TabTypes.MIDCHAMBER:
-                    self.wid_notebook.AddPage(
-                        tab.panel,
-                        '',
-                        select=first_tab,
-                    )
-                    icon = WX_IMG.sync_load(IMG_MID)
-                case TabTypes.RESPONSE:
-                    self.wid_notebook.AddPage(
-                        tab.panel,
-                        str(TRANS_RESPONSE_SHORT),
-                        select=first_tab,
-                    )
-                    icon = WX_IMG.sync_load(IMG_RESP_FLIP)
-                case TabTypes.NORMAL:
-                    self.wid_notebook.AddPage(
-                        tab.panel,
-                        str(tab.title),
-                        select=first_tab,
-                    )
-                    icon = wx.BitmapBundle()
-                case never:
-                    assert_never(never)
-            self.wid_notebook.SetPageBitmap(
-                self.wid_notebook.FindPage(tab.panel),
-                icon
+        for i in reversed(range(self.wid_notebook.GetPageCount())):
+            self.wid_notebook.RemovePage(i)
+        for i, tab in enumerate(self.tabs.placed):
+            self.wid_notebook.InsertPage(
+                i,
+                tab.panel,
+                str(TAB_TITLES.get(tab.kind, tab.title)),
             )
-            first_tab = False
+            # For special tabs, change the colour to differentiate.
+            if tab.kind is not TabTypes.NORMAL:
+                self.wid_notebook.SetPageTextColour(i, TAB_SPECIAL_COLOUR)
 
         set_win_title(self.win, title)
         self.win.Show()
