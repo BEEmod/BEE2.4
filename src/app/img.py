@@ -249,8 +249,6 @@ class Handle(User):
     # This is set if a PeTI background was automatically composited behind a transparent image.
     _bg_composited: bool = attrs.field(init=False, default=False)
 
-    # Determines whether `get_pil()` and `get_tk()` can be called directly.
-    allow_raw: ClassVar[bool] = False
     # If set, assigning this handle to a widget preserves the alpha. This is only set on UI icons
     # and the like, not packages.
     alpha_result: ClassVar[bool] = False
@@ -283,6 +281,12 @@ class Handle(User):
     def resize(self, width: int, height: int) -> Self:
         """Return a copy with a different size."""
         raise NotImplementedError
+
+    def allow_raw(self) -> bool:
+        """Determines whether the image can be parsed synchronously.
+
+        Only allowed for builtin images since they don't need to reload."""
+        return False
 
     @abstractmethod
     def _is_themed(self) -> bool:
@@ -577,7 +581,7 @@ class Handle(User):
 
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
-        if self.allow_raw:
+        if self.allow_raw():
             # Force load, so it's always ready.
             self.force_load()
         elif not self._users and _load_nursery is not None:
@@ -596,7 +600,7 @@ class Handle(User):
 
         This is only allowed on BUILTIN images, that don't come from packages.
         """
-        if not self.allow_raw:
+        if not self.allow_raw():
             raise ValueError(f'Cannot force-load handle with non-builtin type {self!r}!')
         if not self._force_loaded:
             LOGGER.debug('Force loading: {!r}', self)
@@ -879,7 +883,6 @@ class ImgFile(Handle):
 class ImgBuiltin(Handle):
     """An image loaded from builtin UI resources."""
     uri: utils.PackagePath
-    allow_raw: ClassVar[bool] = True
     alpha_result: ClassVar[bool] = True
     _uses_theme: bool = False
 
@@ -903,6 +906,10 @@ class ImgBuiltin(Handle):
     def _is_themed(self) -> bool:
         """Return if this uses a themed image."""
         return self._uses_theme
+
+    @override
+    def allow_raw(self) -> bool:
+        return True
 
     @override
     def uses_packsys(self) -> bool:
@@ -988,6 +995,10 @@ class ImgTransform(Handle):
     transpose: Image.Transpose | None
 
     @override
+    def allow_raw(self) -> bool:
+        return self.source.allow_raw()
+
+    @override
     def _children(self) -> Iterator[Handle]:
         yield self.source
 
@@ -1065,7 +1076,10 @@ class ImgTransform(Handle):
 class ImgIcon(Handle):
     """An image containing the PeTI background with a centered icon."""
     icon_name: str
-    allow_raw: ClassVar[bool] = True
+
+    @override
+    def allow_raw(self) -> bool:
+        return True
 
     @override
     def _make_image(self) -> Image.Image:
