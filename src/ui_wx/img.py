@@ -205,6 +205,15 @@ class WXImages(img.UIImage):
             Image.Resampling.NEAREST,
         ))
 
+    def sync_load(self, handle: img.Handle) -> wx.BitmapBundle:
+        """Load the WX image if required immediately, then return it.
+
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
+        """
+        handle.force_load()
+        return self._load_wx(handle, force=False)
+
     # noinspection PyProtectedMember
     def apply[Widget: WxImgWidgets](self, widget: Widget, image: img.Handle | None, /) -> Widget:
         """Set the image in a basic widget.

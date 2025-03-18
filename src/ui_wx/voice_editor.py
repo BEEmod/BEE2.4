@@ -8,10 +8,13 @@ import io
 
 import srctools
 import wx.html
+import wx.aui
+import wx
 
 from BEE2_config import ConfigFile
+from app import img
 from app.voiceEditor import (
-    CRITERIA_ICONS, TRANS_RESPONSE_SHORT, TRANS_TRANSCRIPT_TITLE,
+    CRITERIA_ICONS, IMG_MID, IMG_RESP, TRANS_RESPONSE_SHORT, TRANS_TRANSCRIPT_TITLE,
     TabBase, TabContents, TabTypes, Transcript, VoiceEditorBase,
 )
 from transtoken import TransToken
@@ -22,6 +25,8 @@ from ui_wx.wid_transtoken import set_text, set_tooltip, set_win_title
 
 FONT_TAB_TITLE = wx.Font(20, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
 FONT_QUOTE = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+# Icon has to be on the left side, so flip to match.
+IMG_RESP_FLIP = IMG_RESP.transform(transpose=img.FLIP_LEFT_RIGHT)
 
 
 class Tab(TabBase):
@@ -52,7 +57,6 @@ class Tab(TabBase):
         set_text(self.wid_title, title)
         set_text(self.wid_desc, desc)
 
-        print('Child', self.sizer.GetChildren())
         self.sizer.Clear(delete_windows=True)
 
         for name, conf_id, lines in contents:
@@ -104,7 +108,7 @@ class VoiceEditor(VoiceEditorBase[Tab]):
         self.wid_splitter.SetMinimumPaneSize(80)
         self.wid_splitter.SetSashGravity(0.0)
 
-        self.wid_notebook = wx.Notebook(self.wid_splitter)
+        self.wid_notebook = wx.aui.AuiNotebook(self.wid_splitter, style=wx.aui.AUI_NB_TOP)
 
         pan_trans = wx.Panel(self.wid_splitter)
         sizer_trans = wx.BoxSizer(wx.VERTICAL)
@@ -124,36 +128,39 @@ class VoiceEditor(VoiceEditorBase[Tab]):
     def _ui_win_show(self, title: TransToken) -> None:
         # Re-add all tabs, reordering if required.
         first_tab = True
+        self.wid_notebook.DeleteAllPages()
         for tab in self.tabs.placed:
             # For the special tabs, we use a special image to make
             # sure they are well-distinguished from the other groups.
-
-            # TODO: Needs wx.ImageList.
+            # Image 'ID's match SetImages() call above.
             match tab.kind:
                 case TabTypes.MIDCHAMBER:
                     self.wid_notebook.AddPage(
                         tab.panel,
-                        'TMP MID',
-                        # compound='image',
-                        # image=TK_IMG.sync_load(IMG_MID),
+                        '',
                         select=first_tab,
                     )
+                    icon = WX_IMG.sync_load(IMG_MID)
                 case TabTypes.RESPONSE:
                     self.wid_notebook.AddPage(
                         tab.panel,
-                        # compound='right',
-                        # image=TK_IMG.sync_load(IMG_RESP),
-                        text=str(TRANS_RESPONSE_SHORT),
+                        str(TRANS_RESPONSE_SHORT),
                         select=first_tab,
                     )
+                    icon = WX_IMG.sync_load(IMG_RESP_FLIP)
                 case TabTypes.NORMAL:
                     self.wid_notebook.AddPage(
                         tab.panel,
-                        text=str(tab.title),
+                        str(tab.title),
                         select=first_tab,
                     )
+                    icon = wx.BitmapBundle()
                 case never:
                     assert_never(never)
+            self.wid_notebook.SetPageBitmap(
+                self.wid_notebook.FindPage(tab.panel),
+                icon
+            )
             first_tab = False
 
         set_win_title(self.win, title)
