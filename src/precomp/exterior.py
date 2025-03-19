@@ -1,5 +1,6 @@
 import srctools.logger
-from srctools import VMF, Vec, FrozenVec, Angle, FrozenAngle, Matrix
+from srctools import Vec, FrozenVec, Angle, FrozenAngle, Matrix
+from srctools.vmf import VMF
 
 import consts
 import precomp.options
@@ -31,7 +32,7 @@ def make_exterior(vmf: VMF, coll, info: CorrInfo) -> None:
     map_bounds = make_exterior_shell(vmf)
 
     # Move Elevators to valid location if possible and then generate elevator shell
-    place_entrance_exit(info, map_bounds)
+    place_entrance_exit(vmf, info, map_bounds)
 
     # Open Walls and add square beams
 
@@ -59,7 +60,7 @@ def make_exterior_shell(vmf : VMF):
 
     # vmf.add_brush(vmf.make_prism(pos_min, pos_max, consts.Tools.SKIP).solid)
 
-def place_entrance_exit(info: CorrInfo, map_bounds):
+def place_entrance_exit(vmf: VMF, info: CorrInfo, map_bounds):
 
     entry_pos = Vec.from_str(info.inst_entry['origin'])
     entry_orient = Matrix.from_angstr(info.inst_entry['angles'])
@@ -84,8 +85,8 @@ def place_entrance_exit(info: CorrInfo, map_bounds):
             # mdl, off, yaw_val = CATWALKS[node.trace]
             # ang = node.yaw.orient.to_angle()
             # ang.yaw += yaw_val
-            VMF.create_ent(
-                'info_particle_system',
+            vmf.create_ent(
+                classname='info_particle_system',
                 origin=grid_to_world(node.pos.thaw()),
                 angles=node.orient.to_angle(),
                 targetname = str(node.trace.name)
