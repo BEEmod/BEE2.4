@@ -817,6 +817,10 @@ async def init_windows(
         ]:
             nursery.start_soon(pane.load_conf)
 
+    #Hack! Force refresh the style window display to properly set it to correct label
+    #Todo: Properly fix this
+    style_win.set_disp()
+
     item_picker.set_items(pal_ui.selected.items)
     pal_ui.is_dirty.set()
     task_status.started()
