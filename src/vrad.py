@@ -260,13 +260,15 @@ async def main(argv: list[str]) -> None:
         LOGGER.info('Scanning map for files to pack:')
         packlist.pack_from_bsp(bsp_file)
         packlist.pack_from_ents(bsp_file.ents, Path(path).stem, ['P2'])
-        packlist.eval_dependencies()
         LOGGER.info('Done!')
-
-        packlist.write_soundscript_manifest()
-        packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
     else:
         LOGGER.warning('Packing disabled!')
+
+    LOGGER.info('Analysing file dependencies....')
+    packlist.eval_dependencies()
+
+    packlist.write_soundscript_manifest()
+    packlist.write_particles_manifest(f'maps/{Path(path).stem}_particles.txt')
 
     # Replace tools/toolsinvisible temporarily, the original blocks light annoyingly.
     # Do it after packing, so it isn't packed. We'll swap back to the original,
@@ -320,7 +322,7 @@ async def main(argv: list[str]) -> None:
 
     # Pack to the BSP *after* running VRAD, to ensure an extra-large packfile doesn't crash
     # VRAD.
-    LOGGER.info('Writing to BSP...')
+    LOGGER.info('Writing packed files to BSP...')
     packlist.pack_into_zip(
         bsp_file,
         ignore_vpk=True,
