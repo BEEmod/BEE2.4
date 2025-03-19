@@ -16,7 +16,7 @@ from . import TK_ROOT
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports
-    'set_text', 'set_win_title', 'set_stringvar',
+    'set_text', 'set_win_title',
     'set_menu_text', 'clear_stored_menu',
 ]
 
@@ -31,9 +31,6 @@ _applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDiction
 # menu -> index -> token.
 _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
-# StringVar isn't hashable, just key by var name instead and handle it in update_task().
-_stringvars: dict[str, TransToken] = {}
-
 
 def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified label/button/etc."""
@@ -43,12 +40,6 @@ def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     else:
         _applied_text_tokens[widget] = token
     return widget
-
-
-def set_stringvar(var: tk.StringVar, token: TransToken) -> None:
-    """Set the value of a StringVar to the token."""
-    var.set(str(token))
-    _stringvars[str(var)] = token
 
 
 def set_win_title(win: tk.Wm, token: TransToken) -> None:
@@ -100,16 +91,6 @@ async def update_task() -> None:
         for window, token in _window_titles.items():
             window.wm_title(str(token))
 
-        for var_name, token in list(_stringvars.items()):
-            await trio.lowlevel.checkpoint()
-            # Use raw TK calls to check if the variable exists. Can't use
-            # StringVar because of the __del__() method.
-            if TK.getboolean(TK.call("info", "exists", var_name)):  # type: ignore[no-untyped-call]
-                TK.globalsetvar(var_name, str(token))  # type: ignore[no-untyped-call]
-            else:
-                # No longer exists, forget about it.
-                del _stringvars[var_name]
-
 
 def stats() -> str:
     """Output debingging statistics."""
@@ -118,5 +99,4 @@ def stats() -> str:
         f'- label["text"]: {len(_applied_text_tokens)}\n'
         f'- Menus: {len(_applied_menu_tokens)}\n'
         f'- Windows: {len(_window_titles)}\n'
-        f'- Stringvars: {len(_stringvars)}\n'
     )
