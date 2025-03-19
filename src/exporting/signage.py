@@ -224,7 +224,7 @@ def make_legend(
                 num_x, num_y = legend_info.num_off
                 num_step, num_rem = divmod(num_sheet.width, 10)
                 if num_rem != 0:
-                    exp.warn_auth(legend_info.pak_id, TRANS_INVALID_NUMBERS_WIDTH)
+                    exp.warn_auth(legend_obj.pak_id, TRANS_INVALID_NUMBERS_WIDTH)
             break
     else:
         exp.warn_auth(exp.selected_style.pak_id, TRANS_NO_OVERLAY)
