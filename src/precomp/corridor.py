@@ -223,9 +223,11 @@ def analyse_and_modify(
             if corr_dir is Direction.ENTRY:
                 chosen_entry = chosen
                 fixup = entry_fixups
+                inst_entry_door = item
             else:
                 chosen_exit = chosen
                 fixup = exit_fixups
+                inst_exit_door = item
 
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value

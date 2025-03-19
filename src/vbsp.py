@@ -1686,6 +1686,7 @@ async def main(argv: list[str]) -> None:
         add_extra_ents(vmf, info)
 
         exterior.make_exterior(vmf, coll, info)
+
         LOGGER.info('Generating tiles...')
         if texturing.NEW_TILE_GEN:
             tiling_gen.generate_brushes(vmf)
