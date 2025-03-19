@@ -253,14 +253,14 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             timer_delay = item.inst.fixup.int('$timer_delay')
             # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not
             # being selectable issue.
-            offset = max(0, item.inst.fixup.int('$timer_delay') - 3)
+            timer_ind = max(0, item.inst.fixup.int('$timer_delay') - 3)
             try:
                 pos = CORNER_POS[timer_delay] @ orient + pos
             except IndexError:
                 raise user_errors.UserError(
                     user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
                         value=timer_delay,
-                        corrected=offset % 8 + 3,
+                        corrected=timer_ind % 8 + 3,
                     ),
                     points=[(point @ orient + pos) for point in CORNER_POS],
                 )
