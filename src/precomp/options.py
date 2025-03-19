@@ -614,7 +614,7 @@ GLOBAL_PTI_ENTS = Opt.string(
     """)
 
 GLOBAL_PTI_ENTS_LOC = Opt.vector(
-    'global_pti_ents_loc', Vec(-2400, -2800, 0),
+    'global_pti_ents_loc', Vec(-4800, -2800, 0),
     """Location of global_pti_ents.
 
     The default pos is next to `arrival_departure_ents`.
@@ -623,10 +623,31 @@ GLOBAL_PTI_ENTS_LOC = Opt.vector(
     """)
 
 GLOBAL_ENTS_LOC = Opt.vector(
-    'global_ents_loc', Vec(-2400, 0, 0),
+    'global_ents_loc', Vec(-4800, 0, 0),
     """Location of global entities.
 
     A 128x128 room is added there, and logic ents are added inside.
+    """)
+
+ARRIVAL_DEPARTURE_ENTS_LOC = Opt.vector(
+    'arrival_departure_ents_loc', Vec(-4500, -2500, 0),
+    """Location of the arrival departure entities
+    
+    Original PTI location is (-2500 -2500 0)
+    """)
+
+ENTRANCE_ELEVATOR_LOC = Opt.vector(
+    'entrance_elevator_loc', Vec(-4000, 2000, 0),
+    """Location of the entrance elevator
+    
+    Original PTI location is (-2000 2000 0)
+    """)
+
+EXIT_ELEVATOR_LOC = Opt.vector(
+    'exit_elevator_loc', Vec(-4000, -2000, 0),
+    """Location of the exit elevator
+    
+    Original PTI location is (-2000 -2000 0)
     """)
 
 ######

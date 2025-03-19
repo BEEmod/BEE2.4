@@ -1685,7 +1685,8 @@ async def main(argv: list[str]) -> None:
         conditions.check_all(vmf, coll, info, voice_data_res.result())
         add_extra_ents(vmf, info)
 
-        exterior.make_exterior(vmf, coll, info)
+        if options.EXTEND_CHAMBER():
+            exterior.make_exterior(vmf, coll, info)
 
         LOGGER.info('Generating tiles...')
         if texturing.NEW_TILE_GEN:

@@ -313,8 +313,12 @@ def analyse_and_modify(
     # Apply selected fixups to the elevator also.
     if inst_elev_entry is not None:
         inst_elev_entry.fixup.update(entry_fixups)
+        inst_elev_entry['origin'] = options.ENTRANCE_ELEVATOR_LOC()
     if inst_elev_exit is not None:
         inst_elev_exit.fixup.update(exit_fixups)
+        inst_elev_exit['origin'] = options.EXIT_ELEVATOR_LOC()
+    if inst_transition is not None:
+        inst_transition['origin'] = options.ARRIVAL_DEPARTURE_ENTS_LOC()
 
     [is_publishing] = seen_no_player_start
     [game_mode] = seen_game_modes
