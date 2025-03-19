@@ -22,9 +22,7 @@ from ui_tk import tk_tools
 from ui_tk.img import TK_IMG
 from ui_tk.rich_textbox import RichText
 from ui_tk.tooltip import add_tooltip, set_tooltip
-from ui_tk.wid_transtoken import (
-    set_menu_text, set_stringvar, set_text, set_win_title,
-)
+from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 import utils
 
 
@@ -139,10 +137,8 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
     prop_reset: ttk.Button
     attr_labels: dict[AttrDef, ttk.Label]
 
-    # Variable associated with self.display.
-    disp_label: tk.StringVar
     # The textbox on the parent window.
-    display: tk_tools.ReadOnlyEntry | None
+    display: ttk.Label | None
     # The '...' button to open our window.
     disp_btn: ttk.Button | None
 
@@ -170,8 +166,6 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.win.transient(master=parent)
         set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
 
-        # Variable associated with self.display.
-        self.disp_label = tk.StringVar(self.win, name=f'selwin_dispvar_{opt.save_id}')
         self.display = self.disp_btn = None
 
         # Allow resizing in X and Y.
@@ -454,7 +448,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.evt_window_resized)
 
-    async def widget(self, frame: tk.Misc) -> ttk.Entry:
+    async def widget(self, frame: tk.Misc) -> tk.Widget:
         """Create the special textbox used to open the selector window."""
         await trio.lowlevel.checkpoint()
 
@@ -467,20 +461,15 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                 self.open_win()
             return ''
 
-        self.display = tk_tools.ReadOnlyEntry(
+        self.display = ttk.Label(
             frame,
-            textvariable=self.disp_label,
-            cursor=tk_tools.Cursors.REGULAR,
+            background='white',
+            foreground='black',
+            relief='solid',
+            padding=(3, 2),
         )
         tk_tools.bind_leftclick(self.display, open_window)
-        set_disp = self.set_disp
 
-        def on_key(_: object) -> str:
-            """Prevent typing in the display by reverting, then cancelling the event."""
-            set_disp()
-            return 'break'
-
-        self.display.bind("<Key>", on_key)
         tk_tools.bind_rightclick(
             self.display,
             self._evt_open_context,
@@ -828,13 +817,15 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
             case _:
                 assert_never(font)
 
-        if str(self.display['font']) != str(font_obj):
-            # Changing the font causes a flicker, so only set it
-            # when the font is actually different.
-            self.display['font'] = font_obj
-        self.display['foreground'] = 'red' if font == 'error' else ''
+        self.display['font'] = font_obj
         set_tooltip(self.display, tooltip)
-        set_stringvar(self.disp_label, text)
+        set_text(self.display, text)
+        if enabled:
+            self.display['foreground'] = 'red' if font == 'error' else 'black'
+            self.display['background'] = 'white'
+        else:
+            self.display['foreground'] = 'DarkRed' if font == 'error' else 'grey50'
+            self.display['background'] = 'grey94'
 
         state = ('!disabled', ) if enabled else ('disabled', )
         self.disp_btn.state(state)
