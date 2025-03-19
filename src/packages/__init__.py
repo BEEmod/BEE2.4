@@ -854,7 +854,7 @@ class PackagesSet:
                 and (key := (cls, obj_id)) not in self._unknown_obj_warnings
             ):
                 self._unknown_obj_warnings.add(key)
-                LOGGER.warning('Unknown {} "{}"!', cls.__name__, obj_id)
+                LOGGER.warning('The {} package object "{}" does not exist!', cls.__name__, obj_id)
             raise
 
     def add(self, obj: PakObject, pak_id: utils.SpecialID, pak_name: str) -> None:

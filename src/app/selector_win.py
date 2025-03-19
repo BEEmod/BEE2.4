@@ -352,7 +352,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         try:
             return self.func_get_data(self._packset, item_id)
         except KeyError:
-            LOGGER.warning('ID "{}" does not exist', item_id)
+            # obj_by_id should have warned.
             return packages.SEL_DATA_MISSING
 
     async def _load_data_task(self) -> None:

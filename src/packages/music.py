@@ -185,18 +185,22 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
         if channel is MusicChannel.BASE and self.inst:
             # The instance provides the base track.
             return True
+        if not (child_id := self.children[channel]):
+            return False
         try:
-            children = packset.obj_by_id(Music, self.children[channel])
+            children = packset.obj_by_id(Music, child_id)
         except KeyError:
             return False
         return bool(children.sound[channel])
 
     def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> utils.SpecialID:
         """Get the ID we want to suggest for a channel."""
-        try:
-            child = packset.obj_by_id(Music, self.children[channel])
-        except KeyError:
-            child = self
+        child = self
+        if self.children[channel]:
+            try:
+                child = packset.obj_by_id(Music, self.children[channel])
+            except KeyError:
+                pass
         if child.sound[channel]:
             return utils.obj_id(child.id)
         return utils.ID_NONE
