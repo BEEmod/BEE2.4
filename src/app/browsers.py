@@ -126,6 +126,9 @@ SOUND_TYPES = [
 
 # A single sound.
 type SoundMode = Literal[AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND, AllowedSounds.CHOREO]
+SND_PREFERENCE: list[SoundMode] = [
+    AllowedSounds.CHOREO, AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND
+]
 
 
 def parse_soundscript(file: File) -> dict[str, Sound]:
@@ -207,7 +210,7 @@ class SoundBrowserBase(Browser, ABC):
         initial: str,
         allowed: AllowedSounds = AllowedSounds.ALL,
     ) -> str | None:
-        for snd_type in AllowedSounds:
+        for snd_type in SND_PREFERENCE:
             if snd_type in allowed:
                 self.mode.value = snd_type
                 break

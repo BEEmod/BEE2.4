@@ -38,7 +38,8 @@ async def _messagebox(
     detail: str,
 ) -> str:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    args: tuple[str, ...] = (
+    # tk.call requires command, type this to be at least 1 long.
+    args: tuple[str, *tuple[str, ...]] = (
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,

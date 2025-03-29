@@ -1,7 +1,7 @@
 """Export signage configuration, and write the legend."""
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Final
 from pathlib import Path
 
@@ -185,7 +185,7 @@ def iter_ant_cells() -> Iterator[tuple[int, int, int]]:
 def make_legend(
     exp: ExportData,
     sign_path: Path,
-    icons: dict[int, ImgHandle | ResultCapture[Image.Image | None]],
+    icons: Mapping[int, ImgHandle | ResultCapture[Image.Image | None]],
     is_antline: bool,
 ) -> None:
     """Construct the legend texture for the signage."""

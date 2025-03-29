@@ -376,7 +376,8 @@ class Palette:
                 message = config.build_version_mismatch_prompt(
                     unknown, can_skip=not readonly, pal_name=name,
                 )
-                match await dialogs.ask_custom(
+                # XXX: useless walrus assignment required for mypy#17230
+                match _ := await dialogs.ask_custom(
                     message,
                     TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
                     None if readonly else TRANS_BTN_SKIP,
