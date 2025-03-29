@@ -21,7 +21,6 @@ import trio
 
 from hammeraddons.bsp_transform import run_transformations
 from hammeraddons.plugin import PluginFinder, Source as PluginSource
-from hammeraddons import __version__ as version_haddons
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
@@ -89,8 +88,8 @@ def run_vrad(args: list[str]) -> None:
 async def main(argv: list[str]) -> None:
     """Main VRAD script."""
     LOGGER.info(
-        "BEE{} VRAD hook initiallised, srctools v{}, Hammer Addons v{}",
-        utils.BEE_VERSION, srctools.__version__, version_haddons,
+        "BEE{} VRAD hook initialised, srctools v{}, Hammer Addons v{}",
+        utils.BEE_VERSION, srctools.__version__, utils.HA_VERSION,
     )
 
     # Warn if srctools Cython code isn't installed.
