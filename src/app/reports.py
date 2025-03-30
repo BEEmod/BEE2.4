@@ -8,121 +8,11 @@ from srctools import FileSystemChain
 from srctools.mdl import Model
 
 from packages import Item, OBJ_TYPES, get_loaded_packages
+from app import gameMan
 import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-
-# The models shipped by Valve, we don't need to include these in the editor report.
-VALVE_EDITOR_MODELS = {
-    # handles_map_editor/
-    'glass_handle',
-    'handle4way',
-    'handle4waygrip',
-    'handle5way',
-    'handle6way',
-    'handle6waygrip',
-    'handle_grip_arrow',
-    'handle_grip_diamond',
-    'handle_grip_resize',
-    'handle_grip_sphere',
-    'handle_grip_square',
-    'handle_grip_trianglesmall',
-    'handle_pos_4way',
-    'handletarget',
-    'rotation',
-    'rotation45',
-    'rotationgrip',
-    'torus',
-    # props_map_editor/
-    'airlock_ghost_30deg',
-    'airlock_ghost_45deg',
-    'airlock_ghost_60deg',
-    'airlock_ghost_90deg',
-    'arm4_blk_30deg',
-    'arm4_blk_45deg',
-    'arm4_blk_60deg',
-    'arm4_blk_90deg',
-    'arm4_ghost_30deg',
-    'arm4_ghost_45deg',
-    'arm4_ghost_60deg',
-    'arm4_ghost_90deg',
-    'arm4_ghost_stairs_up',
-    'arm4_gls_30deg',
-    'arm4_gls_45deg',
-    'arm4_gls_60deg',
-    'arm4_gls_90deg',
-    'arm4_white_30deg',
-    'arm4_white_45deg',
-    'arm4_white_60deg',
-    'arm4_white_90deg',
-    'arm_motionplatform',
-    'arm_motionplatform_rail',
-    'arm_motionplatform_rail_inwater',
-    'bridge',
-    'buttonball',
-    'buttoncube',
-    'buttonweight',
-    'companion_cube_falling',
-    'cube',
-    'cube_falling',
-    'cubecompanion',
-    'cubelaser',
-    'cubesphere',
-    'cubesphere_falling',
-    'destination_arrow',
-    'destination_target_outline',
-    'door',
-    'door_open',
-    'doorentry',
-    'doorentrycoop',
-    'doorentrycoop2x',
-    'dropper',
-    'error_state',
-    'faithplate',
-    'faithplate_128',
-    'fizzler',
-    'frankenturret',
-    'frankenturret_falling',
-    'glass',
-    'goo_man',
-    'goo_man_water',
-    'goo_tap',
-    'grate',
-    'heart',
-    'heart_outline',
-    'laser_cube_falling',
-    'laseremit',
-    'laseremitc',
-    'laserfield',
-    'laserrecc',
-    'laserrecw',
-    'laserrelay',
-    'laserrelayc',
-    'light_strip',
-    'observation_office_1x1',
-    'observationroom',
-    'paint_dropper_editor_blue',
-    'paint_dropper_editor_orange',
-    'paint_dropper_editor_water',
-    'paint_dropper_editor_white',
-    'paint_splatter_blue',
-    'paint_splatter_orange',
-    'paint_splatter_water',
-    'paint_splatter_white',
-    'panel_flip',
-    'panel_pushout',
-    'piston_lift_grate',
-    'piston_lift_section01',
-    'piston_lift_section02',
-    'piston_lift_section03',
-    'piston_lift_top',
-    'piston_lift_tube',
-    'sentry',
-    'stairs',
-    'switch',
-    'tbeam',
-}
 
 
 def get_report_file(filename: str) -> trio.Path:
@@ -194,6 +84,10 @@ async def report_editor_models() -> None:
                 rel_path = PurePosixPath(file.path).relative_to(mdl_map_editor)
                 usage_counts[str(rel_path).casefold()] = 0
 
+    LOGGER.info('Mounting game resources...')
+    if (game := gameMan.selected_game.value) is not None:
+        fsys.add_sys(game.get_filesystem())
+
     async def worker(channel: trio.MemoryReceiveChannel[PurePosixPath]) -> None:
         """Evaluates each model."""
         async for mdl_name in channel:
@@ -231,10 +125,9 @@ async def report_editor_models() -> None:
         for _ in range(10):
             nursery.start_soon(worker, rec)
         for mdl in set(editor_models):
-            if mdl.stem not in VALVE_EDITOR_MODELS:
-                await send.send(mdl)
+            await send.send(mdl)
 
-    LOGGER.info('Anaylsed, writing info:')
+    LOGGER.info('Analysed, writing info:')
     async with await get_report_file('editor_models.txt').open('w') as f:
         await f.write('Models:\n')
         for filename, count in usage_counts.most_common():
