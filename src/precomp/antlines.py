@@ -1,6 +1,6 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
-from typing import final
+from typing import Protocol, final
 
 from collections.abc import Iterator, Callable, Mapping, Sequence
 from collections import defaultdict
@@ -9,10 +9,10 @@ import math
 
 import attrs
 from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
-from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
+from srctools.vmf import Entity, Output, VMF, overlay_bounds, make_overlay
 
 import utils
-from precomp import options, tiling, rand
+from precomp import options, rand
 from connections import get_outputs, TimerModes, INDICATOR_CHECK_ID, INDICATOR_TIMER_ID
 import consts
 import editoritems
@@ -32,6 +32,14 @@ class PanelSwitchingStyle(Enum):
     CUSTOM = 'custom'      # Some logic, we don't do anything.
     EXTERNAL = 'external'  # Provide a toggle to the instance.
     INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
+
+
+class OverBinder(Protocol):
+    """An object representing some brushes that can have overlays bound to it.
+
+    In practice this is a TileDef.
+    """
+    def bind_overlay(self, over: Entity, /) -> None: ...
 
 
 @attrs.define
@@ -406,7 +414,7 @@ class Segment:
     start: Vec
     end: Vec
     # The brushes this segment is attached to.
-    tiles: set[tiling.TileDef] = attrs.Factory(set)
+    tiles: set[OverBinder] = attrs.Factory(set)
 
     @property
     def on_floor(self) -> bool:
@@ -459,7 +467,11 @@ class Antline:
     name: str
     line: list[Segment]
 
-    def export(self, vmf: VMF, style: IndicatorStyle) -> None:
+    def export(
+        self,
+        vmf: VMF, style: IndicatorStyle,
+        tile_for: Callable[[FrozenVec, FrozenVec], OverBinder | None],
+    ) -> None:
         """Add the antlines into the map."""
 
         # First, do some optimisation. If corners aren't defined, try and
@@ -520,11 +532,8 @@ class Antline:
                 pos[u_axis] = pos[u_axis] // 128 * 128 + 64
                 pos[v_axis] = pos[v_axis] // 128 * 128 + 64
                 pos -= 64 * seg.normal
-                try:
-                    tile = tiling.TILES[pos.as_tuple(), seg.normal.as_tuple()]
-                except KeyError:
-                    pass
-                else:
+                tile = tile_for(pos.freeze(), seg.normal.freeze())
+                if tile is not None:
                     seg.tiles.add(tile)
 
             rng = rand.seed(b'antline', seg.start, seg.end)

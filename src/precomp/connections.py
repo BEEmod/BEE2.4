@@ -9,14 +9,14 @@ from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 
 from srctools import conv_bool
-from srctools.math import Vec, Angle, format_float
+from srctools.math import FrozenVec, Vec, Angle, format_float
 from srctools.vmf import VMF, EntityFixup, Entity, Output
 import srctools.logger
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
 from precomp.texturing import MaterialConf
-from precomp import instance_traits, options, packing, conditions
+from precomp import instance_traits, options, packing, conditions, tiling
 import consts
 import editoritems
 import user_errors
@@ -1349,6 +1349,14 @@ def add_item_inputs(
                         )
 
 
+def get_ant_tile(pos: FrozenVec, normal: FrozenVec) -> tiling.TileDef | None:
+    """Fetches tiles for antlines to bind to."""
+    try:
+        return tiling.TILES[pos.as_tuple(), normal.as_tuple()]
+    except KeyError:
+        return None
+
+
 def add_item_indicators(
     item: Item,
     style: IndicatorStyle,
@@ -1362,7 +1370,7 @@ def add_item_indicators(
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, style)
+        ant.export(item.inst.map, style, get_ant_tile)
 
     # Special case - the item wants full control over its antlines.
     if has_ant and style.toggle_var:
