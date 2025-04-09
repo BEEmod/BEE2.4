@@ -492,7 +492,7 @@ def add_menu_opts(menu: tk.Menu) -> None:
 
     def set_from_radio() -> None:
         """Apply the radio button."""
-        selected_game.value = game = all_games[selectedGame_radio.get()]
+        selected_game.value = all_games[selectedGame_radio.get()]
 
     for val, game in enumerate(all_games):
         menu.add_radiobutton(

@@ -15,7 +15,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     await gameMan.load(DIALOG)
 
     core_nursery.start_soon(lifecycle.lifecycle)
-    packset, _ = await packages.LOADED.wait_transition()
+    await packages.LOADED.wait_transition()
     core_nursery.start_soon(img.init, TK_IMG)
     core_nursery.start_soon(sound.sound_task)
     loadScreen.main_loader.destroy()
