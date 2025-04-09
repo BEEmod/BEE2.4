@@ -32,7 +32,6 @@ LOGGER = init_logging(f'bee2/{app_name}.log')
 LOGGER.info('Arguments: {}', sys.argv)
 
 import utils
-import exceptiongroup  # noqa - Install its import hook
 
 LOGGER.info('Running "{}", version {}:', app_name, utils.BEE_VERSION)
 

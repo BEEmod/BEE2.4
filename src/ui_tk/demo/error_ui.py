@@ -29,7 +29,6 @@ async def test(core_nursery: trio.Nursery) -> None:
 
     async def multi_error() -> None:
         """Display multiple errors."""
-        from exceptiongroup import ExceptionGroup
         async with ErrorUI():
             raise ExceptionGroup('Fail', [
                 AppError(tt('The first error\nwith multiple lines.')),

@@ -5,7 +5,6 @@ from typing_extensions import NoReturn
 from tkinter import ttk
 import tkinter as tk
 from collections.abc import Callable
-from exceptiongroup import ExceptionGroup
 import pprint
 
 from srctools import logger
