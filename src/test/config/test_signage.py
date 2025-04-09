@@ -73,7 +73,7 @@ def test_layout_copies() -> None:
 
 def test_export_kv() -> None:
     """Test exporting keyvalues1 configs."""
-    conf = DEFAULT_IDS.copy()
+    conf = dict(DEFAULT_IDS)
     conf[12] = utils.obj_id('CUSTOM_SIGN')
     kv = Layout(conf).export_kv1()
     assert len(kv) == 28

@@ -11,7 +11,8 @@ import utils
 
 
 LOGGER = logger.get_logger(__name__, 'conf.signs')
-DEFAULT_IDS: dict[int, utils.ObjectID | utils.BlankID] = {
+type SignLayout = Mapping[int, utils.ObjectID | utils.BlankID]
+DEFAULT_IDS: SignLayout = {
     3: utils.obj_id('SIGN_NUM_1'),
     4: utils.obj_id('SIGN_NUM_2'),
     5: utils.obj_id('SIGN_NUM_3'),
@@ -50,10 +51,7 @@ def _sign_converter(value: Mapping[int, str]) -> Mapping[int, utils.ObjectID | u
 @attrs.frozen
 class Layout(config.Data, conf_name='Signage'):
     """A layout of selected signs."""
-    signs: Mapping[int, utils.ObjectID | utils.BlankID] = attrs.field(
-        default=DEFAULT_IDS,
-        converter=_sign_converter,
-    )
+    signs: SignLayout = attrs.field(default=DEFAULT_IDS, converter=_sign_converter)
 
     @classmethod
     @override
@@ -73,7 +71,7 @@ class Layout(config.Data, conf_name='Signage'):
         if not data:  # No config, use defaults.
             return cls(DEFAULT_IDS)
 
-        sign = dict.fromkeys(VALID_TIME, '')
+        sign: dict[int, utils.ObjectID | utils.BlankID] = dict.fromkeys(VALID_TIME, utils.ID_EMPTY)
         for child in data:
             try:
                 timer = int(child.name)
