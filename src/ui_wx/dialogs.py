@@ -16,6 +16,7 @@ from . import MAIN_WINDOW
 
 __all__ = ['Dialogs', 'WxDialogs', 'DIALOG']
 
+
 @overload
 def _messagebox(
     style: int, parent: wx.TopLevelWindow,

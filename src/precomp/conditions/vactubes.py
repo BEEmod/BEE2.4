@@ -1,8 +1,7 @@
 """Implements the cutomisable vactube items.
 """
-from __future__ import annotations
-from collections.abc import Iterator, Iterable
-from typing import Callable, Sequence
+from collections.abc import Callable, Iterator, Iterable, Sequence
+from typing import Self, final
 
 import attrs
 from srctools import Angle, FrozenVec, Vec, Keyvalues, Entity, VMF, Solid, Matrix
@@ -21,7 +20,8 @@ UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
 PUSH_TRIGS: dict[FrozenVec, Entity] = {}
-VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
+type Track = tuple[Marker, dict[str, Marker]]  # Start marker, and name -> marker.
+VAC_TRACKS: list[Track] = []
 
 
 @attrs.define
@@ -47,6 +47,7 @@ class Config:
         self.inst_straight_fitter = utils.get_piece_fitter(self.inst_straight.keys())
 
 
+@final
 @attrs.define
 class Marker:
     """A single node point."""
@@ -64,7 +65,7 @@ class Marker:
         rot = Matrix.from_angstr(self.ent['angles'])
         return Matrix.from_yaw(180) @ rot
 
-    def follow_path(self, vac_list: dict[str, Marker]) -> Iterator[tuple[Marker, Marker]]:
+    def follow_path(self, vac_list: dict[str, Self]) -> Iterator[tuple[Self, Self]]:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:

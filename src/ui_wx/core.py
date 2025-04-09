@@ -2,7 +2,6 @@
 from __future__ import annotations
 from typing import Any
 from collections.abc import Awaitable, Callable
-import collections
 
 from outcome import Outcome, Error
 import trio

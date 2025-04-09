@@ -263,7 +263,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                         corrected=timer_ind % 8 + 3,
                     ),
                     points=[(point @ orient + pos) for point in CORNER_POS],
-                )
+                ) from None
         nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:

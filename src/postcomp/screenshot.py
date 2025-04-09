@@ -1,9 +1,9 @@
 """Handles modification of the editor screenshot."""
+from collections.abc import Iterator
 import os
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator
 
 import srctools.logger
 import utils

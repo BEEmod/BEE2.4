@@ -1,12 +1,13 @@
 """Implement cubes and droppers."""
 from __future__ import annotations
+from typing import NamedTuple, Literal, assert_never
 
+from collections.abc import MutableMapping
 from collections import defaultdict
 from contextlib import suppress
 from weakref import WeakKeyDictionary
 
 from enum import Enum
-from typing import NamedTuple, MutableMapping,  Literal, assert_never
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle

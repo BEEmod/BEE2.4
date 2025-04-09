@@ -86,6 +86,7 @@ class LegendInfo:
             numbers=numbers, num_off=num_off,
         )
 
+
 LEGEND_INFO_BLANK = LegendInfo(
     overlay=None, background=None, blank=None,
     numbers=None, num_off=(0, 0)

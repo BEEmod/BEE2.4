@@ -1,4 +1,5 @@
 """Test misc utils."""
+from typing import assert_type
 import re
 
 import pytest
@@ -14,7 +15,7 @@ def test_not_none() -> None:
         utils.not_none(None)
     # Basic typechecker test.
     nonable: int | None = [1, None][eval('0')]
-    nums: int = utils.not_none(nonable)
+    assert_type(utils.not_none(nonable), int)
 
 
 def test_iter_neighbours() -> None:

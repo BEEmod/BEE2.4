@@ -1,5 +1,5 @@
 """Common code for testing configuration."""
-from typing import Generator
+from collections.abc import Generator
 import contextlib
 
 from BEE2_config import ConfigFile

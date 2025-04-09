@@ -61,7 +61,6 @@ def set_menu_text(menu_item: wx.MenuItem, token: TransToken) -> None:
     """Apply this text to an item on a menu."""
     menu_item.SetItemLabel(str(token))
     menu = menu_item.GetMenu()
-    item_id = menu_item.GetId()
     try:
         menu_map = _menu_labels[menu]
     except KeyError:

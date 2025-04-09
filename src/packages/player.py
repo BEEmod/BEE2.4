@@ -1,5 +1,5 @@
 """Objects defining which player models are available."""
-from typing import Final, Self
+from typing import Self
 from collections.abc import Iterator, Mapping
 
 import trio.lowlevel

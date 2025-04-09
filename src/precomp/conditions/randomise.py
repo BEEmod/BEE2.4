@@ -1,5 +1,5 @@
 """Conditions for randomising instances."""
-from typing import Callable
+from collections.abc import Callable
 
 from srctools import Keyvalues, Vec, Angle, Entity
 

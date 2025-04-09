@@ -1,6 +1,6 @@
 """A consistent interface for dialog boxes."""
 from __future__ import annotations
-from typing import Literal, override
+from typing import override
 
 from tkinter import commondialog, filedialog, simpledialog, ttk
 from tkinter.font import Font
@@ -246,6 +246,7 @@ class QueryValidator(tk.Toplevel):
 class CustomMessagebox:
     """Implements a custom messagebox with 2 or 3 buttons."""
     result: Btn3 | None
+
     def __init__(
         self,
         parent: tk.Toplevel | tk.Tk,

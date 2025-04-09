@@ -1,7 +1,5 @@
 """Wx implementation of the corridor selector."""
-from __future__ import annotations
-from typing import Final
-from typing_extensions import override
+from typing import Final, override
 
 import itertools
 
@@ -40,7 +38,7 @@ ICON_INSET: Final = 8
 
 class IconUI(Icon):
     """An icon for a corridor."""
-    def __init__(self, selector: WxSelector, index: int) -> None:
+    def __init__(self, selector: 'WxSelector', index: int) -> None:
         """Create the widgets."""
         self.widget = wx.Panel(selector.panel_items)
         self.index = index

@@ -1,6 +1,6 @@
 """Options specifically for app development."""
 from __future__ import annotations
-from typing_extensions import NoReturn
+from typing import NoReturn
 
 from tkinter import ttk
 import tkinter as tk

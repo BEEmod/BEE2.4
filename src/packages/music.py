@@ -1,8 +1,8 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import Final, Iterator, Mapping
+from typing import Final
 
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Mapping, Iterable, Iterator
 
 from srctools import conv_float
 import srctools.logger

@@ -61,8 +61,8 @@ import utils
 
 __all__ = [
     'ALL_INST', 'DIRECTIONS', 'INST_ANGLE', 'PETI_INST_ANGLE', 'RES_EXHAUSTED',
-    'MapInfo',
-    'TestCallable', 'ResultCallable', 'make_test', 'make_result', 'make_result_setup', 'add_meta',
+    'MapInfo', 'Condition', 'TestCallable', 'ResultCallable',
+    'make_test', 'make_result', 'make_result_setup', 'add_meta',
     'add', 'check_all', 'check_test', 'import_conditions', 'Unsatisfiable',
     'add_inst', 'add_suffix', 'add_output', 'local_name', 'fetch_debug_visgroup', 'set_ent_keys',
     'resolve_offset',

@@ -5,14 +5,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, ItemsView, MutableMapping
 from collections import deque
-from typing import Any
+from typing import Any, Self
 from enum import Enum
 import math
 
 from srctools import FrozenVec, Vec, Matrix, VMF
 
 import srctools.logger
-from typing_extensions import Self
 
 import consts
 import editoritems
