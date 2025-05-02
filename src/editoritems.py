@@ -1,7 +1,9 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
-
 from typing import ClassVar, Protocol, Any
+
+from operator import itemgetter
+import string
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -1585,7 +1587,7 @@ class Item:
             tags = set()
             for bbox_key in tok.block(box_name):
                 folded_key = bbox_key.casefold()
-                if folded_key.rstrip('0123456789') == 'pos':
+                if folded_key.rstrip(string.digits) == 'pos':
                     points.append(Vec.from_str(tok.expect(Token.STRING)))
                 elif folded_key in ('tag', 'tags'):
                     tags.update(tok.expect(Token.STRING).casefold().split())

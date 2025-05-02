@@ -40,6 +40,7 @@ import inspect
 import math
 import operator
 import pkgutil
+import string
 import sys
 import types
 import warnings
@@ -441,8 +442,7 @@ def annotation_caller[Res](
         for ind, parm in
         enumerate(sig.parameters.values())
     }
-    letters = 'abcdefghijklmnopqrstuvwxyz'
-    for var_name, parm_typ in zip(letters, parms, strict=False):
+    for var_name, parm_typ in zip(string.ascii_lowercase, parms, strict=False):
         inputs.append(var_name)
         out_name = type_to_parm[parm_typ]
         if out_name is not None:

@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import assert_never
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
+import string
 
 from srctools import conv_bool
 from srctools.math import FrozenVec, Vec, Angle, format_float
@@ -638,7 +639,7 @@ def calc_connections(
         for out_name in inputs:
             # Fizzler base -> model/brush outputs, ignore these (discard).
             # fizzler.py will regenerate as needed.
-            if out_name.rstrip('0123456789').endswith(('_modelStart', '_modelEnd', '_brush')):
+            if out_name.rstrip(string.digits).endswith(('_modelStart', '_modelEnd', '_brush')):
                 continue
 
             if out_name in toggles:
@@ -734,7 +735,7 @@ def calc_connections(
     # Now we've computed everything, strip numbers.
     for inst in corridors:
         old_name = inst['targetname']
-        new_name = inst['targetname'] = old_name.rstrip('0123456789')
+        new_name = inst['targetname'] = old_name.rstrip(string.digits)
         try:
             ITEMS[new_name] = ITEMS.pop(old_name)
         except KeyError:

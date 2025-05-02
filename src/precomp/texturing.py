@@ -1,11 +1,11 @@
 """Manages the list of textures used for brushes, and how they are applied."""
 from __future__ import annotations
-
 from typing import ClassVar, TYPE_CHECKING, Any
 
 from collections.abc import Sequence, Iterable
 from pathlib import Path
 from enum import Enum, StrEnum
+import string
 import itertools
 import abc
 
@@ -689,7 +689,7 @@ def apply(
     if loc is None:
         loc = face.get_origin()
 
-    generator.get(loc + face.normal(), tex_name).apply(face)
+    generator.get(loc - face.normal(), tex_name).apply(face)
 
 
 def load_config(conf: Keyvalues) -> None:
@@ -1050,7 +1050,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
         antigel_filename = antigel_loc / Path(texture)
         antigel_mat = Path(antigel_filename).relative_to(material_folder).with_suffix('').as_posix()
         if antigel_mat in antigel_mats:
-            antigel_filename_base = antigel_filename.name.rstrip('0123456789')
+            antigel_filename_base = antigel_filename.name.rstrip(string.digits)
             for i in itertools.count(1):
                 antigel_filename = antigel_filename.with_name(f'{antigel_filename_base}{i:02}')
                 antigel_mat = Path(antigel_filename).relative_to(material_folder).with_suffix('').as_posix()
