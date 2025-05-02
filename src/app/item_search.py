@@ -7,13 +7,13 @@ from contextlib import aclosing
 
 from pygtrie import CharTrie
 import srctools.logger
+import trio_util
 import trio
 
 from app import localisation
 from async_util import iterval_cancelling
 from packages import PackagesSet, PakRef, Style
 from packages.item import Item, SubItemRef
-from trio_util import AsyncValue
 from ui_tk.wid_transtoken import set_text
 import packages
 
@@ -26,7 +26,7 @@ _type_cback: Callable[[], None] | None = None
 searchbar_wid: ttk.Entry
 
 
-def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
+def init(frm: ttk.Frame, refresh_val: trio_util.AsyncValue[Filter | None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
@@ -87,7 +87,7 @@ def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
     _type_cback = on_type
 
 
-async def update_task(cur_style: AsyncValue[PakRef[Style]]) -> None:
+async def update_task(cur_style: trio_util.AsyncValue[PakRef[Style]]) -> None:
     """Whenever styles or packages change, reload."""
     scope = trio.CancelScope()
     style = cur_style.value
@@ -96,13 +96,11 @@ async def update_task(cur_style: AsyncValue[PakRef[Style]]) -> None:
     async def wait_packset() -> None:
         """Reload if the package changes, making sure items are ready first."""
         nonlocal packset
-        new_packset: PackagesSet
-        async with iterval_cancelling(packages.LOADED) as aiterable:
-            async for load_scope in aiterable:
-                with load_scope as new_packset:
-                    await new_packset.ready(Item).wait()
-                    packset = new_packset
-                    scope.cancel()
+        while True:
+            async with iterval_cancelling(packages.LOADED) as new_packset:
+                await new_packset.ready(Item).wait()
+                packset = new_packset
+                scope.cancel()
 
     async def wait_style() -> None:
         """Reload if the style changes."""

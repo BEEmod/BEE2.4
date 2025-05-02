@@ -1,15 +1,12 @@
 """Various utilities for async code."""
 from __future__ import annotations
 from typing import Protocol, overload
-from typing_extensions import AsyncContextManager
-
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
-import types
+from collections.abc import Awaitable, AsyncGenerator, Callable
+import contextlib
 
 from srctools.logger import get_logger
 from trio_util import AsyncBool, AsyncValue
 import trio.lowlevel
-import trio_util
 import aioresult
 
 
@@ -136,72 +133,23 @@ async def run_as_task[*Args](
         nursery.start_soon(func, *args)
 
 
-class CancelWrapper[T]:
-    """Enter a cancel scope, then yield a value. Can be used either async or sync."""
-    def __init__(self, value: T, scope: trio.CancelScope) -> None:
-        self.value = value
-        self.scope = scope
+@contextlib.asynccontextmanager
+async def iterval_cancelling[T](value: AsyncValue[T]) -> AsyncGenerator[T]:
+    """Yield the current AsyncValue value, then cancel if the value changes.
 
-    def __enter__(self) -> T:
-        self.scope.__enter__()
-        return self.value
-
-    async def __aenter__(self) -> T:
-        self.scope.__enter__()
-        return self.value
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None:
-        return self.scope.__exit__(exc_type, exc_val, exc_tb)
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None:
-        return self.scope.__exit__(exc_type, exc_val, exc_tb)
-
-
-class _IterValCancel[T](AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]):
-    def __init__(self, value: trio_util.AsyncValue[T]) -> None:
-        self.value = value
-        self._agen: AsyncGenerator[T, None] | None = None
-
-    async def __aenter__(self) -> AsyncIterator[CancelWrapper[T]]:
-        if self._agen is not None:
-            raise RecursionError('Cannot re-enter.')
-        self._agen = agen = self.value.eventual_values()
-        return self._iterate(agen)
-
-    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        if self._agen is not None:
-            await self._agen.aclose()
-
-    async def _iterate(
-        self, agen: AsyncGenerator[T, None],
-    ) -> AsyncIterator[CancelWrapper[T]]:
-        scope = trio.CancelScope()
-        yield CancelWrapper(await anext(agen), scope)
-        async for value in agen:
-            scope.cancel()
-            scope = trio.CancelScope()
-            yield CancelWrapper(value, scope)
-
-
-def iterval_cancelling[T](
-    value: trio_util.AsyncValue[T],
-) -> AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]:
-    """Iterate over the values produced by an AsyncValue, cancelling the iteration if it changes again.
-
+    If the block completes, wait for the value to change or some other cancellation.
     Use like so:
-    async with iterval_cancelling(some_value) as aiterator:
-        async for scope in aiterator:
-            [async] with scope as result:
-                await use(result)
+    while True:
+        async with iterval_cancelling(some_value) as value:
+            ...
     """
-    return _IterValCancel(value)
+    async def wait() -> None:
+        """Wait for a change, then cancel."""
+        await value.wait_transition()
+        nursery.cancel_scope.cancel()
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(wait)
+        yield value.value
+        # If we get here, the with block was completed. Wait for change or cancellation.
+        await trio.sleep_forever()

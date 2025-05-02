@@ -357,20 +357,18 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
     async def _load_data_task(self) -> None:
         """Whenever packages change, reload all items."""
-        packset: packages.PackagesSet
-        async with async_util.iterval_cancelling(packages.LOADED) as aiterator:
-            async for scope in aiterator:
-                with scope as packset:
-                    LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
-                    # Lock into the loading state so that it can't be interacted with while loading.
-                    self._loading = True
-                    self.set_disp()
-                    self.exit()
-                    self._packset = packset
-                    await async_util.run_as_task(self._rebuild_items, packset)
-                    self._loading = False
-                    self.set_disp()
-                    LOGGER.debug('Reload complete for selectorwin {}', self.save_id)
+        while True:
+            async with async_util.iterval_cancelling(packages.LOADED) as packset:
+                LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
+                # Lock into the loading state so that it can't be interacted with while loading.
+                self._loading = True
+                self.set_disp()
+                self.exit()
+                self._packset = packset
+                await async_util.run_as_task(self._rebuild_items, packset)
+                self._loading = False
+                self.set_disp()
+                LOGGER.debug('Reload complete for selectorwin {}', self.save_id)
 
     async def _rebuild_items(self, packset: packages.PackagesSet) -> None:
         """Rebuild the menus and options based on the item list."""

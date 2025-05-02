@@ -1,6 +1,6 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing import Final,  override
+from typing import Final, override, Never
 
 from abc import abstractmethod
 from collections.abc import Sequence
@@ -8,13 +8,14 @@ from contextlib import aclosing
 import itertools
 import random
 
+import async_util
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 import srctools.logger
 import trio
 import trio_util
 
-from async_util import EdgeTrigger, iterval_cancelling
+from async_util import EdgeTrigger
 from config.corridors import Config, Options, UIState
 from corridor import Attachment, Direction, GameMode, Option
 from packages import CorridorGroup, PackagesSet, PakRef, Style, corridor
@@ -241,22 +242,20 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             self.store_conf()
             self.corridors_dirty.set()
 
-    async def _packages_changed_task(self) -> None:
+    async def _packages_changed_task(self) -> Never:
         """When packages or styles change, reload."""
-        packset: PackagesSet
-        async with iterval_cancelling(packages.LOADED) as aiterator:
-            async for scope in aiterator:
-                # This scope is cancelled if new packages load.
-                async with scope as packset:
-                    # Only use the packages once styles and corridors are ready for
-                    # us.
-                    await packset.ready(Style).wait()
-                    await packset.ready(CorridorGroup).wait()
-                    self.packset = packset
-                    async with aclosing(self.cur_style.eventual_values()) as agen:
-                        async for style in agen:
-                            self.load_corridors(style)
-                            self.corridors_dirty.set()
+        while True:
+            async with async_util.iterval_cancelling(packages.LOADED) as packset:
+                # Only use the packages once styles and corridors are ready for
+                # us.
+                await packset.ready(Style).wait()
+                await packset.ready(CorridorGroup).wait()
+                self.packset = packset
+                async with aclosing(self.cur_style.eventual_values()) as agen:
+                    async for style in agen:
+                        await trio.lowlevel.checkpoint()
+                        self.load_corridors(style)
+                        self.corridors_dirty.set()
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""

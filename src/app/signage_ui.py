@@ -11,10 +11,10 @@ import trio
 import trio_util
 
 from app import ReflowWindow, WidgetCache, dragdrop, img
-from async_util import EdgeTrigger, iterval_cancelling
 from config.signage import DEFAULT_IDS, Layout
 from packages import PakRef, Signage, Style
 from transtoken import TransToken
+import async_util
 import config
 import packages
 import utils
@@ -118,7 +118,7 @@ class SignageUIBase[ParentT](ReflowWindow):
         # Late binding!
         self._close_event.set()
 
-    async def task(self, trigger: EdgeTrigger[()]) -> None:
+    async def task(self, trigger: async_util.EdgeTrigger[()]) -> None:
         """Handles opening/closing the UI."""
         # Alternate between showing and hiding.
         async with trio.open_nursery() as nursery:
@@ -166,18 +166,16 @@ class SignageUIBase[ParentT](ReflowWindow):
 
     async def _update_picker_items_task(self) -> None:
         """Create the slots for all possible signs."""
-        packset: packages.PackagesSet
-        async with iterval_cancelling(packages.LOADED) as aiterator:
-            async for scope in aiterator:
-                with scope as packset:
-                    await packset.ready(Signage).wait()
-                    self.picker_slots.reset()
-                    for sign in sorted(packset.all_obj(Signage), key=lambda s: s.name):
-                        await trio.lowlevel.checkpoint()
-                        if not sign.hidden:
-                            self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
-                    self.picker_slots.hide_unused()
-                    self.item_pos_dirty.set()
+        while True:
+            async with async_util.iterval_cancelling(packages.LOADED) as packset:
+                await packset.ready(Signage).wait()
+                self.picker_slots.reset()
+                for sign in sorted(packset.all_obj(Signage), key=lambda s: s.name):
+                    await trio.lowlevel.checkpoint()
+                    if not sign.hidden:
+                        self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
+                self.picker_slots.hide_unused()
+                self.item_pos_dirty.set()
 
     async def _apply_config_task(self) -> None:
         """Apply saved signage info to the UI."""

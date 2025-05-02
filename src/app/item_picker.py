@@ -1,5 +1,5 @@
 """Implements the selected palette and list of items."""
-from typing import Final
+from typing import Final, Never
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
@@ -193,7 +193,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
 
     async def open_contextwin_task(
         self, open_func: Callable[[ItemSlot, Coord | None], None],
-    ) -> None:
+    ) -> Never:
         """Monitors rightclicks, then triggers the window.
 
         This is started by the context window, not us.
@@ -216,7 +216,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         else:
             return DragInfo(icon)
 
-    async def _reload_items_task(self) -> None:
+    async def _reload_items_task(self) -> Never:
         """Update all the items."""
         while True:
             await self.items_dirty.wait()
@@ -254,23 +254,21 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             self.drag_man.load_icons()
             await trio.lowlevel.checkpoint()
 
-    async def _packset_changed_task(self) -> None:
+    async def _packset_changed_task(self) -> Never:
         """Update whenever packages reload."""
-        packset: PackagesSet
-        async with iterval_cancelling(PAK_LOADED) as aiterator:
-            async for scope in aiterator:
-                with scope as packset:
-                    await packset.ready(Item).wait()
-                    # Create the items in the palette.
-                    # Sort by item ID, and then group by package ID.
-                    # Reverse sort packages so 'Valve' appears at the top...
-                    items = sorted(packset.all_obj(Item), key=lambda item: item.id)
-                    items.sort(key=lambda item: item.pak_id, reverse=True)
-                    self._all_items = items
-                    self.packset = packset
-                    self.items_dirty.set()
+        while True:
+            async with iterval_cancelling(PAK_LOADED) as packset:
+                await packset.ready(Item).wait()
+                # Create the items in the palette.
+                # Sort by item ID, and then group by package ID.
+                # Reverse sort packages so 'Valve' appears at the top...
+                items = sorted(packset.all_obj(Item), key=lambda item: item.id)
+                items.sort(key=lambda item: item.pak_id, reverse=True)
+                self._all_items = items
+                self.packset = packset
+                self.items_dirty.set()
 
-    async def _filter_search_changed_task(self) -> None:
+    async def _filter_search_changed_task(self) -> Never:
         """Update whenever the filter configuration changes."""
         while True:
             await self.cur_filter.wait_transition()

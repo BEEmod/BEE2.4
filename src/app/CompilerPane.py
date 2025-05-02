@@ -15,9 +15,9 @@ import random
 from PIL import Image, ImageTk
 from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
-from trio_util import AsyncValue
 import attrs
 import trio
+import trio_util
 
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_LEGACY_IDS
 from config.player import AvailablePlayer
@@ -121,7 +121,7 @@ SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
-player_model = AsyncValue(_read_player_model())
+player_model = trio_util.AsyncValue(_read_player_model())
 del _read_player_model
 
 start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
@@ -826,29 +826,27 @@ async def make_map_widgets(
 
 async def load_player_task(model_combo: ComboBoxMap[utils.ObjectID]) -> None:
     """Load player model definitions from packages."""
-    packset: packages.PackagesSet
-    async with async_util.iterval_cancelling(packages.LOADED) as iterval:
-        async for packset_wrapper in iterval:
-            async with packset_wrapper as packset:
-                # If standalone, this will stall forever since packages never load.
-                await packset.ready(packages.PlayerModel).wait()
-                model_combo.update(
-                    (model.id, model.name)
-                    for model in sorted(
-                        packset.all_obj(packages.PlayerModel),
-                        key=lambda model: str(model.name),
-                   )
-                )
-                LOGGER.debug('Updated player model list.')
-                while True:
-                    # Store the translated versions, discard extras, then wait for translation change.
-                    to_discard = set(dict(config.APP.get_cur_conf_type(AvailablePlayer)))
-                    for mdl in packset.all_obj(packages.PlayerModel):
-                        config.APP.store_conf(AvailablePlayer(str(mdl.name)), mdl.id)
-                        to_discard.discard(mdl.id)
-                    for mdl_id in to_discard:
-                        config.APP.discard_conf(AvailablePlayer, mdl_id)
-                    await CURRENT_LANG.wait_transition()
+    while True:
+        async with async_util.iterval_cancelling(packages.LOADED) as packset:
+            # If standalone, this will stall forever since packages never load.
+            await packset.ready(packages.PlayerModel).wait()
+            model_combo.update(
+                (model.id, model.name)
+                for model in sorted(
+                    packset.all_obj(packages.PlayerModel),
+                    key=lambda model: str(model.name),
+               )
+            )
+            LOGGER.debug('Updated player model list.')
+            while True:
+                # Store the translated versions, discard extras, then wait for translation change.
+                to_discard = set(dict(config.APP.get_cur_conf_type(AvailablePlayer)))
+                for mdl in packset.all_obj(packages.PlayerModel):
+                    config.APP.store_conf(AvailablePlayer(str(mdl.name)), mdl.id)
+                    to_discard.discard(mdl.id)
+                for mdl_id in to_discard:
+                    config.APP.discard_conf(AvailablePlayer, mdl_id)
+                await CURRENT_LANG.wait_transition()
 
 
 async def make_pane(
