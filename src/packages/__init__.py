@@ -401,27 +401,41 @@ class PackErrorInfo:
     packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
     errors: ErrorUI
 
+    def use_dev_warnings(self, package: utils.SpecialID) -> bool:
+        """Check if the specified package is a developer package."""
+        if DEV_MODE.value:
+            return True
+        try:
+            # If it's a special ID, this will fail to find, so we can cast.
+            return self.packset.packages[utils.ObjectID(package)].is_dev()
+        except KeyError:
+            LOGGER.warning('Trying to warn about package "{}" which does not exist?', package)
+            return True  # Missing, warn about it?
+
     def warn(self, warning: AppError | TransToken) -> None:
         """Emit a non-fatal warning, shortcut for errors.add()."""
         self.errors.add(warning)
 
     def warn_auth(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
         """If the specified package is a developer package, emit a warning."""
-        try:
-            # If it's a special ID, this will fail to find.
-            is_dev = self.packset.packages[utils.ObjectID(package)].is_dev()
-        except KeyError:
-            LOGGER.warning('Trying to warn about package "{}" which does not exist?', package)
-            is_dev = True  # Missing, warn about it?
-        if DEV_MODE.value or is_dev:
+        if self.use_dev_warnings(package):
             self.errors.add(warning)
+        else:  # Write it to the log.
+            if isinstance(warning, AppError):
+                warning = warning.message
+            LOGGER.warning(str(warning))
 
     def warn_auth_fatal(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
         """If the specified package is a developer package, emit a fatal warning."""
         if not isinstance(warning, AppError):
             warning = AppError(warning)
         warning.fatal = True
-        self.warn_auth(package, warning)
+        if self.use_dev_warnings(package):
+            self.errors.add(warning)
+        else:  # Write it to the log.
+            if isinstance(warning, AppError):
+                warning = warning.message
+            LOGGER.error(str(warning))
 
 
 @attrs.define
