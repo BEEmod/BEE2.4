@@ -77,33 +77,37 @@ async def lifecycle(
         wait_nursery.cancel_scope.cancel()
 
     while True:
-        LOGGER.info('Loading packages...')
-        packset = packages.PackagesSet()
-        await mod_support.scan_music_locs(packset, gameMan.all_games)
-        async with ErrorUI(error_desc=TRANS_LOAD_ERROR, warn_desc=TRANS_LOAD_PARTIAL) as error_ui:
-            # noinspection PyProtectedMember
-            await run_as_task(
-                packages._load_packages,
-                packset,
-                list(BEE2_config.get_package_locs()),
-                error_ui,
-            )
-        if error_ui.result is ErrorResult.FAILED:
-            quit_app()
-            return
+        # The filecheck task is out here so it can run during UI code,
+        # we don't want it to interrupt proceeding to the UI.
+        async with trio.open_nursery() as filecheck_nursery:
+            LOGGER.info('Loading packages...')
+            packset = packages.PackagesSet()
+            await mod_support.scan_music_locs(packset, gameMan.all_games)
+            async with ErrorUI(error_desc=TRANS_LOAD_ERROR, warn_desc=TRANS_LOAD_PARTIAL) as error_ui:
+                # noinspection PyProtectedMember
+                await run_as_task(
+                    packages._load_packages,
+                    packset,
+                    list(BEE2_config.get_package_locs()),
+                    error_ui,
+                )
 
-        dev_filecheck_send, dev_filecheck_rec = trio.open_memory_channel[tuple[PackagePath, File]](256)
+                dev_filecheck_send, dev_filecheck_rec = trio.open_memory_channel[tuple[PackagePath, File]](256)
 
-        async with trio.open_nursery() as load_nursery, dev_filecheck_send:
-            if DEV_MODE.value:
-                load_nursery.start_soon(filecheck_task, dev_filecheck_rec)
-                packset.devmode_filecheck_chan = dev_filecheck_send
-            # else: The channels will just be left unused.
+                async with dev_filecheck_send, trio.open_nursery() as load_nursery:
+                    if DEV_MODE.value:
+                        filecheck_nursery.start_soon(filecheck_task, dev_filecheck_rec)
+                        packset.devmode_filecheck_chan = dev_filecheck_send
+                    # else: The channels will just be left unused.
 
-            # noinspection PyProtectedMember
-            load_nursery.start_soon(packages._load_objects, packset, error_ui)
-            # noinspection PyProtectedMember
-            load_nursery.start_soon(packages._load_templates, packset)
+                    # noinspection PyProtectedMember
+                    load_nursery.start_soon(packages._load_objects, packset, error_ui)
+                    # noinspection PyProtectedMember
+                    load_nursery.start_soon(packages._load_templates, packset)
+
+            if error_ui.result is ErrorResult.FAILED:
+                quit_app()
+                return
 
             # Todo: Move these ready calls elsewhere, then eliminate foreground.
             for pack_cls in packages.OBJ_TYPES.values():
@@ -113,24 +117,25 @@ async def lifecycle(
 
             # Foreground objects loaded, release the packset for the UI.
             packages.LOADED.value = packset
-        # Everything is loaded now, we can export.
 
-        while True:
-            await trio.lowlevel.checkpoint()
-            if export_info is not None and export_results is not None:
-                # User pressed export, perform the export.
-                # If export_results is None, we just ignore export requests.
-                await export_results.send((export_info, await exporting.export(export_info)))
-            # Wait for either trigger to fire.
-            async with trio.open_nursery() as wait_nursery:
-                should_reload = False
-                export_info = None
-                # Starting wait_export will enable the UI buttons.
-                wait_nursery.start_soon(wait_reload)
-                wait_nursery.start_soon(wait_export)
-                await trio.sleep_forever()
-            if should_reload:
-                break  # Go the outer loop, which will reload again.
+            # Everything is loaded now, we can export.
+            while True:
+                await trio.lowlevel.checkpoint()
+                if export_info is not None and export_results is not None:
+                    # User pressed export, perform the export.
+                    # If export_results is None, we just ignore export requests.
+                    await export_results.send((export_info, await exporting.export(export_info)))
+                # Wait for either trigger to fire.
+                async with trio.open_nursery() as wait_nursery:
+                    should_reload = False
+                    export_info = None
+                    # Starting wait_export will enable the UI buttons.
+                    wait_nursery.start_soon(wait_reload)
+                    wait_nursery.start_soon(wait_export)
+                    await trio.sleep_forever()
+                if should_reload:
+                    filecheck_nursery.cancel_scope.cancel()
+                    break  # Go the outer loop, which will reload again.
 
 
 async def filecheck_task(rec_channel: trio.MemoryReceiveChannel[tuple[PackagePath, File]]) -> None:
