@@ -11,7 +11,7 @@ import utils
 from app import lazy_conf
 from consts import MusicChannel
 from packages import (
-    AttrMap, ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData,
+    AttrMap, ExportKey, PackagesSet, PackErrorInfo, SelPakObject, ParseData, SelitemData,
     get_config,
 )
 from transtoken import TransTokenSource
@@ -206,20 +206,20 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
         return utils.ID_NONE
 
     @classmethod
-    async def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """Check children of each music item actually exist.
 
         This must be done after they all were parsed.
         """
         sounds: dict[frozenset[str], str] = {}
 
-        for music in packset.all_obj(cls):
+        for music in ctx.packset.all_obj(cls):
             for channel in MusicChannel:
                 # Base isn't present in this.
                 child_id = music.children.get(channel, '')
                 if child_id:
                     try:
-                        packset.obj_by_id(cls, child_id)
+                        ctx.packset.obj_by_id(cls, child_id)
                     except KeyError:
                         LOGGER.warning(
                             'Music "{}" refers to nonexistent'

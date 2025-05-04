@@ -28,8 +28,8 @@ from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from connections import Config as ConnConfig
 from editoritems import InstCount, Item as EditorItem
 from packages import (
-    ExportKey, PackagesSet, PakObject, PakRef, ParseData, Style, desc_parse,
-    get_config, sep_values,
+    ExportKey, PackagesSet, PackErrorInfo, PakObject, PakRef, ParseData, Style,
+    desc_parse, get_config, sep_values,
 )
 from transtoken import TransToken, TransTokenSource
 import async_util
@@ -723,15 +723,16 @@ class Item(PakObject, needs_foreground=True):
 
     @classmethod
     @override
-    async def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """After styles and items are done, assign all the versions."""
+        packset = ctx.packset
         # This has to be done after styles.
         await packset.ready(Style).wait()
         LOGGER.info('Allocating styled items...')
         styles = packset.all_obj(Style)
         async with trio.open_nursery() as nursery:
             for item_to_style in packset.all_obj(Item):
-                nursery.start_soon(assign_styled_items, packset, styles, item_to_style)
+                nursery.start_soon(assign_styled_items, ctx, styles, item_to_style)
 
     def selected_version(self) -> Version:
         """Fetch the selected version for this item."""
@@ -1082,7 +1083,7 @@ async def parse_item_folder(
 
 
 # noinspection PyProtectedMember
-async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style], item: Item) -> None:
+async def assign_styled_items(ctx: PackErrorInfo, all_styles: Iterable[Style], item: Item) -> None:
     """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
@@ -1174,7 +1175,7 @@ async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style],
                     styles[sty_id] = start_data.copy()
                 else:
                     styles[sty_id] = await start_data.modify(
-                        packset, conf.pak_id, conf.config,
+                        ctx.packset, conf.pak_id, conf.config,
                         f'<{item.id}:{vers.id}.{sty_id}>',
                     )
 

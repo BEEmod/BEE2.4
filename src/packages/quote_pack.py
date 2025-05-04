@@ -8,7 +8,7 @@ import srctools
 
 from packages import (
     AttrMap, ExportKey, PackagesSet, ParseData, SelitemData, SelPakObject,
-    get_config, set_cond_source,
+    get_config, set_cond_source, PackErrorInfo,
 )
 from quote_pack import (
     RESPONSE_NAMES, Group, Line, Monitor, Quote, QuoteEvent, QuoteInfo,
@@ -196,11 +196,11 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
         return f'<Voice:{self.id}>'
 
     @classmethod
-    async def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """Verify no quote packs have duplicate IDs."""
         used: set[str] = set()
         voice: QuotePack
-        for voice in packset.all_obj(cls):
+        for voice in ctx.packset.all_obj(cls):
             for group in voice.data.groups.values():
                 used.clear()
                 for quote in group.quotes:

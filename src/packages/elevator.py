@@ -2,7 +2,8 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Final, Iterator
+from typing import Final
+from collections.abc import Iterator
 
 from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource

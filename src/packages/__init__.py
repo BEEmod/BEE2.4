@@ -53,7 +53,7 @@ __all__ = [
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup', 'BarrierHole',
 
     # Mainly intended for package object code.
-    'ParseData', 'ExportKey', 'reraise_keyerror', 'get_config', 'set_cond_source',
+    'ParseData', 'PackErrorInfo', 'ExportKey', 'reraise_keyerror', 'get_config', 'set_cond_source',
     'parse_multiline_key', 'desc_parse', 'sep_values',
     # For exporting module only.
     '_ExportValue',
@@ -562,7 +562,7 @@ class PakObject:
         return iter(())
 
     @classmethod
-    async def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, info: PackErrorInfo, /) -> None:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
 
@@ -1100,7 +1100,7 @@ async def parse_type[PakT: PakObject](
     # run until post_parse finishes. So use two flags.
     # noinspection PyProtectedMember
     packset._parsed.add(obj_class)
-    await obj_class.post_parse(packset)
+    await obj_class.post_parse(PackErrorInfo(packset, errors))
     packset.ready(obj_class).set()
 
 
@@ -1539,8 +1539,9 @@ class Style(SelPakObject, needs_foreground=True):
             self.suggested[sugg_cls].update(sugg)
 
     @classmethod
-    async def post_parse(cls, packset: PackagesSet) -> None:
+    async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """Assign the bases lists for all styles, and set default suggested items."""
+        packset = ctx.packset
         for style in packset.all_obj(Style):
             for sugg_cls, sugg_set in style.suggested.items():
                 if not sugg_set:

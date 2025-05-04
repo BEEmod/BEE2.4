@@ -300,8 +300,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             self.global_options[kind] += additional
 
     @classmethod
-    async def post_parse(cls, packset: packages.PackagesSet) -> None:
+    async def post_parse(cls, ctx: packages.PackErrorInfo) -> None:
         """After items are parsed, convert legacy definitions in the item into these groups."""
+        packset = ctx.packset
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
