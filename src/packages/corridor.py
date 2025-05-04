@@ -393,22 +393,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 try:
                     parent_group = packset.obj_by_id(cls, inherit, optional=True)
                 except KeyError:
-                    # TODO: Make this an AppError warning for package authors.
-                    LOGGER.warning(
-                        'Corridor Group "{}" is trying to inherit from nonexistent group "{}"!',
-                        corridor_group.id, inherit,
-                    )
+                    ctx.warn_auth(corridor_group.pak_id, TransToken.untranslated(
+                        'Corridor Group "{id}" is trying to inherit from nonexistent group "{inherit}"!'
+                    ).format(id=corridor_group.id, inherit=inherit))
                     continue
                 if parent_group.inherit:
                     # Disable recursive inheritance for simplicity, can add later if it's actually
                     # useful.
-                    # TODO: Make this also an AppError warning.
-                    LOGGER.warning(
-                        'Corridor Groups "{}" cannot inherit from a group that '
-                        'itself inherits ("{}"). If you need this, ask for '
-                        'it to be supported.',
-                        corridor_group.id, inherit,
-                    )
+                    ctx.warn_auth(corridor_group.pak_id, TransToken.untranslated(
+                        'Corridor Group "{id}" cannot inherit from a group that '
+                        'itself inherits ("{inherit}"). If you need this, ask for '
+                        'it to be supported.'
+                    ).format(id=corridor_group.id, inherit=inherit))
                     continue
                 for kind, corridors in parent_group.corridors.items():
                     try:

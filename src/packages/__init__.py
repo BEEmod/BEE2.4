@@ -1552,8 +1552,12 @@ class Style(SelPakObject, needs_foreground=True):
             while b_style is not None:
                 # Recursively find all the base styles for this one.
                 if b_style in base:
-                    # Already hit this!
-                    raise Exception(f'Loop in bases for "{b_style.id}"!')
+                    # Already hit this, fatal error. Append the style to the end to more clearly
+                    # show the loop. We also reverse the order, so parents are on the left.
+                    raise AppError(TransToken.untranslated(
+                        'An infinite loop in style bases was found: {last} -> {ids}\n'
+                        'Change one style to break the loop!'
+                    ).format(ids=' -> '.join(style.id for style in reversed(base)), last=b_style.id))
                 # Just append the style.base_style to the list,
                 # until the style with that ID isn't found any more.
                 base.append(b_style)
@@ -1561,7 +1565,9 @@ class Style(SelPakObject, needs_foreground=True):
                     try:
                         b_style = packset.obj_by_id(cls, b_style.base_style)
                     except KeyError:
-                        LOGGER.warning('Unknown style "{}"!', b_style.base_style)
+                        ctx.warn_auth_fatal(b_style.pak_id, TransToken.untranslated(
+                            f'Style "{b_style.id}" has unknown base "{b_style.base_style}"!'
+                        ))
                         break
                 else:
                     # No more.
