@@ -161,7 +161,7 @@ class QueryValidator(tk.Toplevel):
             self.tk.call("::tk::unsupported::MacWindowStyle", "style", self, "moveableModal", "")
             self.bind("<Command-.>", self.cancel)
         elif self._windowingsystem == "x11":
-            self.wm_attributes("type", "dialog")
+            self.wm_attributes("-type", "dialog")
 
         self.bind('<Key-Escape>', self.cancel)
         self.protocol("WM_DELETE_WINDOW", self.cancel)
