@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 # The location of the relevant filesystem.
 MUSIC_MEL_DIR: Final = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
-MUSIC_TAG_DIR: Final = 'aperture tag/aperturetag/sound/music'
+MUSIC_TAG_DIR: Final = 'Aperture Tag/aperturetag/sound/music'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
