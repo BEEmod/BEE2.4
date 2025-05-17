@@ -250,12 +250,12 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         pos = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])
         if node_type is NodeType.CORNER:
-            timer_delay = item.inst.fixup.int('$timer_delay')
             # We treat inf, 1, 2 and 3 as the same, to get around the 1 and 2 not
             # being selectable issue.
-            timer_ind = max(0, item.inst.fixup.int('$timer_delay') - 3)
+            timer_delay = item.inst.fixup.int('$timer_delay')
+            timer_ind = max(0, timer_delay - 3)
             try:
-                pos = CORNER_POS[timer_delay] @ orient + pos
+                pos = CORNER_POS[timer_ind] @ orient + pos
             except IndexError:
                 raise user_errors.UserError(
                     user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
