@@ -1401,7 +1401,7 @@ def place_lighting_origin(
         (segment.offset + segment.thickness / 2)
         for segment in barrier.type.surfaces
         # Guard against /0 error, just use 0.
-    ) / min(1, len(barrier.type.surfaces))
+    ) / max(1, len(barrier.type.surfaces))
     ent = vmf.create_ent(
         'info_lighting',
         origin=plane.plane_to_world(
