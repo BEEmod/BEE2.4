@@ -3,7 +3,6 @@ from typing import Final
 
 from collections.abc import Iterable
 
-
 __version__: Final[str]
 
 class BaseNoise:

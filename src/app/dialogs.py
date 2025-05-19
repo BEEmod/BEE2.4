@@ -190,10 +190,20 @@ async def test_generic_msg(dialog: Dialogs) -> None:
 
     cancel: Literal[0, 1, 2]
     for cancel in (0, 1, 2):
-        assert await dialog.ask_custom(tt("Press Left for info"), left, mid, right, icon=Icon.INFO, cancel=cancel) == 0
-        assert await dialog.ask_custom(tt("Press Center for question"), left, mid, right, icon=Icon.QUESTION, cancel=cancel) == 1
-        assert await dialog.ask_custom(tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING, cancel=cancel) == 2
-        assert await dialog.ask_custom(tt("Press X for error"), left, mid, right, icon=Icon.ERROR, cancel=cancel) == cancel
+        assert await dialog.ask_custom(
+            tt("Press Left for info"),
+            left, mid, right, icon=Icon.INFO, cancel=cancel,
+        ) == 0
+        assert await dialog.ask_custom(
+            tt("Press Center for question"),
+            left, mid, right, icon=Icon.QUESTION, cancel=cancel,
+        ) == 1
+        assert await dialog.ask_custom(
+            tt("Press Right for warning"), left, mid, right, icon=Icon.WARNING, cancel=cancel,
+        ) == 2
+        assert await dialog.ask_custom(
+            tt("Press X for error"), left, mid, right, icon=Icon.ERROR, cancel=cancel,
+        ) == cancel
 
 
 async def test_generic_prompt(dialog: Dialogs) -> None:

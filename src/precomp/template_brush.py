@@ -525,7 +525,7 @@ async def load_templates(path: str) -> None:
         """Read templates from disk."""
         with open(path, 'rb') as f:
             dmx, fmt_name, fmt_ver = Element.parse(f, unicode=True)
-        if fmt_name != 'bee_templates' or fmt_ver not in [1]:
+        if fmt_name != 'bee_templates' or fmt_ver != 1:
             raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
         return dmx
 
@@ -1096,11 +1096,7 @@ def retexture_template(
     if template_data.detail is not None:
         all_brushes.extend(template_data.detail.solids)
 
-    # Template faces are randomised per block and side. This means
-    # multiple templates in the same block get the same texture, so they
-    # can clip into each other without looking bad.
-    rand_prefix = f'TEMPLATE_{(origin // 128).x}_{(origin // 128).y}_{(origin // 128).z}:'
-    # All lookups will fail if no instance was provided.
+    # If no instance is provided, act like all vars are missing.
     fixup_inst = Entity(_DUMMY_VMF) if instance is None else instance
 
     # Reprocess the replace_tex passed in, converting values.

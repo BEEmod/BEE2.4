@@ -88,7 +88,7 @@ class Link:
 
 class EmptyLink(Link):
     """Special case link, which is never placed. This ensures straight ends aren't placed on stairs."""
-    S = E = W = N = property(fget=lambda self: False, fset=lambda self, val: None)  # type: ignore
+    S = E = W = N = property(fget=lambda self: False, fset=lambda self, val: None)
 
 
 EMPTY = EmptyLink()

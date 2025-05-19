@@ -1,7 +1,6 @@
 """Implements the cutomisable vactube items.
 """
 from collections.abc import Callable, Iterator, Iterable, Sequence
-from typing import Self, final
 
 import attrs
 from srctools import Angle, FrozenVec, Vec, Keyvalues, Entity, VMF, Solid, Matrix
@@ -47,7 +46,6 @@ class Config:
         self.inst_straight_fitter = utils.get_piece_fitter(self.inst_straight.keys())
 
 
-@final
 @attrs.define
 class Marker:
     """A single node point."""
@@ -65,7 +63,7 @@ class Marker:
         rot = Matrix.from_angstr(self.ent['angles'])
         return Matrix.from_yaw(180) @ rot
 
-    def follow_path(self, vac_list: dict[str, Self]) -> Iterator[tuple[Self, Self]]:
+    def follow_path(self, vac_list: dict[str, 'Marker']) -> Iterator[tuple['Marker', 'Marker']]:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:

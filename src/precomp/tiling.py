@@ -7,9 +7,9 @@ Note: We also store a list of tiledefs in overlay entities in the map, if
 they were attached to the original brushes.
 """
 from __future__ import annotations
-from typing import Iterable, Literal, cast
+from typing import Literal, cast
 
-from collections.abc import Callable, Iterator, MutableMapping
+from collections.abc import Callable, Iterable, Iterator, MutableMapping
 from collections import defaultdict, Counter
 from enum import Enum, Flag
 from weakref import WeakKeyDictionary
@@ -2473,7 +2473,7 @@ def generate_goo(vmf: VMF) -> None:
     goo_scale = options.GOO_SCALE()
 
     # Find key with the highest value - that gives the largest z-level.
-    [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
+    [best_goo, _] = max(goo_heights.items(), key=operator.itemgetter(1))
 
     for ((min_z, max_z), grid) in goo_pos.items():
         for min_x, min_y, max_x, max_y, _ in grid_optim.optimise(grid):

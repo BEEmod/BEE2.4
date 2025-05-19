@@ -1117,8 +1117,10 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     points: set[FrozenVec] = set()
 
     if 'point' in props:
-        for prop in props.find_all('point'):
-            points.add(conditions.resolve_offset(inst, prop.value, zoff=-64).freeze())
+        points |= {
+            conditions.resolve_offset(inst, prop.value, zoff=-64).freeze()
+            for prop in props.find_all('point')
+        }
     elif 'pos1' in props and 'pos2' in props:
         pos1, pos2 = Vec.bbox(
             conditions.resolve_offset(inst, props['pos1', '-48 -48 0'], zoff=-64),

@@ -52,7 +52,7 @@ def test_map_int() -> None:
 def test_map_float() -> None:
     """Test mapping to a float."""
     ent = VMF().create_ent('func_instance')
-    ent.fixup['$value'] = '3.14'
+    ent.fixup['$value'] = '6.14'
 
     const_val = LazyValue.parse('3.24').as_float(18.92)
     assert isinstance(const_val, ConstValue)
@@ -61,7 +61,7 @@ def test_map_float() -> None:
 
     inst_val = LazyValue.parse('$value').as_float(82.9)
     assert isinstance(inst_val, UnaryMapValue)
-    assert inst_val(ent) == 3.14
+    assert inst_val(ent) == 6.14
 
     inst_val = LazyValue.parse('$missing', '').as_float(98.72)
     assert isinstance(inst_val, UnaryMapValue)

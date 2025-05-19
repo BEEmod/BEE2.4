@@ -1,7 +1,8 @@
 """Implements the BEE2 VBSP compiler replacement."""
-from typing import Any, TypedDict
+from typing import Any, NamedTuple, TypedDict
 from collections.abc import Iterable
-from collections import defaultdict, namedtuple, Counter
+from collections import defaultdict, Counter
+from operator import itemgetter
 from io import StringIO
 import os
 import sys
@@ -954,7 +955,7 @@ def change_brush(vmf: VMF) -> None:
             goo_heights[brushLoc.g2w(pos).z + 32] += 1
     # Find key with the highest value = z-level with highest brush.
     try:
-        best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+        best_goo = max(goo_heights.items(), key=itemgetter(1))[0]
     except ValueError:
         # No goo in the map, it's fine.
         best_goo = 0
@@ -996,12 +997,14 @@ def change_brush(vmf: VMF) -> None:
         LOGGER.info('Done!')
 
 
-Clump = namedtuple('Clump', [
-    'min_pos',
-    'max_pos',
-    'tex',
-])
-PRESET_CLUMPS: list[Clump] = []  # Additional clumps set by conditions, for certain areas.
+class Clump(NamedTuple):
+    """Additional clumps set by conditions. TODO: Not functional."""
+    min_pos: Vec
+    max_pos: Vec
+    tex: dict[str, str]
+
+
+PRESET_CLUMPS: list[Clump] = []
 
 
 @conditions.make_result('SetAreaTex')

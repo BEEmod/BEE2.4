@@ -1,9 +1,6 @@
 from typing import Any, Literal, NoReturn, Protocol, Self, overload
 
-from collections.abc import (
-    Callable, Iterable, Iterator, MutableMapping, MutableSet,
-)
-
+from collections.abc import Callable, Iterable, Iterator, MutableMapping, MutableSet
 
 __version__: str
 _EMPTY: _NoChildren

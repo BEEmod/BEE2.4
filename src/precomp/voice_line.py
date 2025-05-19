@@ -387,7 +387,7 @@ def add_voice(
     if voice.global_bullseye:
         add_bullseye(vmf, quote_loc, voice.global_bullseye)
 
-    allow_mid_voices = not style_vars.get('nomidvoices', False)
+    allow_mid_voices = not style_vars.get('nomidvoices')
 
     # Enable using the beep before and after choreo lines.
     if voice.use_dings or voice.response_use_dings:

@@ -264,17 +264,15 @@ class ItemVariant:
             else:
                 inst_desc.append(f'\n**Instances ({editor.id}):**\n')
             for ind, inst in enumerate(editor.instances):
-                inst_desc.append(f'* {ind}: ')
-                inst_desc.append(
-                    f'"`{inst.inst}`"\n'
-                    if inst.inst != FSPath() else '""\n'
-                )
+                inst_desc += [
+                    f'* {ind}: ',
+                    f'"`{inst.inst}`"\n' if inst.inst != FSPath() else '""\n',
+                ]
             for name, inst_path in editor.cust_instances.items():
-                inst_desc.append(f'* "{name}": ')
-                inst_desc.append(
-                    f'"`{inst_path}`"\n'
-                    if inst_path != FSPath() else '""\n'
-                )
+                inst_desc += [
+                    f'* "{name}": ',
+                    f'"`{inst_path}`"\n' if inst_path != FSPath() else '""\n',
+                ]
         LOGGER.info('Desc: {}', repr(''.join(inst_desc)))
         self._inst_desc = desc = MarkdownData(TransToken.untranslated(''.join(inst_desc)), None)
         return desc

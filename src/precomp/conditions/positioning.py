@@ -555,8 +555,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Keyvalues) -> None:
 
     # Only if actually downward.
     if normal.z < -0.9 and collide_goo:
-        mask.append(brushLoc.Block.GOO_TOP)
-        mask.append(brushLoc.Block.GOO_SINGLE)
+        mask += [brushLoc.Block.GOO_TOP, brushLoc.Block.GOO_SINGLE]
 
     opposing_pos = brushLoc.POS.raycast_world(
         origin,

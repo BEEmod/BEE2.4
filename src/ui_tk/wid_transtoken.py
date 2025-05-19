@@ -11,8 +11,6 @@ import trio.lowlevel
 from app.localisation import gradual_iter
 from transtoken import CURRENT_LANG, TransToken
 
-from . import TK_ROOT
-
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports
@@ -31,6 +29,7 @@ _applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDiction
 # menu -> index -> token.
 _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
+
 
 def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified label/button/etc."""
@@ -71,7 +70,6 @@ def clear_stored_menu(menu: tk.Menu) -> None:
 
 async def update_task() -> None:
     """Apply new languages to all stored widgets."""
-    TK = TK_ROOT.tk
     # Using gradual_iter() yields to the event loop in-between each conversion.
     while True:
         await CURRENT_LANG.wait_transition()

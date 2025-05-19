@@ -611,7 +611,7 @@ class ConfigSpec:
         * The new config is returned, alongside a bool indicating if it was upgraded
         and so should be resaved, and a list of any unknown/new sections.
         """
-        if fmt_name != DMX_NAME or fmt_version not in [1]:
+        if fmt_name != DMX_NAME or fmt_version != 1:
             raise ValueError(f'Unknown config {fmt_name} v{fmt_version}!')
 
         conf = Config()

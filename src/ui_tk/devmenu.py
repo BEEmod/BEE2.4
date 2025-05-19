@@ -5,6 +5,7 @@ from typing import NoReturn
 from tkinter import ttk
 import tkinter as tk
 from collections.abc import Callable
+from pathlib import Path
 import pprint
 
 from srctools import logger
@@ -52,8 +53,7 @@ def dump_tasktree() -> str:
         # Don't add this as a dependency.
         return '<No stackscope module>'
     stack = stackscope.extract(trio.lowlevel.current_root_task(), recurse_child_tasks=True)
-    with open('../reports/tasks.txt', 'w', encoding='utf8') as f:
-        f.write(str(stack))
+    Path('../reports/tasks.txt').write_text(str(stack), encoding='utf8')
     return str(stack)
 
 

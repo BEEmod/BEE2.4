@@ -1,4 +1,6 @@
 """Test ConfigGroup stored state."""
+import itertools
+
 import pytest
 from srctools import Keyvalues
 from srctools.dmx import Attribute, Element, ValueType
@@ -39,10 +41,10 @@ TIMER_DICT = {
     TimerNum("29"): "1740",
     TimerNum("30"): "1791",
 }
-TIMER_BLOCK = Keyvalues('timervalue', [
-    Keyvalues(num, value)
-    for num, value in TIMER_DICT.items()
-])
+TIMER_BLOCK = Keyvalues(
+    'timervalue',
+    list(itertools.starmap(Keyvalues, TIMER_DICT.items()))
+)
 
 
 def test_parse_legacy() -> None:

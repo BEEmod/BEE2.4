@@ -188,7 +188,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> PlaneGrid[ValT]:
+    def __deepcopy__(self, memodict: dict[int, Any]) -> PlaneGrid[ValT]:
         """Deep-copy the plane."""
         cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__)  # Immutables

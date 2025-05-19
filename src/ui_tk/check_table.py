@@ -6,6 +6,8 @@ be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
 from __future__ import annotations
+
+import itertools
 from typing import overload
 
 from tkinter import font, ttk
@@ -253,10 +255,7 @@ class CheckDetails[UserT](ttk.Frame):
             showhandle=False,
         )
         self.wid_header.grid(row=0, column=1, sticky='EW')
-        self.headers: list[Header] = [
-            self._make_header(ind, text)
-            for ind, text in enumerate(headers)
-        ]
+        self.headers: list[Header] = list(itertools.starmap(self._make_header, enumerate(headers)))
 
         self.wid_canvas = tk.Canvas(self)
         self.wid_canvas.grid(row=1, column=0, columnspan=2, sticky='NSEW')

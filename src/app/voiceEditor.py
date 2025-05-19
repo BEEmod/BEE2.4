@@ -167,7 +167,7 @@ def quote_sort_func(quote: Keyvalues) -> Decimal:
     try:
         return Decimal(quote['priority', '0'])
     except ArithmeticError:
-        return Decimal('0')
+        return Decimal()
 
 
 def show_trans(transcript: list[tuple[str, TransToken]], e: tk.Event) -> None:

@@ -1018,8 +1018,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
             #  Skip these special mats.
             if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap'):
                 # We don't care about the configured scale/rotation, just the mat.
-                for mat_conf in mats:
-                    materials.add(mat_conf.mat)
+                materials |= {mat_conf.mat for mat_conf in mats}
 
     async def generate_mat(mat_name: str) -> None:
         """Generate an antigel material."""

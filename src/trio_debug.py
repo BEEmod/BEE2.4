@@ -1,7 +1,7 @@
 """Instrumentation which outputs statistics about Trio tasks."""
-from typing import Any
-from typing_extensions import override
+from typing import Any, override
 
+from operator import itemgetter
 import pprint
 import time
 import types
@@ -127,9 +127,9 @@ class Tracer(trio.abc.Instrument):
 
         LOGGER.info('Slow tasks\n{}', '\n'.join([
             msg for _, msg in
-            sorted(self.slow, key=lambda t: t[0], reverse=True)
+            sorted(self.slow, key=itemgetter(0), reverse=True)
         ]))
         LOGGER.info('Blocking tasks\n{}', '\n'.join([
             msg for _, msg in
-            sorted(self.blocking, key=lambda t: t[0], reverse=True)
+            sorted(self.blocking, key=itemgetter(0), reverse=True)
         ]))
