@@ -245,6 +245,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
+        ids: set[str] = set()  # Prevent duplicates inside this definition.
         widgets: list[SingleWidget] = []
         multi_widgets: list[MultiWidget] = []
 
@@ -264,6 +265,12 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
+
+            if wid_id in ids:
+                # Duplicates inside the definition are nonsensical.
+                raise ValueError(f'{data.id} in {data.pak_id} has duplicate widget "{wid_id}"!')
+            ids.add(wid_id)
+
             try:
                 name = TransToken.parse(data.pak_id, wid['Label'])
             except LookupError:
@@ -388,6 +395,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     @override
     def add_over(self, override: ConfigGroup) -> None:
         """Override a ConfigGroup to add additional widgets."""
+        wid_single = {wid.id: wid for wid in self.widgets}
+        wid_multi = {wid.id: wid for wid in self.multi_widgets}
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()
         if conficts:
@@ -395,10 +404,38 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         if self.name is TransToken.BLANK:
             self.name = override.name
-
-        self.widgets.extend(override.widgets)
-        self.multi_widgets.extend(override.multi_widgets)
         self.desc += override.desc
+
+        for single_wid in override.widgets:
+            try:
+                single_existing = wid_single[single_wid.id]
+            except KeyError:
+                self.widgets.append(single_wid)
+                continue
+            if (
+                single_wid.kind is not single_existing.kind
+                or single_wid.config != single_existing.config
+                or single_wid.stylevar_id != single_existing.stylevar_id
+            ):
+                raise ValueError(
+                    f'Duplicate widget {self.id}:{single_wid.id}:'
+                    f'\n{single_wid}\n{single_existing}'
+                )
+
+        for multi_wid in override.multi_widgets:
+            try:
+                multi_existing = wid_multi[multi_wid.id]
+            except KeyError:
+                self.multi_widgets.append(multi_wid)
+                continue
+            if (
+                multi_existing.kind is not multi_existing.kind
+                or multi_existing.config != multi_existing.config
+            ):
+                raise ValueError(
+                    f'Duplicate widget {self.id}:{multi_existing.id}:'
+                    f'\n{multi_wid}\n{multi_existing}'
+                )
 
     @classmethod
     @override
