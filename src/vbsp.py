@@ -1072,14 +1072,17 @@ def position_exit_signs(vmf: VMF) -> None:
     except ValueError:
         exit_arrow = None
 
-    if options.REMOVE_EXIT_SIGNS():
+    # If turned off, user requested removal of signs entirely.
+    enable_signs = options.get_itemconf(('VALVE_MANDATORY', 'ExitSignage'), True)
+
+    if not enable_signs or options.REMOVE_EXIT_SIGNS():
         if exit_sign is not None:
             exit_sign.remove()
         if exit_arrow is not None:
             exit_arrow.remove()
 
     inst_filename = options.SIGN_EXIT_INST()
-    if inst_filename is None or exit_sign is None or exit_arrow is None:
+    if not enable_signs or inst_filename is None or exit_sign is None or exit_arrow is None:
         return
 
     sign_pos = Vec.from_str(exit_sign['origin'])
