@@ -142,6 +142,9 @@ class SingleWidget(Widget):
         self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
     ) -> None:
         """Apply the configuration to the UI."""
+        if not self.has_values:
+            return  # No need to load.
+
         data: WidgetConfig
         with cm as channel:
             async for data in channel:
@@ -155,6 +158,9 @@ class SingleWidget(Widget):
 
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
+        if not self.has_values:
+            return  # No need to save anything.
+
         data_id = self.conf_id()
         async with aclosing(self.holder.eventual_values()) as agen:
             async for value in agen:

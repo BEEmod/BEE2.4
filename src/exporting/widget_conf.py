@@ -17,10 +17,16 @@ async def set_apply_widget_defaults(exp_data: ExportData) -> None:
         await trio.lowlevel.checkpoint()
         for widget in group.widgets + group.multi_widgets:
             conf_id = widget.conf_id()
-            try:
-                exp_data.config.get(WidgetConfig, conf_id)
-                continue
-            except KeyError:
-                # Apply defaults.
-                LOGGER.debug('Applying default for {}', conf_id)
-                exp_data.config = exp_data.config.with_value(widget.create_conf(), conf_id)
+            if widget.has_values:
+                try:
+                    exp_data.config.get(WidgetConfig, conf_id)
+                    continue
+                except KeyError:
+                    # Apply defaults.
+                    LOGGER.debug('Applying default for {}', conf_id)
+                    exp_data.config = exp_data.config.with_value(widget.create_conf(), conf_id)
+            else:
+                # Strip item variants if present.
+                exp_data.config, value = exp_data.config.discard(WidgetConfig, conf_id)
+                if value is not None:
+                    LOGGER.debug('Discarding config for {}', conf_id)

@@ -510,7 +510,7 @@ class ConfigSpec:
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         new_conf, popped = self._current.discard(cls, data_id)
-        if self._current.discard(cls, data_id) is not None:
+        if popped is not None:
             LOGGER.debug('Discarding conf {}[{}]', info.name, data_id)
             self._current = new_conf
 
