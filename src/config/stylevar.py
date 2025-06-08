@@ -43,12 +43,8 @@ class State(config.Data, conf_name='StyleVar', uses_id=True):
         """Parse DMX config files."""
         if version != 1:
             raise config.UnknownVersion(version, '1')
-        try:
-            value = data['value'].val_bool
-        except KeyError:
-            return cls(False)
-        else:
-            return cls(value)
+        value = data.get_wrap('value', False).val_bool
+        return cls(value)
 
     @override
     def export_dmx(self) -> Element:

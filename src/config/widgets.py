@@ -1,3 +1,4 @@
+import itertools
 from typing import Self, NewType, final, override
 
 from collections.abc import Mapping
@@ -72,10 +73,10 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         if isinstance(self.values, str):
             return Keyvalues('', self.values)
         else:
-            return Keyvalues('ItemVar', [
-                Keyvalues(tim, value)
-                for tim, value in self.values.items()
-            ])
+            return Keyvalues(
+                'ItemVar',
+                list(itertools.starmap(Keyvalues, self.values.items())),
+            )
 
     @classmethod
     @override

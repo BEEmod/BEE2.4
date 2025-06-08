@@ -156,7 +156,7 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues, /) -> dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues, /) -> Mapping[str, Self]:
         """Parse from the old legacy config.
 
         This is parsed the entire config, the user is in charge of parsing each ID individually.

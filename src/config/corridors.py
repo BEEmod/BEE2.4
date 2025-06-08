@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Self, override
 from collections.abc import Mapping
+import itertools
 
 from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
 from srctools.dmx import Element, ValueType as DMXValue
@@ -139,10 +140,10 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
 
     @override
     def export_kv1(self) -> Keyvalues:
-        return Keyvalues('', [
-            Keyvalues(opt_id, value)
-            for opt_id, value in self.options.items()
-        ])
+        return Keyvalues(
+            '',
+            list(itertools.starmap(Keyvalues, self.options.items())),
+        )
 
     @classmethod
     @override
@@ -257,26 +258,19 @@ class UIState(config.Data, conf_name='CorridorUIState'):
             last_direction = Direction.ENTRY
 
         try:
-            last_orient = Orient(data['orient'].val_string)
-        except (LookupError, ValueError):
-            last_orient = Orient.HORIZONTAL
-        try:
             last_attach = Attachment(data['attach'].val_string)
         except (LookupError, ValueError):
-            last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
-
-        try:
-            width = data['width'].val_int
-        except KeyError:
-            width = -1
-        try:
-            height = data['height'].val_int
-        except KeyError:
-            height = -1
+            try:
+                last_orient = Orient(data['orient'].val_string)
+            except (LookupError, ValueError):
+                last_attach = Attachment.HORIZONTAL
+            else:
+                last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         return UIState(
             last_mode, last_direction, last_attach,
-            width, height,
+            data.get_wrap('width', -1).val_int,
+            data.get_wrap('height', -1).val_int
         )
 
     @override

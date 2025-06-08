@@ -2,7 +2,7 @@
 General app configuration options, controlled by the options window.
 """
 from __future__ import annotations
-from typing import Any, TypeGuard, override
+from typing import Any, Final, TypeGuard, override
 from enum import Enum
 
 from srctools import Keyvalues
@@ -62,12 +62,12 @@ class GenOptions(config.Data, conf_name='Options', version=2):
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF.get(
             'Debug', 'window_log_level',
-            fallback=not_none(attrs.fields(GenOptions).log_win_level.default),
+            fallback=_DEFAULT_LOG,
         )
         try:
             after_export = AfterExport(LEGACY_CONF.get_int('General', 'after_export_action', -1))
         except ValueError:
-            after_export = AfterExport.NORMAL
+            after_export = _DEFAULT_AFTER_EXPORT
 
         res: dict[str, bool] = {}
         for field in gen_opts_bool:
@@ -98,16 +98,16 @@ class GenOptions(config.Data, conf_name='Options', version=2):
         """Parse KV1 values."""
         if version not in (1, 2):
             raise config.UnknownVersion(version, '1 or 2')
-        preserve_fgd = data.bool('preserve_fgd' if version > 1 else 'preserve_resources')
+        preserve_fgd = data.bool('preserve_fgd' if version > 1 else 'preserve_resources', _DEFAULT_RESOURCES)
         try:
             after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
-            after_export = not_none(attrs.fields(GenOptions).after_export.default)
+            after_export = _DEFAULT_AFTER_EXPORT
 
         return GenOptions(
             after_export=after_export,
-            log_win_level=data['log_win_level', 'INFO'],
-            language=data['language', ''],
+            log_win_level=data['log_win_level', _DEFAULT_LOG],
+            language=data['language', _DEFAULT_LANG],
             preserve_fgd=preserve_fgd,
             **{
                 field.name: data.bool(field.name, not_none(field.default))
@@ -135,22 +135,16 @@ class GenOptions(config.Data, conf_name='Options', version=2):
         if version not in (1, 2):
             raise config.UnknownVersion(version, '1 or 2')
 
-        res: dict[str, Any] = {}
-        try:
-            res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
-        except KeyError:
-            pass
+        res: dict[str, Any] = {
+            'preserve_fgd': data.get_wrap(
+                'preserve_fgd' if version > 1 else 'preserve_resources', _DEFAULT_RESOURCES
+            ).val_bool,
+            'log_win_level': data.get_wrap('log_win_level', _DEFAULT_LOG).val_str,
+            'language': data.get_wrap('language', _DEFAULT_LANG).val_str,
+        }
         try:
             res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
-            pass
-        try:
-            res['log_win_level'] = data['log_win_level'].val_str
-        except (KeyError, ValueError):
-            pass
-        try:
-            res['language'] = data['language'].val_str
-        except KeyError:
             pass
 
         for field in gen_opts_bool:
@@ -186,3 +180,7 @@ gen_opts_bool: list[attrs.Attribute[bool]] = [
     if field.name != 'preserve_fgd'  # Needs special handling
 ]
 del _is_bool_attr
+_DEFAULT_LOG: Final[str] = not_none(attrs.fields(GenOptions).log_win_level.default)
+_DEFAULT_AFTER_EXPORT: Final[AfterExport] = not_none(attrs.fields(GenOptions).after_export.default)
+_DEFAULT_RESOURCES: Final[bool] = not_none(attrs.fields(GenOptions).preserve_resources.default)
+_DEFAULT_LANG: Final[str] = not_none(attrs.fields(GenOptions).language.default)
