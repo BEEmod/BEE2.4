@@ -499,7 +499,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                 self.display.winfo_rootx(),
                 self.display.winfo_rooty() + self.display.winfo_height())
 
-    def _evt_key_navigate(self, event: tk.Event[tk.Misc]) -> None:
+    def _evt_key_navigate(self, event: tk.Event) -> None:
         """Handle keyboard control for the window."""
         try:
             key = KEYSYM_TO_NAV[event.keysym]

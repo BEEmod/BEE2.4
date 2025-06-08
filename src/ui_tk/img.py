@@ -30,7 +30,7 @@ def get_app_icon(path: os.PathLike[str]) -> ImageTk.PhotoImage:
         return ImageTk.PhotoImage(Image.open(f))
 
 
-def _on_destroyed(e: tk.Event[tk.Misc]) -> None:
+def _on_destroyed(e: tk.Event) -> None:
     """When widgets are destroyed, clear their associated images."""
     if isinstance(e.widget, tk.Text):
         _on_textwid_destroyed(e.widget)

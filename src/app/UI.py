@@ -410,12 +410,12 @@ async def init_option(
         for win in suggest_windows.values():
             win.sel_suggested()
 
-    def suggested_style_mousein(_: tk.Event[tk.Misc]) -> None:
+    def suggested_style_mousein(_: tk.Event) -> None:
         """When mousing over the button, show the suggested items."""
         for win in suggest_windows.values():
             win.suggested_rollover_active.value = True
 
-    def suggested_style_mouseout(_: tk.Event[tk.Misc]) -> None:
+    def suggested_style_mouseout(_: tk.Event) -> None:
         """Return text to the normal value on mouseout."""
         for win in suggest_windows.values():
             win.suggested_rollover_active.value = False

@@ -319,11 +319,11 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
         else:
             self._drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
 
-    def _evt_move(self, evt: tk.Event[tk.Misc]) -> None:
+    def _evt_move(self, evt: tk.Event) -> None:
         """Event fired when the drag window is being moved."""
         self._on_move(evt.x_root, evt.y_root)
 
-    def _evt_stop(self, evt: tk.Event[tk.Misc]) -> None:
+    def _evt_stop(self, evt: tk.Event) -> None:
         """Event fired when dragging should stop."""
         self._on_stop(evt.x_root, evt.y_root)
 

@@ -402,7 +402,7 @@ async def make_widgets(
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    def update_label(e: tk.Event[tk.Misc]) -> None:
+    def update_label(e: tk.Event) -> None:
         """Force the top label to wrap."""
         reload_lbl['wraplength'] = window.winfo_width() - 10
 

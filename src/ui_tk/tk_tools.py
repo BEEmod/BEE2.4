@@ -247,23 +247,23 @@ def bind_mousewheel[*Args](
         widgets = [widgets]
 
     if utils.WIN:
-        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
+        def mousewheel_handler(event: tk.Event) -> None:
             """Handle mousewheel events."""
             func(int(event.delta / -120), *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.MAC:
-        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
+        def mousewheel_handler(event: tk.Event) -> None:
             """Handle mousewheel events."""
             func(-event.delta, *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.LINUX:
-        def scroll_up(_: tk.Event[tk.Misc]) -> None:
+        def scroll_up(_: tk.Event) -> None:
             """Handle scrolling up."""
             func(-1, *args)
 
-        def scroll_down(_: tk.Event[tk.Misc]) -> None:
+        def scroll_down(_: tk.Event) -> None:
             """Handle scrolling down."""
             func(1, *args)
 
@@ -291,19 +291,19 @@ def add_mousewheel(target: tk.XView | tk.YView, *frames: tk.Misc, orient: Litera
 
 
 def make_handler(
-    func: Callable[[], Awaitable[object]] | Callable[[tk.Event[tk.Misc]], Awaitable[object]],
-) -> Callable[[tk.Event[tk.Misc]], object]:
+    func: Callable[[], Awaitable[object]] | Callable[[tk.Event], Awaitable[object]],
+) -> Callable[[tk.Event], object]:
     """Given an asyncronous event handler, return a sync function which uses background_run().
 
     This checks the signature of the function to decide whether to pass along the event object.
     """
     sig = inspect.signature(func)
     if len(sig.parameters) == 0:
-        def wrapper(e: tk.Event[tk.Misc]) -> None:
+        def wrapper(e: tk.Event) -> None:
             """Discard the event."""
             background_run(func)  # type: ignore
     else:
-        def wrapper(e: tk.Event[tk.Misc]) -> None:
+        def wrapper(e: tk.Event) -> None:
             """Pass along the event."""
             background_run(func, e)  # type: ignore
     functools.update_wrapper(wrapper, func)

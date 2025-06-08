@@ -380,7 +380,7 @@ class CheckDetails[UserT](ttk.Frame):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, _: tk.Event[tk.Misc] | None = None) -> None:
+    def refresh(self, _: tk.Event | None = None) -> None:
         """Reposition the widgets.
 
         Must be called when `self.items` is changed,
