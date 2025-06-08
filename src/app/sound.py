@@ -156,11 +156,13 @@ class PygletSound(NullSound):
                 LOGGER.warning('Sound "{}" couldn\'t be loaded in time!', sound)
                 snd = await self.load(sound)
             marker = object()
+            if snd is None:
+                await trio.lowlevel.checkpoint()
+                return
             try:
                 add_playing(marker)
                 try:
-                    if snd is not None:
-                        snd.play()
+                    snd.play()
                 except Exception:
                     LOGGER.exception("Couldn't play sound {}:", sound)
                     LOGGER.info('UI sounds disabled.')
@@ -168,8 +170,7 @@ class PygletSound(NullSound):
                         _nursery.cancel_scope.cancel()
                     sounds = NullSound()
                     await trio.sleep(0.1)
-                duration: float | None = snd.duration
-                if duration is not None:
+                if (duration := snd.duration) is not None:
                     await trio.sleep(duration)
                 else:
                     LOGGER.warning('No duration: {}', sound)

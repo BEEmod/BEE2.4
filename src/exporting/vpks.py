@@ -160,6 +160,7 @@ async def fill_vpk(exp_data: ExportData, vpk_file: VPK, style_vpk: StyleVPK | No
     """Generate the new VPK."""
     def add_files(vpk: VPK, style_vpk: StyleVPK) -> None:
         """Add selected files to the VPK."""
+        # Don't check cancellation, we'd want to output a full file each time.
         for file in style_vpk.fsys.walk_folder(style_vpk.dir):
             with file.open_bin() as open_file:
                 vpk.add_file(

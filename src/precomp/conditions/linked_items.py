@@ -120,7 +120,7 @@ def res_linked_item(res: Keyvalues) -> conditions.ResultCallable:
     except ValueError:
         raise ValueError(
             f'Unknown antline behaviour "{antline_str}" '
-            f'(accepted: {", ".join(AntlineHandling)})'
+            f'(accepted: {", ".join(ant.value for ant in AntlineHandling)})'
         ) from None
 
     conf = Config(
