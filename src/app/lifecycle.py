@@ -143,7 +143,7 @@ async def filecheck_task(rec_channel: trio.MemoryReceiveChannel[tuple[PackagePat
     def worker(file: File) -> None:
         """Parse immediately, to check the syntax."""
         with file.open_str() as f:
-            Keyvalues.parse(f)
+            Keyvalues.parse(f, periodic_callback=trio.from_thread.check_cancelled)
 
     async for path, file in rec_channel:
         try:

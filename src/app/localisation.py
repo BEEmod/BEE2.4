@@ -319,6 +319,7 @@ def parse_basemodui(result: dict[str, str], data: bytes) -> None:
     # Also operate on the raw bytes, because the line endings are sometimes ASCII-style, not UTF16!
     # We instead parse each key/value pair individually.
     for line in data.splitlines():
+        trio.from_thread.check_cancelled()
         key_byte: bytes
         try:
             __, key_byte, __, value, __ = line.split(b'"\x00')
@@ -423,6 +424,7 @@ async def rebuild_app_langs() -> None:
         """Synchronous I/O code run as a background thread."""
         with filename.open('rb') as src:
             catalog = read_po(src, locale=filename.stem)
+        trio.from_thread.check_cancelled()
         with filename.with_suffix('.mo').open('wb') as dest:
             write_mo(dest, catalog)
 

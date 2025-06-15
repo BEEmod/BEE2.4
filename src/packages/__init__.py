@@ -2,37 +2,42 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
+from typing import Any, ClassVar, NewType, NoReturn, Self, cast, overload
 
-from enum import Enum
-from typing import Any, NewType, NoReturn, ClassVar, Self, cast, overload
-
-from collections.abc import Awaitable, Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
+from collections.abc import (
+    Awaitable, Callable, Collection, Iterable, Iterator, Mapping,
+)
+from enum import Enum
 from pathlib import Path
 import os
 import zipfile
 
-from aioresult import ResultCapture
-from config import Config
-from trio_util import AsyncValue
-from srctools import Keyvalues, NoKeyError, Vec
-from srctools.tokenizer import TokenSyntaxError
-from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem, File
-import attrs
 import trio
+
+from aioresult import ResultCapture
+from srctools import Keyvalues, NoKeyError, Vec
+from srctools.filesys import (
+    File, FileSystem, RawFileSystem, VPKFileSystem, ZipFileSystem,
+)
+from srctools.tokenizer import TokenSyntaxError
+from trio_util import AsyncValue
+import attrs
 import srctools
 import srctools.logger
 
+from app import DEV_MODE, img, lazy_conf
 from app.errors import ErrorUI
 from app.mdown import MarkdownData
-from transtoken import AppError, TransToken, TransTokenSource
-from editoritems import Item as EditorItem, Renderable, RenderableType
-from corridor import CORRIDOR_COUNTS, GameMode, Direction
-from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 from BEE2_config import ConfigFile
-from app import DEV_MODE, img, lazy_conf
-import utils
+from config import Config
+from corridor import CORRIDOR_COUNTS, Direction, GameMode
+from editoritems import Item as EditorItem, Renderable, RenderableType
+from loadScreen import MAIN_OBJ as LOAD_OBJ, MAIN_PAK as LOAD_PAK
+from transtoken import AppError, TransToken, TransTokenSource
+import async_util
 import consts
+import utils
 
 
 __all__ = [
@@ -938,7 +943,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
 
             # Valid packages must have an info.txt file!
             try:
-                info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', abandon_on_cancel=True)
+                info = await async_util.parse_kv1_fsys(filesys, 'info.txt')
             except FileNotFoundError:
                 if name.is_dir():
                     # This isn't a package, so check the subfolders too...
@@ -1561,7 +1566,7 @@ class Style(SelPakObject, needs_foreground=True):
                 if not sugg_set:
                     sugg_set.add(sugg_cls.suggest_default)
 
-            base = []
+            base: list[Style] = []
             b_style = style
             while b_style is not None:
                 # Recursively find all the base styles for this one.

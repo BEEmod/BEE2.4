@@ -76,12 +76,12 @@ async def from_file(
 		def worker() -> Keyvalues:
 			"""Run this in a background thread."""
 			with file.open_str() as f:
-				kv = Keyvalues.parse(f)
+				kv = Keyvalues.parse(f, periodic_callback=trio.from_thread.check_cancelled)
 			if source:
 				packages.set_cond_source(kv, source)
 			return kv
 		try:
-			kv = await trio.to_thread.run_sync(worker)
+			kv = await trio.to_thread.run_sync(worker, abandon_on_cancel=True)
 		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 			LOGGER.exception('Unable to read "{}"', path)
 			raise

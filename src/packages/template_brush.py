@@ -16,7 +16,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 def read_vmf(file: File) -> VMF:
     """Read a file and parse as a VMF."""
     with file.open_str() as f:
-        props = Keyvalues.parse(f)
+        props = Keyvalues.parse(f, periodic_callback=trio.from_thread.check_cancelled)
     return VMF.parse(props)
 
 
@@ -60,6 +60,7 @@ def parse_template_fast(file: File, path: str) -> str:
             if not in_entity:
                 if line != 'entity':
                     continue
+                trio.from_thread.check_cancelled()
                 lnum, line = next(iterator, (None, ''))
                 if line.strip() != '{':
                     raise KeyValError('Expected brace in entity definition', path, lnum)

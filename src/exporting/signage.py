@@ -199,6 +199,7 @@ def make_legend(
     background: Image.Image | None = None
     num_step = num_x = num_y = 0
     for style in exp.selected_style.bases:
+        trio.from_thread.check_cancelled()
         try:
             legend_obj = exp.packset.obj_by_id(SignageLegend, style.id, optional=True)
         except KeyError:
@@ -231,6 +232,7 @@ def make_legend(
         overlay = None
 
     for num, x, y in iter_ant_cells() if is_antline else iter_sign_cells():
+        trio.from_thread.check_cancelled()
         try:
             handle = icons[num]
         except KeyError:
@@ -290,6 +292,7 @@ def make_legend(
     vtf.clear_mipmaps()
     vtf.flags |= VTFFlags.ANISOTROPIC
 
+    trio.from_thread.check_cancelled()
     sign_path.parent.mkdir(parents=True, exist_ok=True)
     LOGGER.info('Writing {}...', sign_path)
 

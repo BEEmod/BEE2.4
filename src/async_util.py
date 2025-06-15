@@ -3,7 +3,10 @@ from __future__ import annotations
 from typing import Protocol, overload
 from collections.abc import Awaitable, AsyncGenerator, Callable
 import contextlib
+import os
 
+from srctools import Keyvalues
+from srctools.filesys import File, FileSystem
 from srctools.logger import get_logger
 from trio_util import AsyncBool, AsyncValue
 import trio.lowlevel
@@ -119,6 +122,39 @@ def acompose[**ParamsT, ResultT](
         res = await func(*args, **kwargs)
         on_completed(res)
     return task
+
+
+def _parse_kv1_path_worker(path: str | os.PathLike[str], encoding: str) -> Keyvalues:
+    """Parse in the background."""
+    with open(path, encoding=encoding) as f:
+        return Keyvalues.parse(f, periodic_callback=trio.from_thread.check_cancelled)
+
+
+def _parse_kv1_fsys_worker[FSys: FileSystem](
+    fsys: FSys, file: str | File[FSys], encoding: str,
+) -> Keyvalues:
+    """Parse in the background."""
+    return fsys.read_kv1(file, encoding, periodic_callback=trio.from_thread.check_cancelled)
+
+
+async def parse_kv1_path(path: str | os.PathLike[str], encoding: str = 'utf8') -> Keyvalues:
+    """Parse a keyvalues file from a path."""
+
+    return await trio.to_thread.run_sync(
+        _parse_kv1_path_worker, path, encoding,
+        abandon_on_cancel=True,
+    )
+
+
+async def parse_kv1_fsys[FSys: FileSystem](
+    fsys: FSys, file: str | File[FSys], *,
+    encoding: str = 'utf8',
+) -> Keyvalues:
+    """Parse a keyvalues file from a filesystem file."""
+    return await trio.to_thread.run_sync(
+        _parse_kv1_fsys_worker, fsys, file, encoding,
+        abandon_on_cancel=True,
+    )
 
 
 async def run_as_task[*Args](

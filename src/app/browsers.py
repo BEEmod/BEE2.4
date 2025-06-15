@@ -20,6 +20,7 @@ from app.gameMan import Game, is_valid_game, selected_game
 from async_util import EdgeTrigger
 from packages import LOADED, PackagesSet
 from transtoken import TransToken
+import async_util
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -134,7 +135,11 @@ SND_PREFERENCE: list[SoundMode] = [
 def parse_soundscript(file: File) -> dict[str, Sound]:
     """Parse a soundscript file."""
     with file.open_str(encoding='cp1252') as f:
-        kv = Keyvalues.parse(f, file.path, allow_escapes=False)
+        kv = Keyvalues.parse(
+            f, file.path,
+            allow_escapes=False,
+            periodic_callback=trio.from_thread.check_cancelled,
+        )
     return Sound.parse(kv)
 
 
@@ -231,9 +236,9 @@ class SoundBrowserBase(Browser, ABC):
         LOGGER.info('Reloading soundscripts for browser...')
         self._soundscripts.clear()
         try:
-            sounds_manifest = await trio.to_thread.run_sync(
-                fsys.read_kv1,
-                'scripts/game_sounds_manifest.txt', 'cp1252',
+            sounds_manifest = await async_util.parse_kv1_fsys(
+                fsys, 'scripts/game_sounds_manifest.txt',
+                encoding='cp1252',
             )
         except FileNotFoundError:
             LOGGER.warning('No soundscript manifest?')
@@ -316,7 +321,10 @@ class SoundBrowserBase(Browser, ABC):
             image = {}
         else:
             with image_file.open_bin() as f:
-                image = await trio.to_thread.run_sync(choreo.parse_scenes_image, f, abandon_on_cancel=True)
+                image = await trio.to_thread.run_sync(
+                    choreo.parse_scenes_image,
+                    f, abandon_on_cancel=True,
+                )
 
         scenes = {}
 
@@ -339,7 +347,8 @@ class SoundBrowserBase(Browser, ABC):
                     try:
                         with file.open_str() as f:
                             scene = await trio.to_thread.run_sync(
-                                choreo.Scene.parse_text, Tokenizer(f),
+                                choreo.Scene.parse_text,
+                                Tokenizer(f, periodic_callback=trio.from_thread.check_cancelled),
                             )
                     except TokenSyntaxError as exc:
                         LOGGER.warning('Could not parse choreo scene "{}"!', file.path, exc_info=exc)

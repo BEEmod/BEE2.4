@@ -26,7 +26,7 @@ class CycleError(Exception):
 @attrs.define(eq=False, hash=False)
 class Step[CtxT, ResourceT]:
     """Each individual step."""
-    func: Func[CtxT]
+    func: Func[CtxT] = attrs.field(repr=lambda func: getattr(func, "__name__", repr(func)))
     prereqs: set[ResourceT]
     results: Collection[ResourceT]
 
