@@ -888,23 +888,23 @@ class EnumButton[EnumT: Enum](BaseEnumButton[ttk.Button, EnumT]):
         button.state(('pressed', ) if pressed else ('!pressed', ))
 
 
-class ComboBoxMap[StrKeyT: str]:
+class ComboBoxMap[KeyT]:
     """A Combobox which displays TransTokens, mapping them to internal IDs.
 
     If the current value is not present, it is temporarily added to the start.
     """
     _ordered_tokens: list[TransToken]
-    _index_to_key: list[StrKeyT]
-    _key_to_index: dict[StrKeyT, int]
-    current: AsyncValue[StrKeyT]
-    _missing_value: StrKeyT | None
+    _index_to_key: list[KeyT]
+    _key_to_index: dict[KeyT, int]
+    current: AsyncValue[KeyT]
+    _missing_value: KeyT | None
 
     def __init__(
         self,
         parent: tk.Misc,
         name: str,
-        current: AsyncValue[StrKeyT],
-        values: Iterable[tuple[StrKeyT, TransToken]],
+        current: AsyncValue[KeyT],
+        values: Iterable[tuple[KeyT, TransToken]],
     ) -> None:
         self._index_to_key = []
         self._key_to_index = {}
@@ -936,7 +936,7 @@ class ComboBoxMap[StrKeyT: str]:
                 cur_lang = lang
             self.widget.current(self._key_to_index[self.current.value])
 
-    def _build_values(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+    def _build_values(self, values: Iterable[tuple[KeyT, TransToken]]) -> None:
         """Rebuild our dicts from a new set of values.
 
         Empty values are allowed, in that case only the current value can be chosen.
@@ -960,12 +960,19 @@ class ComboBoxMap[StrKeyT: str]:
         index = self.widget.current()
         if index == -1:
             return  # No item selected?
-        self.current.value = current = self._index_to_key[index]
+        try:
+            self.current.value = current = self._index_to_key[index]
+        except IndexError:
+            LOGGER.warning(
+                'Combobox {} selecting {}/{}, not present',
+                str(self.widget), index, len(self._index_to_key),
+            )
+            return
         if self._missing_value is not None and current != self._missing_value:
             # Moved away from the missing value, strip that and rebuild
             self._build_values(zip(self._index_to_key[1:], self._ordered_tokens[1:], strict=True))
 
-    def update(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+    def update(self, values: Iterable[tuple[KeyT, TransToken]]) -> None:
         """Change the set of values displayed in the box.
 
         If the old value is not present, the first is selected.

@@ -1,7 +1,6 @@
 """Allows searching and selecting various resources."""
 from typing import Final, Literal, assert_never
 
-from abc import ABC
 from collections.abc import Mapping, Sequence
 import abc
 import enum
@@ -37,7 +36,7 @@ TRANS_SND_AUTOPLAY = TransToken.ui("Autoplay Sounds")
 TRANS_SND_PREVIEW = TransToken.ui("Preview")
 
 
-class Browser(ABC):
+class Browser(abc.ABC):
     """Base functionality - reload if game changes, only allow opening once."""
     def __init__(self) -> None:
         self._ready = AsyncBool(False)
@@ -89,10 +88,6 @@ class Browser(ABC):
         """Close the browser, cancelling."""
         self.result.trigger(None)
 
-    def _evt_ok(self, value: str) -> None:
-        """Successfully select a value."""
-        self.result.trigger(value)
-
     @abc.abstractmethod
     async def _reload(self, packset: PackagesSet, game: Game) -> None:
         """Reload data for a new game or packages."""
@@ -119,16 +114,15 @@ class AllowedSounds(enum.Flag):
     ALL = SOUNDSCRIPT | RAW_SOUND | CHOREO
 
 
-SOUND_TYPES = [
-    (AllowedSounds.SOUNDSCRIPT, TransToken.ui("Soundscript")),
-    (AllowedSounds.RAW_SOUND, TransToken.ui("Raw Sounds")),
-    (AllowedSounds.CHOREO, TransToken.ui("Choreo Scenes")),
-]
-
 # A single sound.
 type SoundMode = Literal[AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND, AllowedSounds.CHOREO]
 SND_PREFERENCE: list[SoundMode] = [
     AllowedSounds.CHOREO, AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND
+]
+SOUND_TYPES: list[tuple[SoundMode, TransToken]] = [
+    (AllowedSounds.SOUNDSCRIPT, TransToken.ui("Soundscript")),
+    (AllowedSounds.RAW_SOUND, TransToken.ui("Raw Sounds")),
+    (AllowedSounds.CHOREO, TransToken.ui("Choreo Scenes")),
 ]
 
 
@@ -143,10 +137,11 @@ def parse_soundscript(file: File) -> dict[str, Sound]:
     return Sound.parse(kv)
 
 
-type SoundSeq = Sequence[Sound | str | choreo.Entry]
+type AnySound = Sound | str | choreo.Entry
+type SoundSeq = Sequence[AnySound]
 
 
-class SoundBrowserBase(Browser, ABC):
+class SoundBrowserBase(Browser, abc.ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
     def __init__(self) -> None:
         super().__init__()
@@ -161,7 +156,7 @@ class SoundBrowserBase(Browser, ABC):
         self._raw: Final[list[str]] = []
 
     @staticmethod
-    def path_for(value: Sound | choreo.Entry | str) -> str:
+    def path_for(value: AnySound) -> str:
         """Get the filename/path for this sound."""
         match value:
             case Sound() as sndscript:
@@ -222,7 +217,10 @@ class SoundBrowserBase(Browser, ABC):
         else:
             raise ValueError('No sound types provided!')
         self.allowed = allowed
-        self._ui_set_allowed(allowed)
+        self._ui_set_allowed(
+            allowed,
+            TRANS_SND_TITLE_CHOREO if allowed is AllowedSounds.CHOREO else TRANS_SND_TITLE,
+        )
         return await super().browse(initial)
 
     async def _reload(self, packset: PackagesSet, game: Game) -> None:
@@ -369,10 +367,50 @@ class SoundBrowserBase(Browser, ABC):
         self._scenes.sort(key=lambda entry: entry.filename)
         LOGGER.info('Loaded {} choreo scenes', len(self._scenes))
 
-    def _ui_set_allowed(self, allowed: AllowedSounds) -> None:
-        """Set the allowed sound modes."""
+    def _evt_ok(self, _: object = None) -> None:
+        """Successfully select a value."""
+        self.result.trigger(self._ui_get_name())
+
+    def _evt_preview(self, _: object = None) -> None:
+        """Preview the selected value."""
+        raise NotImplementedError # TODO
+
+    def _evt_select(self, _: object = None) -> None:
+        """Item was selected in the listbox, update the display."""
+        match self._ui_get_selected():
+            # TODO: Determine original filenames.
+            case Sound() as sndscript:
+                self._ui_set_props(sndscript.name, '???')
+            case choreo.Entry() as scene:
+                self._ui_set_props(scene.filename, '???')
+            case str() as raw:
+                return self._ui_set_props(raw, raw)
+            case None:
+                self._ui_set_props('', '')
+            case err:
+                assert_never(err)
+
+    @abc.abstractmethod
+    def _ui_get_selected(self) -> AnySound | None:
+        """Get the currently selected sound, or None if none selected."""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def _ui_get_name(self) -> str:
+        """Get the sound name that was set"""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_set_allowed(self, allowed: AllowedSounds, title: TransToken) -> None:
+        """Set the allowed sound modes, and window title."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     async def _ui_set_items(self, items: SoundSeq) -> None:
         """Update the items displayed."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_set_props(self, name: str, file: str) -> None:
+        """Update the displayed values."""
         raise NotImplementedError

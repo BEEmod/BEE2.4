@@ -7,9 +7,10 @@ import wx
 
 from app.browsers import (
     SOUND_TYPES, TRANS_SND_AUTOPLAY, TRANS_SND_FILTER, TRANS_SND_HEADING,
-    TRANS_SND_NAME, TRANS_SND_TITLE, TRANS_SND_TITLE_CHOREO, TRANS_SND_TYPE,
-    AllowedSounds, SoundBrowserBase, SoundSeq, TRANS_SND_FIlE,
+    TRANS_SND_NAME, TRANS_SND_TYPE, TRANS_SND_FIlE,  AllowedSounds, SoundBrowserBase,
+    SoundSeq, AnySound,
 )
+from transtoken import TransToken
 from ui_wx import MAIN_WINDOW, wid_transtoken
 
 
@@ -68,6 +69,7 @@ class SoundBrowser(SoundBrowserBase):
         self.wid_soundlist.AppendColumn('', wx.LIST_FORMAT_LEFT)
         sizer_main.Add(self.wid_soundlist, 1, wx.BOTTOM | wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
         self.wid_soundlist.Bind(wx.EVT_SIZE, self._evt_resize_soundlist)
+        self.wid_soundlist.Bind(wx.EVT_LIST_ITEM_SELECTED, self._evt_select)
 
         sizer_info = wx.FlexGridSizer(4, 2, 0, 4)
         sizer_main.Add(sizer_info, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 32)
@@ -84,9 +86,9 @@ class SoundBrowser(SoundBrowserBase):
         wid_transtoken.set_text(lbl_snd_file, TRANS_SND_FIlE)
         sizer_info.Add(lbl_snd_file, flags_info_lbl)
 
-        self.wid_text_sound = wx.TextCtrl(panel_main)
-        self.wid_text_sound.Enable(False)
-        sizer_info.Add(self.wid_text_sound, 0, wx.EXPAND, 0)
+        self.wid_text_file = wx.TextCtrl(panel_main)
+        self.wid_text_file.Enable(False)
+        sizer_info.Add(self.wid_text_file, 0, wx.EXPAND, 0)
 
         lbl_type = wx.StaticText(panel_main)
         wid_transtoken.set_text(lbl_type, TRANS_SND_TYPE)
@@ -122,7 +124,7 @@ class SoundBrowser(SoundBrowserBase):
         sizer_btn.Add(self.btn_preview, flags_btn)
 
         self.btn_cancel.Bind(wx.EVT_BUTTON, self._evt_cancel)
-        self.btn_ok.Bind(wx.EVT_BUTTON, self._evt_btn_ok)
+        self.btn_ok.Bind(wx.EVT_BUTTON, self._evt_ok)
         self.win.Bind(wx.EVT_CLOSE, self._evt_cancel)
 
         sizer_info.AddGrowableCol(1)
@@ -144,7 +146,7 @@ class SoundBrowser(SoundBrowserBase):
         self.win.Hide()
 
     @override
-    def _ui_set_allowed(self, allowed: AllowedSounds) -> None:
+    def _ui_set_allowed(self, allowed: AllowedSounds, title: TransToken) -> None:
         self.wid_type.Clear()
         i = 0
         for kind, token in SOUND_TYPES:
@@ -154,19 +156,21 @@ class SoundBrowser(SoundBrowserBase):
                 if self.mode.value is kind:
                     self.wid_type.SetSelection(i)
                 i += 1
-        wid_transtoken.set_win_title(
-            self.win,
-            TRANS_SND_TITLE_CHOREO
-            if allowed is AllowedSounds.CHOREO
-            else TRANS_SND_TITLE
-        )
+        wid_transtoken.set_win_title(self.win, title)
 
-    def _evt_btn_ok(self, event: wx.CommandEvent) -> None:
+    def _ui_get_selected(self) -> AnySound | None:
         sel_ind = self.wid_soundlist.GetFirstSelected()
         if sel_ind == -1:
-            self._evt_ok('')
+            return None
         else:
-            self._evt_ok(SoundBrowser.path_for(self.wid_soundlist.data[sel_ind]))
+            return self.wid_soundlist.data[sel_ind]
+
+    def _ui_get_name(self) -> str:
+        return self.wid_text_name.Value
+
+    def _ui_set_props(self, name: str, file: str) -> None:
+        self.wid_text_name.Value = name
+        self.wid_text_file.Value = file
 
     def _evt_set_type(self, event: wx.CommandEvent) -> None:
         chosen = self.wid_type.GetClientData(self.wid_type.GetSelection())
