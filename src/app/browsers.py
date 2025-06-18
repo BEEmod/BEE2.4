@@ -147,6 +147,7 @@ class SoundBrowserBase(Browser, abc.ABC):
         super().__init__()
         self.mode: AsyncValue[SoundMode] = AsyncValue(AllowedSounds.SOUNDSCRIPT)
         self.filter = AsyncValue('')
+        self.autoplay_enabled = AsyncBool(True)
         self.allowed: AllowedSounds = AllowedSounds.ALL
 
         self._fsys = FileSystemChain()

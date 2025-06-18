@@ -32,7 +32,7 @@ class SoundBrowser(SoundBrowserBase):
         listbox_holder.grid(row=1, column=0, sticky='NSEW')
         outer.grid_columnconfigure(0, weight=1)
         outer.grid_rowconfigure(1, weight=1)
-        self._item_data = []
+        self._item_data: SoundSeq = ()
         self.wid_items = tk.Listbox(
             listbox_holder,
             exportselection=False,
@@ -64,7 +64,7 @@ class SoundBrowser(SoundBrowserBase):
         self.wid_file.grid(row=1, column=1, sticky='EW')
 
         set_text(ttk.Label(props_frame), TRANS_SND_TYPE).grid(row=2, column=0)
-        self.wid_type = tk_tools.ComboBoxMap(props_frame,'snd_type', self.mode, ())
+        self.wid_type = tk_tools.ComboBoxMap(props_frame, 'snd_type', self.mode, ())
         self.wid_type.grid(row=2, column=1, sticky='EW')
 
         set_text(ttk.Label(props_frame), TRANS_SND_FILTER).grid(row=3, column=0)
@@ -73,8 +73,12 @@ class SoundBrowser(SoundBrowserBase):
         self.wid_filter_var.trace_add("write", self._evt_filter_changed)
         self.wid_filter.grid(row=3, column=1, sticky='EW')
 
+        self.wid_autoplay_var = tk.BooleanVar(self.win, self.autoplay_enabled.value)
+        self.wid_autoplay = ttk.Checkbutton(outer, variable=self.wid_autoplay_var)
+        set_text(self.wid_autoplay, TRANS_SND_AUTOPLAY).grid(row=3, column=0)
+
         btn_frame = ttk.Frame(outer)
-        btn_frame.grid(row=3, column=0)
+        btn_frame.grid(row=4, column=0)
         btn_ok = ttk.Button(btn_frame, command=self._evt_ok)
         set_text(btn_ok, TransToken.ui('Ok')).grid(row=0, column=0)
         btn_cancel = ttk.Button(btn_frame, command=self._evt_cancel)
@@ -85,6 +89,10 @@ class SoundBrowser(SoundBrowserBase):
     def _evt_filter_changed(self, *_: str) -> None:
         self.filter.value = self.wid_filter.get()
 
+    def _evt_autoplay_changed(self) -> None:
+        self.autoplay_enabled.value = self.wid_autoplay_var.get()
+
+    @override
     def _ui_set_allowed(self, allowed: AllowedSounds, title: TransToken) -> None:
         self.wid_type.update([
             (kind, token)
@@ -93,12 +101,14 @@ class SoundBrowser(SoundBrowserBase):
         ])
         set_win_title(self.win, title)
 
+    @override
     async def _ui_set_items(self, items: SoundSeq) -> None:
         self.wid_items.delete(0, 'end')
         for sound in items:
             self.wid_items.insert('end', self.path_for(sound))
         self._item_data = items
 
+    @override
     def _ui_get_selected(self) -> AnySound | None:
         try:
             [sel_ind] = self.wid_items.curselection()
@@ -107,16 +117,20 @@ class SoundBrowser(SoundBrowserBase):
         except (ValueError, IndexError):
             return None
 
+    @override
     def _ui_get_name(self) -> str:
         return self.wid_name.get()
 
+    @override
     def _ui_set_props(self, name: str, file: str) -> None:
         self.wid_name_var.set(name)
         self.wid_file['text'] = file
 
+    @override
     def _ui_show_window(self) -> None:
         self.win.deiconify()
         tk_tools.center_onscreen(self.win)
 
+    @override
     def _ui_hide_window(self) -> None:
         self.win.withdraw()

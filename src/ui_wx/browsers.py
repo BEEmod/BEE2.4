@@ -107,6 +107,8 @@ class SoundBrowser(SoundBrowserBase):
         sizer_info.Add(self.wid_text_filter, 0, wx.EXPAND, 0)
 
         self.wid_chk_autoplay = wx.CheckBox(panel_main)
+        self.wid_chk_autoplay.SetValue(self.autoplay_enabled.value)
+        self.wid_chk_autoplay.Bind(wx.EVT_CHECKBOX, self._evt_autoplay_changed)
         wid_transtoken.set_text(self.wid_chk_autoplay, TRANS_SND_AUTOPLAY)
         sizer_main.Add(self.wid_chk_autoplay, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 8)
 
@@ -158,6 +160,7 @@ class SoundBrowser(SoundBrowserBase):
                 i += 1
         wid_transtoken.set_win_title(self.win, title)
 
+    @override
     def _ui_get_selected(self) -> AnySound | None:
         sel_ind = self.wid_soundlist.GetFirstSelected()
         if sel_ind == -1:
@@ -165,9 +168,11 @@ class SoundBrowser(SoundBrowserBase):
         else:
             return self.wid_soundlist.data[sel_ind]
 
+    @override
     def _ui_get_name(self) -> str:
         return self.wid_text_name.Value
 
+    @override
     def _ui_set_props(self, name: str, file: str) -> None:
         self.wid_text_name.Value = name
         self.wid_text_file.Value = file
@@ -178,6 +183,9 @@ class SoundBrowser(SoundBrowserBase):
 
     def _evt_filter_changed(self, event: wx.Event) -> None:
         self.filter.value = self.wid_text_filter.Value
+
+    def _evt_autoplay_changed(self, event: wx.CommandEvent) -> None:
+        self.autoplay_enabled.value = self.wid_chk_autoplay.IsChecked()
 
     def _evt_resize_soundlist(self, event: wx.SizeEvent) -> None:
         """Update column size when the listbox changes."""
