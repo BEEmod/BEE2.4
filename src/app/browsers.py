@@ -155,6 +155,8 @@ class SoundBrowserBase(Browser, abc.ABC):
         self._soundscripts: Final[list[Sound]] = []
         self._scenes: Final[list[choreo.Entry]] = []
         self._raw: Final[list[str]] = []
+        # Soundscript name -> original filename.
+        self._soundscript_filenames: dict[str, str] = {}
 
     @staticmethod
     def path_for(value: AnySound) -> str:
@@ -234,6 +236,7 @@ class SoundBrowserBase(Browser, abc.ABC):
     async def _load_soundscripts(self, fsys: FileSystemChain, packset: PackagesSet) -> None:
         LOGGER.info('Reloading soundscripts for browser...')
         self._soundscripts.clear()
+        self._soundscript_filenames.clear()
         try:
             sounds_manifest = await async_util.parse_kv1_fsys(
                 fsys, 'scripts/game_sounds_manifest.txt',
@@ -246,8 +249,8 @@ class SoundBrowserBase(Browser, abc.ABC):
         # We need to preserve the order, in case any override each other.
         # So fill parsed with EmptyMapping of the same length, have each task
         # insert into the correct slot.
-        script_files: list[File] = []
-        parsed: list[Mapping[str, Sound]] = []
+        script_files: list[tuple[str, File]] = []
+        parsed: list[tuple[str, Mapping[str, Sound]]] = []
         file: File
 
         for prop in sounds_manifest.find_children('game_sounds_manifest'):
@@ -258,35 +261,40 @@ class SoundBrowserBase(Browser, abc.ABC):
             except FileNotFoundError:
                 LOGGER.warning('Soundscript "{}" does not exist!', prop.value)
             else:
-                script_files.append(file)
-                parsed.append(srctools.EmptyMapping)
+                script_files.append((file.path, file))
+                parsed.append((file.path, srctools.EmptyMapping))
         for pack in packset.packages.values():
             for folder in ['resources/scripts/bee2_snd/', 'resources/scripts/bee_snd/']:
                 for file in pack.fsys.walk_folder(folder):
                     if file.path.endswith('.txt'):
-                        script_files.append(file)
-                        parsed.append(srctools.EmptyMapping)
+                        path = f'{pack.id}:{file.path}'
+                        script_files.append((path, file))
+                        parsed.append((path, srctools.EmptyMapping))
 
-        async def parse_script(file: File, i: int) -> None:
+        async def parse_script(file: File, path: str, i: int) -> None:
             """Parse a soundscript then add it to the list of scripts."""
             try:
-                parsed[i] = await trio.to_thread.run_sync(parse_soundscript, file, abandon_on_cancel=True)
+                sounds = await trio.to_thread.run_sync(parse_soundscript, file, abandon_on_cancel=True)
             except (KeyValError, ValueError) as exc:
                 LOGGER.warning('Invalid soundscript: {}', file.path, exc_info=exc)
+            else:
+                parsed[i] = path, sounds
 
         LOGGER.info('{} soundscript files', len(script_files))
         assert len(script_files) == len(parsed)
 
         async with trio.open_nursery() as nursery:
-            for pos, file in enumerate(script_files):
-                LOGGER.debug('Parsing {}...', file.path)
-                nursery.start_soon(parse_script, file, pos)
+            for pos, (path, file) in enumerate(script_files):
+                LOGGER.debug('Parsing {}...', path)
+                nursery.start_soon(parse_script, file, path, pos)
         # Merge everything together.
         soundscripts: dict[str, Sound] = {}
-        for sounds in parsed:
+        for filename, sounds in parsed:
             soundscripts.update(sounds)
+            self._soundscript_filenames.update(dict.fromkeys(sounds, filename))
         self._soundscripts.extend(soundscripts.values())
         self._soundscripts.sort(key=lambda snd: snd.name)
+        LOGGER.debug('Filenames: {}', self._soundscript_filenames)
         LOGGER.info('{} soundscripts loaded.', len(self._soundscripts))
 
     async def _load_raw(self, fsys: FileSystemChain, packset: PackagesSet) -> None:
@@ -374,18 +382,18 @@ class SoundBrowserBase(Browser, abc.ABC):
 
     def _evt_preview(self, _: object = None) -> None:
         """Preview the selected value."""
-        raise NotImplementedError # TODO
+        raise NotImplementedError  # TODO
 
     def _evt_select(self, _: object = None) -> None:
         """Item was selected in the listbox, update the display."""
         match self._ui_get_selected():
-            # TODO: Determine original filenames.
             case Sound() as sndscript:
-                self._ui_set_props(sndscript.name, '???')
+                filename = self._soundscript_filenames.get(sndscript.name.casefold(), '???')
+                self._ui_set_props(sndscript.name, filename)
             case choreo.Entry() as scene:
-                self._ui_set_props(scene.filename, '???')
+                self._ui_set_props(scene.filename, scene.filename)
             case str() as raw:
-                return self._ui_set_props(raw, raw)
+                self._ui_set_props(raw, raw)
             case None:
                 self._ui_set_props('', '')
             case err:
