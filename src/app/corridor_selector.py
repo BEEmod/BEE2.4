@@ -79,7 +79,7 @@ OPTS_DIR = [
     (Direction.EXIT, TransToken.ui('Exit')),
 ]
 OPTS_ATTACH = [
-    (Attachment.FLAT, TransToken.ui('Flat')),
+    (Attachment.FLAT, TransToken.ui('Wall')),
     (Attachment.FLOOR, TransToken.ui('Floor')),
     (Attachment.CEILING, TransToken.ui('Ceiling')),
 ]
