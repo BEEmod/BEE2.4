@@ -19,7 +19,7 @@ viewsettings
 }
 world
 {
-	"id" "2"
+	"id" "1"
 	"classname" "worldspawn"
 	"detailmaterial" "detail/detailsprites"
 	"detailvbsp" "detail.vbsp"
@@ -34,7 +34,7 @@ world
 }
 entity
 {
-	"id" "36"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -313,12 +313,12 @@ entity
 		"color" "220 30 220"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 3500]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "3"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -445,12 +445,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 3]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "4"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -544,12 +544,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 4]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "5"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -643,12 +643,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 5]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "6"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -775,12 +775,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 6]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "7"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -874,12 +874,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 7]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "8"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -973,12 +973,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 8]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "9"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1105,12 +1105,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 9]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "10"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1204,12 +1204,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 10]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "11"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1303,12 +1303,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 11]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "12"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1435,12 +1435,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 12]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "13"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1534,12 +1534,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 13]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "14"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1633,12 +1633,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 14]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "15"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1765,12 +1765,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 15]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "16"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1864,12 +1864,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 16]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "17"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -1963,12 +1963,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 17]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "18"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2095,12 +2095,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 18]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "19"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2194,12 +2194,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 19]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "20"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2293,12 +2293,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 20]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "21"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2425,12 +2425,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 21]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "22"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2524,12 +2524,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 22]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "23"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2623,12 +2623,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 23]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "24"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2755,12 +2755,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 24]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "25"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2854,12 +2854,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 25]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "26"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -2953,12 +2953,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 26]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "27"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3085,12 +3085,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 27]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "28"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3184,12 +3184,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 28]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "29"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3283,12 +3283,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 29]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "30"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3415,12 +3415,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 30]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "31"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3514,12 +3514,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 31]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "32"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3613,12 +3613,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 32]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "33"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3745,12 +3745,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 33]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "34"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3844,12 +3844,12 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 34]"
+		"logicalpos" "[0 0]"
 	}
 }
 entity
 {
-	"id" "35"
+	"id" "1"
 	"classname" "bee2_collision_volume"
 	"coll_antlines" "0"
 	"coll_bridge" "0"
@@ -3943,7 +3943,7 @@ entity
 		"color" "255 255 255"
 		"visgroupshown" "1"
 		"visgroupautoshown" "1"
-		"logicalpos" "[0 35]"
+		"logicalpos" "[0 0]"
 	}
 }
 cameras
