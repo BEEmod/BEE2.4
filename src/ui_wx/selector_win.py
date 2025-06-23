@@ -29,8 +29,12 @@ __all__ = [
     'Options',
 ]
 
+# Icon widget sizes.
 ITEM_WIDTH = SEL_ICON_SIZE + 16
 ITEM_HEIGHT = SEL_ICON_SIZE + 64
+# Space between, and the total space for each widget.
+ITEM_SEP = 2
+ITEM_WIDTH_ALLOC = ITEM_WIDTH + ITEM_SEP * 2
 
 KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Up': NavKeys.UP,
@@ -531,7 +535,8 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_calc_columns(self) -> int:
-        return (self.wid_itemlist.GetSize().Width - 10) // ITEM_WIDTH
+        width = self.wid_itemlist.GetClientSize().Width
+        return (width - 8) // ITEM_WIDTH_ALLOC
 
     @override
     async def _ui_reposition_items(self) -> None:
