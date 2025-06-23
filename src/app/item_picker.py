@@ -59,6 +59,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         """Subclasses must create an appropriate drag manager.
 
         We can't require this to be passed into __init__(), since that ends up requiring HKT.
+        TODO Use ReadOnly[].
         """
         ...
 
@@ -277,7 +278,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
     async def _filter_conf_changed_task(self) -> None:
         """Update whenever the filter configuration changes."""
         with config.APP.get_ui_channel(FilterConf) as channel:
-            async for self.filter_cont in channel:
+            async for self.filter_conf in channel:
                 self.items_dirty.set()
 
     async def _update_name_task(self) -> None:
