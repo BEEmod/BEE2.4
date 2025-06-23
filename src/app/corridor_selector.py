@@ -79,7 +79,7 @@ OPTS_DIR = [
     (Direction.EXIT, TransToken.ui('Exit')),
 ]
 OPTS_ATTACH = [
-    (Attachment.FLAT, TransToken.ui('Wall')),
+    (Attachment.HORIZ, TransToken.ui('Wall')),
     (Attachment.FLOOR, TransToken.ui('Floor')),
     (Attachment.CEILING, TransToken.ui('Ceiling')),
 ]
@@ -328,7 +328,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             # Up/down can have missing ones.
             if attach is Attachment.HORIZONTAL:
                 LOGGER.warning(
-                    'No flat corridor for {}:{}_{}!',
+                    'No horizontal corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,
                 )
             self.corr_list = []

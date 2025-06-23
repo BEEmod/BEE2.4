@@ -46,10 +46,10 @@ class Orient(Enum):
 
 
 ORIENT_TO_ATTACH: Mapping[tuple[Direction, Orient], Attachment] = {
-    (Direction.ENTRY, Orient.FLAT): Attachment.FLAT,
+    (Direction.ENTRY, Orient.FLAT): Attachment.HORIZ,
     (Direction.ENTRY, Orient.UP): Attachment.FLOOR,
     (Direction.ENTRY, Orient.DN): Attachment.CEILING,
-    (Direction.EXIT, Orient.FLAT): Attachment.FLAT,
+    (Direction.EXIT, Orient.FLAT): Attachment.HORIZ,
     (Direction.EXIT, Orient.UP): Attachment.CEILING,
     (Direction.EXIT, Orient.DN): Attachment.FLOOR,
 }
