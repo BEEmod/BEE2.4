@@ -79,7 +79,7 @@ async def start_error_server(ctx: Context) -> None:
             )
 
         if not utils.FROZEN:
-            # We're running outside Portal 2, pop it open in regular Chrome.
+            # We're in dev mode and running outside Portal 2, pop it open in regular Chrome.
             import webbrowser
             webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
@@ -89,8 +89,10 @@ async def load_server() -> tuple[int, str]:
     # We need to boot the web server.
     try:
         data: ServerInfo = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
+    except FileNotFoundError:
+        LOGGER.debug('No server info file.')
+    except json.JSONDecodeError as exc:
+        LOGGER.debug('Failed to parse server info file, assuming truncated:', exc_info=exc)
     else:
         port = data['port']
         coop_text = data.get('coop_text', '')
@@ -133,6 +135,7 @@ async def load_server() -> tuple[int, str]:
                 await trio.sleep(0.1)
                 continue
             else:
+                LOGGER.debug('Got server info: {}', data)
                 await trio.lowlevel.checkpoint()
                 port = data['port']
                 coop_text = data.get('coop_text', '')

@@ -309,9 +309,9 @@ async def main(argv: list[str]) -> None:
     async def load_compiler(name: str) -> None:
         """Load a compiler log file."""
         try:
-            LOGS[name] = await trio.Path(f'bee2/{name}.log').read_text('utf8')
-        except OSError:
-            LOGGER.warning('Could not read bee2/{}.log', name)
+            LOGS[name] = await trio.Path(f'bee2/{name}.log').read_text('utf8', 'backslashreplace')
+        except (OSError, UnicodeDecodeError) as exc:
+            LOGGER.warning('Could not read bee2/{}.log', name, exc_info=exc)
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(load_compiler, 'vbsp')
@@ -335,7 +335,7 @@ async def main(argv: list[str]) -> None:
             # Set deadline after app is ready, and let check_portal2 do checks.
             SHUTDOWN_SCOPE.deadline = trio.current_time() + DELAY
             LOGGER.info(
-                'Current time= {}, deadline={}',
+                'Current time={}, deadline={}',
                 trio.current_time(), SHUTDOWN_SCOPE.deadline,
             )
             if len(binds):
