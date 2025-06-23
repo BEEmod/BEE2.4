@@ -309,7 +309,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
         # For music items, add a '>' button to play sound samples
         if opt.sound_sys is not None and sound.has_sound() and opt.func_get_sample is not None:
-            self.sampler = sound.SamplePlayer(system=opt.sound_sys)
+            self.sampler = sound.SamplePlayer(opt.sound_sys, sound.MUSIC_WRITE_PATH)
         else:
             self.sampler = None
 
@@ -321,7 +321,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             nursery.start_soon(self._rollover_suggest_task)
             nursery.start_soon(self.reposition_items_task)
             if self.sampler is not None:
-                nursery.start_soon(self._update_sampler_task)
+                nursery.start_soon(self._sampler_task, self.sampler)
             if self.store_last_selected:
                 nursery.start_soon(self._load_selected_task)
                 nursery.start_soon(_store_results_task, self.chosen, self.save_id)
@@ -587,17 +587,25 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
                 self.sel_item_id(selected.id)
                 self.save()
 
-    async def _update_sampler_task(self) -> None:
-        """Update the sampler's display."""
-        assert self.sampler is not None
-        async with aclosing(self.sampler.is_playing.eventual_values()) as agen:
+    async def _sampler_task(self, sampler: sound.SamplePlayer) -> None:
+        """Play sound samples, and update the display."""
+        assert self.func_get_sample is not None, "Sanity check."
+        async with (
+            trio.open_nursery() as nursery,
+            aclosing(sampler.is_playing.eventual_values()) as agen
+        ):
+            nursery.start_soon(sampler.task)
             async for is_playing in agen:
                 self._ui_props_set_samp_button_icon(BTN_STOP if is_playing else BTN_PLAY)
 
-    def _evt_icon_clicked(self, event: object) -> None:
+    def _evt_play_sample(self, event: object = None) -> None:
         """When the large image is clicked, play sounds if available."""
-        if self.sampler is not None:
-            self.sampler.play_sample()
+        assert self.sampler is not None
+        assert self.func_get_sample is not None
+        if self.sampler.is_playing.value:
+            self.sampler.stop()
+        else:
+            self.sampler.play(self.func_get_sample(self._packset, self.selected))
 
     def open_win(self) -> None:
         """Display the window."""
@@ -644,7 +652,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self._visible = True
         self.sel_item(self.chosen.value)
         self.item_pos_dirty.set()
-        return None
+        return
 
     def sel_suggested(self) -> None:
         """Select the suggested item."""
@@ -725,18 +733,18 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
         self.selected = item_id
 
-        if self.sampler:
+        if self.sampler is not None:
             assert self.func_get_sample is not None
             is_playing = self.sampler.is_playing.value
-            self.sampler.stop()
 
-            self.sampler.cur_file = self.func_get_sample(self._packset, item_id)
-            if self.sampler.cur_file:
+            samp_file = self.func_get_sample(self._packset, item_id)
+            if samp_file:
                 self._ui_props_set_samp_button_enabled(True)
                 if is_playing:
-                    # Start the sampler again, so it plays the current item!
-                    self.sampler.play_sample()
+                    # Restart with the current file's sample.
+                    self.sampler.play(samp_file)
             else:
+                self.sampler.stop()  # Stop any existing sample.
                 self._ui_props_set_samp_button_enabled(False)
 
         if self.has_def:
@@ -784,10 +792,10 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
     def key_navigate(self, key: NavKeys) -> None:
         """Navigate using arrow keys."""
-
         if key is NavKeys.PLAY_SOUND:
             if self.sampler is not None:
-                self.sampler.play_sample()
+                assert self.func_get_sample is not None
+                self.sampler.play(self.func_get_sample(self._packset, self.selected))
             return
         elif key is NavKeys.ENTER:
             self.save()

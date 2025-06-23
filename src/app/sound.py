@@ -4,9 +4,13 @@ To use, call sound.fx() with one of the dict keys.
 If pyglet fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
+from collections import deque
+from pathlib import Path, PurePath
 from typing import Literal, override
 
-from collections.abc import Callable
+from collections.abc import Callable, Generator, Iterable
+from tempfile import NamedTemporaryFile
+import contextlib
 import functools
 import os
 import shutil
@@ -17,18 +21,20 @@ import trio
 import trio_util
 
 from config.gen_opts import GenOptions
-from ui_tk import TK_ROOT
 import config
 import utils
 
 
 __all__ = ['SamplePlayer', 'block_fx', 'fx', 'fx_blockable', 'pyglet_version']
 LOGGER = srctools.logger.get_logger(__name__)
-SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
+MUSIC_WRITE_PATH = utils.conf_location('music_sample/music')
+# Other locations to clean up.
+_sample_paths: set[Path] = {MUSIC_WRITE_PATH}
 # Nursery to hold sound-related tasks. We can cancel this to shut down sound logic.
 _nursery: trio.Nursery | None = None
 # Keeps track of whether sounds are currently playing, so we know whether to tick or not.
-# Use a set to ensure double-calling doesn't break anything.
+# We're using a context manager so reference counting would be sufficient, but put marker objects
+# in a set to be more robust.
 _playing_count = trio_util.AsyncValue(0)
 _playing: set[object] = set()
 type PygletSource = Source  # Forward ref
@@ -62,16 +68,17 @@ is_positive: Callable[[int], bool] = (0).__lt__
 is_zero: Callable[[int], bool] = (0).__eq__
 
 
-def add_playing(snd_marker: object) -> None:
-    """Mark a sound as playing. The marker can be anything hashable."""
-    _playing.add(snd_marker)
-    _playing_count.value = len(_playing)
-
-
-def remove_playing(snd_marker: object) -> None:
-    """Mark a sound as not playing. The marker can be anything hashable."""
-    _playing.discard(snd_marker)
-    _playing_count.value = len(_playing)
+@contextlib.contextmanager
+def mark_playing() -> Generator[None]:
+    """Mark a sound as playing while active."""
+    marker = object()
+    try:
+        _playing.add(marker)
+        _playing_count.value = len(_playing)
+        yield
+    finally:
+        _playing.discard(marker)
+        _playing_count.value = len(_playing)
 
 
 class NullSound:
@@ -159,8 +166,7 @@ class PygletSound(NullSound):
             if snd is None:
                 await trio.lowlevel.checkpoint()
                 return
-            try:
-                add_playing(marker)
+            with mark_playing():
                 try:
                     snd.play()
                 except Exception:
@@ -175,8 +181,6 @@ class PygletSound(NullSound):
                 else:
                     LOGGER.warning('No duration: {}', sound)
                     await trio.sleep(0.75)  # Should be long enough.
-            finally:
-                remove_playing(marker)
         await trio.lowlevel.checkpoint()
 
 
@@ -278,90 +282,114 @@ except Exception:
 
 def clean_sample_folder() -> None:
     """Delete files used by the sample player."""
-    for file in SAMPLE_WRITE_PATH.parent.iterdir():
-        LOGGER.info('Cleaning up "{}"...', file)
-        try:
-            file.unlink()
-        except (PermissionError, FileNotFoundError):
-            pass
+    for base_fname in _sample_paths:
+        for file in base_fname.parent.iterdir():
+            LOGGER.info('Cleaning up "{}"...', file)
+            try:
+                file.unlink()
+            except (PermissionError, FileNotFoundError):
+                pass
 
 
-# TODO: Switch this to a constantly-playing task, eliminate TK_ROOT usage.
 class SamplePlayer:
-    """Handles playing a single audio file, and allows toggling it on/off."""
-    def __init__(self, system: FileSystemChain) -> None:
+    """Handles playing one or more audio files, and allows toggling it on/off."""
+    # The current queue of sounds to play.
+    _queue: deque[str]
+    # Filesystem to load sounds from. Can be changed by callers.
+    system: FileSystemChain
+    # True if we are playing sounds or want to play them. Queue must be non-empty if so.
+    is_playing: trio_util.AsyncBool
+    # Used to cancel current playback.
+    _play_scope: trio.CancelScope
+
+    extract_path: Path  # Location to extract files to.
+
+    def __init__(self, system: FileSystemChain, extract_path: Path) -> None:
         """Initialise the sample-playing manager."""
-        self.player: pyglet.media.Player | None = None
-        self.after: str | None = None
-        self.cur_file: str | None = None
-        self.system: FileSystemChain = system
+        self._queue = deque()
+        self.system = system
         self.is_playing = trio_util.AsyncBool()
+        self._play_scope = trio.CancelScope()
+        self.extract_path = extract_path
+        _sample_paths.add(extract_path)
 
-    def play_sample(self, _: object = None) -> None:
-        """Play a sample of music.
+    def play(self, *filenames: str) -> None:
+        """Play sounds, clearing existing sounds."""
+        self._play_scope.cancel()
+        self._queue.clear()
+        self._queue.extend(filenames)
+        self.is_playing.value = True
 
-        If music is being played it will be stopped instead.
+    def queue(self, filename: str) -> None:
+        """Queue a new sound."""
+        self._queue.append(filename)
+        self.is_playing.value = True
+
+    def stop(self) -> None:
+        """Cancel playback, if it's playing."""
+        self._play_scope.cancel()
+        self._queue.clear()
+        self.is_playing.value = False
+
+    async def task(self) -> None:
+        """Plays audio samples."""
+        # We wait for playing to be set, then start iterating the queue.
+        # If the scope is cancelled, we abort, leaving is-playing untouched. If it is set we
+        # immediately resume. If we finish we set it false and leave it there.
+        while True:
+            await self.is_playing.wait_value(True)
+            with trio.CancelScope() as self._play_scope, mark_playing():
+                LOGGER.debug('Playing queue with {} items', len(self._queue))
+                while self._queue:
+                    LOGGER.debug('Playback queue: {}', self._queue)
+                    filename = self._queue.popleft()
+                    await trio.lowlevel.checkpoint()
+
+                    snd_path = self._get_path(filename)
+                    if snd_path is None:
+                        continue  # Not valid, skip.
+                    try:
+                        sound = await trio.to_thread.run_sync(
+                            decoder.decode,
+                            str(snd_path), None, True,
+                        )
+                    except Exception:
+                        LOGGER.exception('Sound sample not valid: "{}"', filename)
+                        return
+                    player = sound.play()
+                    LOGGER.debug('Sound duration: {}={}', snd_path, sound.duration)
+                    try:
+                        await trio.sleep(sound.duration + 0.1)
+                    finally:
+                        player.delete()
+                LOGGER.debug('Queue completed successfully.')
+                # Definitely finished, reset.
+                self.is_playing.value = False
+
+    def _get_path(self, filename: str) -> Path | None:
+        """Get the real path for this fsys file.
+
+        If raw, give that path, otherwise extract.
         """
-        if self.cur_file is None:
-            return
-
-        if self.player is not None:
-            self.stop()
-            return
-
+        # TODO: Make a context manager, delete sample when finished.
         try:
-            file = self.system[self.cur_file]
+            file = self.system[filename]
         except (KeyError, FileNotFoundError):
-            self.is_playing.value = False
-            remove_playing(self)
-            LOGGER.error('Sound sample not found: "{}"', self.cur_file)
-            return  # Abort if music isn't found..
+            LOGGER.error('Sound file not found: "{}"', filename)
+            return None  # Abort if file isn't found..
 
         child_sys = self.system.get_system(file)
         # Special case raw filesystems - Pyglet is more efficient
         # if it can just open the file itself.
-        if isinstance(child_sys, RawFileSystem):
-            load_path = os.path.join(child_sys.path, file.path)
-            LOGGER.debug('Loading music directly from {!r}', load_path)
+        if isinstance(child_sys, RawFileSystem) and False:
+            load_path = Path(child_sys.path, file.path)
+            LOGGER.debug('Loading sound directly from {!r}', load_path)
+            return load_path
         else:
             # In a filesystem, we need to extract it.
-            # SAMPLE_WRITE_PATH + the appropriate extension.
-            sample_fname = SAMPLE_WRITE_PATH.with_suffix(os.path.splitext(self.cur_file)[1])
-            with file.open_bin() as fsrc, sample_fname.open('wb') as fdest:
+            # Inherit the original extension.
+            extract_to = self.extract_path.with_suffix(PurePath(filename).suffix)
+            with file.open_bin() as fsrc, extract_to.open('wb') as fdest:
                 shutil.copyfileobj(fsrc, fdest)
-            LOGGER.debug('Loading music {} as {}', self.cur_file, sample_fname)
-            load_path = str(sample_fname)
-        try:
-            sound = decoder.decode(filename=load_path, file=None)
-        except Exception:
-            self.is_playing.value = False
-            remove_playing(self)
-            LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
-            return  # Abort if music isn't found or can't be loaded.
-
-        self.player = sound.play()
-        self.after = TK_ROOT.after(
-            int(sound.duration * 1000),
-            self._finished,
-        )
-        self.is_playing.value = True
-        add_playing(self)
-
-    def stop(self) -> None:
-        """Cancel the music, if it's playing."""
-        if self.player is not None:
-            self.player.pause()
-            self.player = None
-            self.is_playing.value = False
-            remove_playing(self)
-
-        if self.after is not None:
-            TK_ROOT.after_cancel(self.after)
-            self.after = None
-
-    def _finished(self) -> None:
-        """Reset values after the sound has finished."""
-        self.player = None
-        self.after = None
-        self.is_playing.value = False
-        remove_playing(self)
+            LOGGER.debug('Loading sound {} as {}', filename, extract_to)
+            return Path(extract_to)

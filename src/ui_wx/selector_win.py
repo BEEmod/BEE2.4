@@ -331,7 +331,11 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
             self.wid_samp_button = wx.Button(self.wid_panel_info, style=wx.BU_EXACTFIT)
             sizer_name.Add(self.wid_samp_button, 0, 0, 0)
+            self.wid_samp_button.Bind(wx.EVT_BUTTON, self._evt_play_sample)
             name_widget = sizer_name
+
+            # Also bind the icon to use this.
+            self.wid_props_icon.Bind(wx.EVT_LEFT_DOWN, self.evt_click_icon)
         else:
             # Add the name widget directly.
             name_widget = self.wid_props_name
@@ -478,6 +482,11 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         while True:
             await CURRENT_LANG.wait_transition()
             self.wid_itemlist.Refresh()
+
+    def evt_click_icon(self, event: wx.MouseEvent) -> None:
+        """Clicking the icon plays the sampler, but we need to allow this to continue."""
+        self._evt_play_sample()
+        event.Skip()
 
     def evt_window_resized(self, event: object) -> None:
         """When resizing, we must always force the group headers to redraw."""

@@ -243,7 +243,8 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
 
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         self.prop_icon.grid(row=0, column=0)
-        tk_tools.bind_leftclick(self.prop_icon, self._evt_icon_clicked)
+        if self.sampler is not None:
+            tk_tools.bind_leftclick(self.prop_icon, self._evt_play_sample)
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -265,11 +266,11 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                 name_frame,
                 name='sample_button',
                 width=2,
+                command=self._evt_play_sample,
             )
             samp_button.grid(row=0, column=1)
             add_tooltip(samp_button, TransToken.ui("Play a sample of this item."))
 
-            samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
             self.samp_button = None
