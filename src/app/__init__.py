@@ -1,6 +1,7 @@
 """The package containg all UI code."""
 from __future__ import annotations
 from typing import Any, Protocol
+
 from typing_extensions import deprecated
 
 from abc import abstractmethod
@@ -12,6 +13,7 @@ from types import TracebackType
 from transtoken import TransToken
 from trio_util import AsyncBool, AsyncValue
 from srctools.logger import get_logger
+import attrs
 import trio
 
 from async_util import run_as_task
@@ -205,17 +207,13 @@ class WidgetCache[Widget]:
         self.hide_unused()
 
 
+@attrs.define(eq=False)
 class ReflowWindow:
     """Base class which handles the logic for a window that reflows contents to fit."""
     # Event set whenever the items need to be redrawn/re-flowed.
-    item_pos_dirty: trio.Event
+    item_pos_dirty: trio.Event = attrs.field(init=False, factory=trio.Event)
     # The current number of columns per row, always >= 1.
-    column_count: int
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.item_pos_dirty = trio.Event()
-        self.column_count = 1
+    column_count: int = attrs.field(kw_only=True, default=1)
 
     async def reposition_items_task(self) -> None:
         """Calls refresh_items whenever they're marked dirty."""

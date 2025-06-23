@@ -22,8 +22,14 @@ ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
 class ItemPicker(ItemPickerBase[tk.Misc]):
     """Tk implementation of the item picker."""
-    __slots__ = ['drag_man']  # Use a slot to override the superclass' property.
+    __slots__ = [
+        'drag_man',  # Use a slot to override the superclass' property.
+        'pal_name', 'picker_canv', 'canv_pos',
+    ]
     drag_man: DragDrop[SubItemRef]
+    pal_name: ttk.Label
+    picker_canv: tk.Canvas
+    canv_pos: CanvasPositioner[ItemSlot]
 
     def __init__(
         self,
@@ -78,7 +84,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
 
         scroll = tk_tools.HidingScroll(
             picker_wrap,
-            orient=tk.VERTICAL,
+            orient='vertical',
             command=canvas.yview,
         )
         scroll.grid(column=1, row=0, sticky="NS")

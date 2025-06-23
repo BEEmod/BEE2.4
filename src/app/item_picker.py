@@ -32,6 +32,7 @@ TRANS_ERROR = TransToken.untranslated('???')
 TRANS_UNKNOWN_ID = TransToken.ui('Unknown: <{id}>')
 
 
+@attrs.define(eq=False, init=False)
 class ItemPickerBase[ParentT](ReflowWindow, ABC):
     """The picker window."""
     # Style ID, referenced from the style window.
