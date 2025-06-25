@@ -268,7 +268,12 @@ def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
 
     Useful with AddOutput commands, or other values which use
     targetnames in the parameter.
-    The result takes the form `<prefix><instance name>[-<local>]<suffix>`.
+    The result takes the form `<prefix><instance name>[-<name>]<suffix>`.
+    
+    * `resultVar`: Fixup variable to assign the result to.
+    * `name`: If set, the output includes `-<name>`.
+    * `prefix`: Added to the start.
+    * `suffix`: Added to the end.
     """
     local_name = inst.fixup.substitute(res['name', ''])
     prefix = inst.fixup.substitute(res['prefix', ''])
