@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import attrs
-from srctools import Keyvalues, Entity, Vec, Matrix
+from srctools import Keyvalues, Entity, Vec, Matrix, VMF
 import srctools.logger
 
-from precomp.conditions import make_test, make_result
+from precomp.conditions import make_test, make_result, fetch_debug_visgroup
 
 COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
@@ -18,11 +18,13 @@ class Marker:
     """A marker placed in the map."""
     pos: Vec
     name: str
-    inst: Entity
+    inst: Entity = attrs.field(kw_only=True)
+    # If dev mode is enabled, the info_target/_null to identify this.
+    debug_ent: Entity = attrs.field(kw_only=True)
 
 
 @make_result('SetMarker')
-def res_set_marker(inst: Entity, res: Keyvalues) -> None:
+def res_set_marker(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Set a marker at a specific position.
 
     Parameters:
@@ -43,13 +45,20 @@ def res_set_marker(inst: Entity, res: Keyvalues) -> None:
     if not is_global:
         pos = pos @ orient + origin
 
-    mark = Marker(pos, name, inst)
+    debug_ent = fetch_debug_visgroup(vmf, 'Markers')(
+        'info_target',
+        origin=pos,
+        targetname=name,
+        comment='Marker not used',
+    )
+
+    mark = Marker(pos, name, inst=inst, debug_ent=debug_ent)
     MARKERS.append(mark)
     LOGGER.debug('Marker added: {}', mark)
 
 
 @make_test('CheckMarker')
-def check_marker(inst: Entity, kv: Keyvalues) -> bool:
+def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     """Check if markers are present at a position.
 
     Parameters:
@@ -94,6 +103,13 @@ def check_marker(inst: Entity, kv: Keyvalues) -> bool:
     if not is_global:
         pos = pos @ orient + origin
 
+    debug_ent = fetch_debug_visgroup(vmf, 'Markers')(
+        'path_track',
+        origin=pos,
+        targetname=name,
+        found='No',
+    )
+
     radius: float | None
     if 'pos2' in kv:
         if 'radius' in kv:
@@ -103,11 +119,14 @@ def check_marker(inst: Entity, kv: Keyvalues) -> bool:
             pos2 = pos2 @ orient + origin
         bb_min, bb_max = Vec.bbox(pos, pos2)
         radius = None
+        debug_ent['classname'] = 'trigger_once'
+        debug_ent.solids.append(vmf.make_prism(bb_min, bb_max, 'tools/toolstrigger').solid)
         LOGGER.debug('Searching for marker "{}" from ({})-({})', name, bb_min, bb_max)
     elif 'radius' in kv:
         radius = abs(srctools.conv_float(inst.fixup.substitute(kv['radius'])))
         bb_min = pos - (radius + 1.0)
         bb_max = pos + (radius + 1.0)
+        debug_ent['radius'] = radius
         LOGGER.debug('Searching for marker "{}" at ({}), radius={}', name, pos, radius)
     else:
         bb_min = pos - (1.0, 1.0, 1.0)
@@ -122,11 +141,17 @@ def check_marker(inst: Entity, kv: Keyvalues) -> bool:
             continue
         if not match(marker.name):
             continue
+        debug_ent['found'] = marker.pos
+        debug_ent['target'] = marker.name
+        debug_ent['parentname'] = marker.inst['targetname']
+        debug_ent.comments = 'Next = marker name, parent = marker instance'
+        marker.debug_ent.comments = 'Marker used'
         # Matched.
         if 'nameVar' in kv:
             inst.fixup[kv['namevar']] = marker.name
         if srctools.conv_bool(inst.fixup.substitute(kv['removeFound'], allow_invert=True)):
             LOGGER.debug('Removing found marker {}', marker)
+            marker.debug_ent['classname'] = 'info_null'
             del MARKERS[i]
 
         for child in kv.find_all('copyto'):
