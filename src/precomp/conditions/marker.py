@@ -5,7 +5,9 @@ import attrs
 from srctools import Keyvalues, Entity, Vec, Matrix, VMF
 import srctools.logger
 
-from precomp.conditions import make_test, make_result, fetch_debug_visgroup
+from precomp import conditions
+from precomp.lazy_value import LazyValue
+
 
 COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
@@ -23,8 +25,8 @@ class Marker:
     debug_ent: Entity = attrs.field(kw_only=True)
 
 
-@make_result('SetMarker')
-def res_set_marker(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
+@conditions.make_result('SetMarker')
+def res_set_marker(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Set a marker at a specific position.
 
     Parameters:
@@ -32,32 +34,37 @@ def res_set_marker(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     * `name`: A name to store to identify this marker/item.
     * `pos`: The position or offset to use for the marker.
     """
-    origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angstr(inst['angles'])
+    is_global = LazyValue.parse(res['global', '0']).as_bool(False)
+    conf_name = LazyValue.parse(res['name']).casefold()
+    conf_pos = LazyValue.parse(res['pos']).as_vec()
 
-    try:
-        is_global = srctools.conv_bool(inst.fixup.substitute(res['global'], allow_invert=True))
-    except LookupError:
-        is_global = False
+    add_debug = conditions.fetch_debug_visgroup(vmf, 'Markers')
 
-    name = inst.fixup.substitute(res['name']).casefold()
-    pos = Vec.from_str(inst.fixup.substitute(res['pos']))
-    if not is_global:
-        pos = pos @ orient + origin
+    def create(inst: Entity) -> None:
+        """Create the marker."""
+        origin = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angstr(inst['angles'])
 
-    debug_ent = fetch_debug_visgroup(vmf, 'Markers')(
-        'info_target',
-        origin=pos,
-        targetname=name,
-        comment='Marker not used',
-    )
+        name = conf_name(inst)
+        pos = conf_pos(inst)
+        if not is_global(inst):
+            pos = pos @ orient + origin
 
-    mark = Marker(pos, name, inst=inst, debug_ent=debug_ent)
-    MARKERS.append(mark)
-    LOGGER.debug('Marker added: {}', mark)
+        debug_ent = add_debug(
+            'info_target',
+            origin=pos,
+            targetname=name,
+            comment='Marker not used',
+        )
+
+        mark = Marker(pos, name, inst=inst, debug_ent=debug_ent)
+        MARKERS.append(mark)
+        LOGGER.debug('Marker added: {}', mark)
+
+    return create
 
 
-@make_test('CheckMarker')
+@conditions.make_test('CheckMarker')
 def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     """Check if markers are present at a position.
 
@@ -103,7 +110,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     if not is_global:
         pos = pos @ orient + origin
 
-    debug_ent = fetch_debug_visgroup(vmf, 'Markers')(
+    debug_ent = conditions.fetch_debug_visgroup(vmf, 'Markers')(
         'path_track',
         origin=pos,
         targetname=name,
