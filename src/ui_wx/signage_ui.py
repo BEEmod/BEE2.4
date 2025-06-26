@@ -1,4 +1,4 @@
-"""Tk-specific implementation of the signage UI."""
+"""Wx-specific implementation of the signage UI."""
 from typing import override
 
 import wx
@@ -15,7 +15,7 @@ from app.signage_ui import IMG_BLANK, SignSlot, SignageUIBase, TRANS_TITLE, TRAN
 
 
 class SignageUI(SignageUIBase[wx.Window]):
-    """Tk-specific implementation of the signage UI."""
+    """Wx-specific implementation of the signage UI."""
     __slots__ = ['drag_man']  # Use a slot to override the superclass' property.
     drag_man: DragDrop[PakRef[Signage]]
 
@@ -64,17 +64,16 @@ class SignageUI(SignageUIBase[wx.Window]):
         sizer_preview_horiz.Add(self.wid_preview_right, 0, wx.ALL, 2)
 
         # Panel holding all possible signage.
-        self.panel_chooser = wx.ScrolledWindow(panel_main, wx.ID_ANY, style=wx.TAB_TRAVERSAL)
-        self.panel_chooser.SetScrollRate(0, 10)
+        self.panel_chooser = chooser = wx.ScrolledWindow(panel_main, wx.ID_ANY, style=wx.TAB_TRAVERSAL)
+        chooser.SetScrollRate(0, 10)
         self.sizer_chooser = wx.WrapSizer(wx.HORIZONTAL)
-        self.panel_chooser.SetSizer(self.sizer_chooser)
-        win.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(self.panel_chooser, self.sizer_chooser))
-
+        chooser.SetSizer(self.sizer_chooser)
+        win.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(chooser, self.sizer_chooser))
         sizer_cols.Add(self.panel_chooser, 1, wx.ALL | wx.EXPAND, 4)
-        # tk_tools.add_mousewheel(canv_all, canv_all, window)
+        # TODO: Make scrolling anywhere on the window scroll the picker.
 
+        # Add the selected-sign slots.
         flags = wx.SizerFlags().Border()
-
         for row, col, slot in self._create_chosen_slots(panel_select):
             sizer_select.Add(self.drag_man.slot_widget(slot), flags)
 
