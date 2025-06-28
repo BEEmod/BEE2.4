@@ -566,26 +566,16 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
             trigger_portal.solids = [whole_map.copy()]
             trigger_portal.add_out(
                 Output(
-                    'OnStartTouchPortal1',
-                    '!activator',
-                    'RunScriptCode',
-                    '__pgun_is_oran <- 0; '
-                    f'__pgun_port_id <- {port_id}; '
-                    '__pgun_active <- 1'
+                    'OnStartTouchPortal1', '@portalgun',
+                    'CallScriptFunction', f'_on_blue{port_id}_open'
                 ),
                 Output(
-                    'OnStartTouchPortal2',
-                    '!activator',
-                    'RunScriptCode',
-                    '__pgun_is_oran <- 1; '
-                    f'__pgun_port_id <- {port_id}; '
-                    '__pgun_active <- 1'
+                    'OnStartTouchPortal2', '@portalgun',
+                    'CallScriptFunction', f'_on_oran{port_id}_open',
                 ),
                 Output(
-                    'OnEndTouchPortal',
-                    '!activator',
-                    'RunScriptCode',
-                    '__pgun_active <- 0',
+                    'OnEndTouchPortal', '@portalgun',
+                    'CallScriptFunction', f'_on_close{port_id}',
                 ),
             )
 
