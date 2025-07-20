@@ -74,13 +74,18 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | Non
 
 def load_conn_icon(fsys: FileSystem, shape: str) -> Image.Image | None:
     """Load the antline signage textures."""
+    filename = f'materials/models/props_map_editor/signage_shape_{shape}.vtf'
     try:
-        file = fsys[f'materials/models/props_map_editor/signage_shape_{shape}.vtf']
+        file = fsys[filename]
     except FileNotFoundError:
         return None
-    with file.open_bin() as f:
-        vtf = VTF.read(f)
-        return vtf.get().to_PIL()
+    try:
+        with file.open_bin() as f:
+            vtf = VTF.read(f)
+            return vtf.get().to_PIL()
+    except Exception as exc:
+        exc.add_note(filename)
+        raise
 
 
 @STEPS.add_step(prereq=[StepResource.VPK_WRITTEN], results=[StepResource.VCONF_DATA, StepResource.RES_SPECIAL])
