@@ -177,7 +177,6 @@ enable_error_code = [
 # TODO: make these pass strict checks.
 module = [
 	'app.backup',
-	'precomp.conditions._scaffold_compat',
 	'precomp.bottomlessPit',
 	'precomp.fizzler',
 	'ui_tk.check_table',

@@ -1,7 +1,7 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from enum import Enum
 import math
 
@@ -9,6 +9,7 @@ from srctools import Vec, Keyvalues, VMF
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
+import utils
 
 
 class LinkType(Enum):
@@ -215,6 +216,7 @@ def legacy_scaffold_link(vmf: VMF) -> None:
                     else:
                         other_node = node.prev
 
+                    assert other_node is not None, (node, link_type)
                     other_offset = get_config(other_node)[1]
                     link_dir = other_offset - offset
 
@@ -254,14 +256,14 @@ def legacy_scaffold_link(vmf: VMF) -> None:
                 logic_inst = vmf.create_ent(
                     classname='func_instance',
                     targetname=node.inst['targetname'],
-                    file=conf.get(
+                    file=cast(str, conf.get(
                         'logic_' + link_type.value + (
                             '_rev' if
                             should_reverse
                             else ''
                             ),
                         '',
-                    ),
+                    )),
                     origin=offset,
                     angles=(
                         '0 0 0' if
@@ -273,13 +275,13 @@ def legacy_scaffold_link(vmf: VMF) -> None:
                 # Add the link-values
                 for linkVar, link in LINKS.items():
                     node.inst.fixup[linkVar] = SCAFF_PATTERN.format(
-                        name=link['name'],
+                        name=utils.not_none(link['name']),
                         group=group_counter,
                         index=index,
                     )
                     if node.next is not None:
-                        node.inst.fixup[link['next']] = SCAFF_PATTERN.format(
-                            name=link['name'],
+                        node.inst.fixup[utils.not_none(link['next'])] = SCAFF_PATTERN.format(
+                            name=utils.not_none(link['name']),
                             group=group_counter,
                             index=index + 1,
                         )
