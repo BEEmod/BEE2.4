@@ -1,7 +1,9 @@
+from trio_util import AsyncValue
 import trio
+import wx
 
 from app import gameMan, img, lifecycle, sound
-from trio_util import AsyncValue
+from ui_wx import MAIN_WINDOW
 from ui_wx.corridor_selector import WxSelector
 from ui_wx.dialogs import DIALOG
 from ui_wx.img import WX_IMG
@@ -20,14 +22,23 @@ async def test(core_nursery: trio.Nursery) -> None:
     core_nursery.start_soon(sound.sound_task)
     loadScreen.main_loader.destroy()
 
+    panel_main = wx.Panel(MAIN_WINDOW)
+    sizer_main = wx.BoxSizer(wx.VERTICAL)
+    panel_main.SetSizer(sizer_main)
+
+    button = wx.Button(panel_main, label='Select')
+    button.SetMinSize((256, 32))
+    button.Bind(wx.EVT_BUTTON, lambda evt: test_sel.show_trigger.trigger())
+    sizer_main.Add(button)
+
+    MAIN_WINDOW.Layout()
+
     test_sel = WxSelector(
         WX_IMG,
         # Will never change.
         AsyncValue(packages.PakRef(packages.Style, packages.CLEAN_STYLE)),
     )
-    core_nursery.start_soon(test_sel.task)
+    core_nursery.start_soon(test_sel.task, button)
 
     # Wait for it to be ready, trigger, wait for it to exit then shutdown.
-    await test_sel.show_trigger.ready.wait_value(True)
-    test_sel.show_trigger.trigger()
     await test_sel.close_event.wait()

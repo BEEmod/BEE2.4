@@ -4,7 +4,7 @@ from typing import Any, Protocol
 
 from typing_extensions import deprecated
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import aclosing
 from enum import Enum
@@ -208,7 +208,7 @@ class WidgetCache[Widget]:
 
 
 @attrs.define(eq=False)
-class ReflowWindow:
+class ReflowWindow(ABC):
     """Base class which handles the logic for a window that reflows contents to fit."""
     # Event set whenever the items need to be redrawn/re-flowed.
     item_pos_dirty: trio.Event = attrs.field(init=False, factory=trio.Event)

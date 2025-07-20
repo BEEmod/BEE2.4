@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final, override, Never
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections.abc import Sequence
 from contextlib import aclosing
 import itertools
@@ -69,6 +69,8 @@ TRANS_ONLY_THIS = TransToken.ui('Use Only This')
 TRANS_GROUP_MODE = TransToken.ui('Game Mode')
 TRANS_GROUP_DIR = TransToken.ui('Corridor Type')
 TRANS_GROUP_ATTACH = TransToken.ui('Attachment Surface')
+TRANS_BTN_NO_CONF = TransToken.ui('Select ({selected}/{total})')
+TRANS_BTN_CONF = TransToken.ui('Select + Configure ({selected}/{total})')
 
 OPTS_MODE = [
     (GameMode.SP, TransToken.ui('SP')),
@@ -137,7 +139,7 @@ class OptionRow:
         raise NotImplementedError
 
 
-class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
+class Selector[IconT: Icon, OptionRowT: OptionRow, OpenButton](ReflowWindow, ABC):
     """Corridor selection UI."""
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
@@ -160,6 +162,8 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     icons: WidgetCache[IconT]
     # The corresponding items for each slot.
     corr_list: list[corridor.CorridorUI]
+    # Widget used to display the corridor, updated to change the text.
+    open_button: OpenButton | None
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -199,8 +203,9 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.corr_list = []
         self.option_rows = []
 
-    async def task(self) -> None:
+    async def task(self, open_button: OpenButton) -> None:
         """Main task handling interaction with the corridor."""
+        self.open_button = open_button
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
@@ -229,6 +234,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         while True:
             await self.select_trigger.wait()
             self.prevent_deselection()
+            self._update_button()
             self.store_conf()
 
     async def _mode_switch_task(self) -> None:
@@ -288,6 +294,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                 enabled[corr.instance.casefold()] = icon.selected
 
         config.APP.store_conf(Config(enabled), self.conf_id)
+        self._update_button()
 
     def load_corridors(self, cur_style: PakRef[Style]) -> None:
         """Fetch the current set of corridors from this style."""
@@ -354,6 +361,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             icon.set_image(corr.icon)
             icon.selected = inst_enabled[corr.instance.casefold()]
         self.icons.hide_unused()
+        self._update_button()
 
         await trio.lowlevel.checkpoint()
         self.prevent_deselection()
@@ -363,6 +371,24 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.displayed_corr.value = None
         # Items must be repositioned.
         self.item_pos_dirty.set()
+
+    def _update_button(self) -> None:
+        """Whenever selections change, update the button text."""
+        if self.open_button is None:
+            return
+        total = 0
+        selected = 0
+        has_conf = bool(self.corr_group.global_options)
+        for (mode, direction, attach), corr_list in self.corr_group.corridors.items():
+            conf = config.APP.get_cur_conf(Config, Config.get_id(self.corr_group.id, mode, direction, attach))
+            for corr in corr_list:
+                if conf.enabled.get(corr.instance.casefold(), corr.default_enabled):
+                    selected += 1
+                if corr.option_ids:
+                    has_conf = True
+                total += 1
+        token = TRANS_BTN_CONF if has_conf else TRANS_BTN_NO_CONF
+        self.ui_set_btn_text(self.open_button, token.format(selected=selected, total=total))
 
     @override
     def evt_window_resized(self, event: object) -> None:
@@ -414,6 +440,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             icon.set_highlight(True)
             self.sticky_corr = corr
             self.displayed_corr.value = corr
+        self._update_button()
 
     def evt_select_one(self) -> None:
         """Select just the sticky corridor."""
@@ -422,6 +449,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                 icon.selected = corr is self.sticky_corr
             self.ui_enable_just_this(False)
             self.prevent_deselection()
+            self._update_button()
 
     async def _display_task(self) -> None:
         """This runs continually, updating which corridor is shown."""
@@ -592,28 +620,28 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         )
 
     @abstractmethod
-    async def ui_task(self) -> None:
+    async def ui_task(self, /) -> None:
         """Task which is run to update the UI."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_win_hide(self) -> None:
+    def ui_win_hide(self, /) -> None:
         """Hide the window."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_win_show(self) -> None:
+    def ui_win_show(self, /) -> None:
         """Show the window."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_win_getsize(self) -> tuple[int, int]:
+    def ui_win_getsize(self, /) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_enable_just_this(self, enable: bool) -> None:
-        """Set whether the just this button is pressable."""
+    def ui_enable_just_this(self, enable: bool, /) -> None:
+        """Set whether the "just this" button is pressable."""
         raise NotImplementedError
 
     @abstractmethod
@@ -629,15 +657,20 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         raise NotImplementedError
 
     @abstractmethod
+    def ui_set_btn_text(self, button: OpenButton, text: TransToken, /) -> None:
+        """Change the text on the button used to open the selector."""
+        raise NotImplementedError
+
+    @abstractmethod
     def ui_desc_set_img_state(self, handle: img.Handle | None, left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_option_create(self) -> OptionRowT:
+    def ui_option_create(self, /) -> OptionRowT:
         """Create a new option row."""
         raise NotImplementedError
 
-    def ui_option_refreshed(self) -> None:
+    def ui_option_refreshed(self, /) -> None:
         """Called when the options have changed, so they can re re-layouted."""
         # If not defined, do nothing.

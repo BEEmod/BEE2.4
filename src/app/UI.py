@@ -514,6 +514,7 @@ async def init_option(
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
         nursery.start_soon(voice_conf_task)
         nursery.start_soon(export_btn_task)
+        nursery.start_soon(corridor.task, corr_button)
         while True:
             await trio_util.wait_any(*[
                 window.chosen.wait_transition
@@ -692,7 +693,6 @@ async def init_windows(
     )
     corridor = TkSelector(tk_img, cur_style)
     await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
-    core_nursery.start_soon(corridor.task)
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()

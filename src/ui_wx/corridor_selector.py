@@ -197,7 +197,7 @@ class OptionRowUI(OptionRow):
             self.current.value = self._value_order[ind]
 
 
-class WxSelector(Selector[IconUI, OptionRowUI]):
+class WxSelector(Selector[IconUI, OptionRowUI, wx.Button]):
     """Wx implementation of the corridor selector."""
     def __init__(self, wx_img: WXImages, cur_style: AsyncValue[packages.PakRef[packages.Style]]) -> None:
         self_ref = self
@@ -362,6 +362,10 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
     @override
     def ui_enable_just_this(self, enable: bool) -> None:
         self.btn_just_this.Enabled = enable
+
+    @override
+    def ui_set_btn_text(self, button: wx.Button, text: TransToken, /) -> None:
+        set_text(button, text)
 
     @override
     def ui_desc_display(

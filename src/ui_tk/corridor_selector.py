@@ -140,7 +140,7 @@ class OptionRowUI(OptionRow):
         self.current.value = self._value_order[self.combo.current()]
 
 
-class TkSelector(Selector[IconUI, OptionRowUI]):
+class TkSelector(Selector[IconUI, OptionRowUI, ttk.Button]):
     """Corridor selection window."""
     win: tk.Toplevel
 
@@ -351,19 +351,20 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
 
     @override
     def ui_win_show(self) -> None:
-        """Show the window."""
         self.win.deiconify()
         tk_tools.center_win(self.win, TK_ROOT)
 
     @override
     def ui_win_getsize(self) -> tuple[int, int]:
-        """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
 
     @override
     def ui_enable_just_this(self, enable: bool) -> None:
-        """Set whether the just this button is pressable."""
         self.btn_just_this.state(('!disabled', ) if enable else ('disabled', ))
+
+    @override
+    def ui_set_btn_text(self, button: ttk.Button, text: TransToken) -> None:
+        set_text(button, text)
 
     @override
     def ui_desc_display(
@@ -374,7 +375,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         options_title: TransToken,
         show_no_options: bool,
     ) -> None:
-        """Display information for a corridor."""
         set_text(self.wid_title, title)
         set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
