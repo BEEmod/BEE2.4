@@ -297,7 +297,7 @@ async def make_widgets(
             set_suggested(packset, music_id)
 
             if music_id == utils.ID_NONE:
-                disable_children = True
+                disable_children = False  # We allow test element music by itself.
             else:
                 # If we have an instance, it's "custom" behaviour, so disable
                 # all the sub-channels.
