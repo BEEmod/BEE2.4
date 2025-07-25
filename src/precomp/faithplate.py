@@ -109,6 +109,10 @@ def associate_faith_plates(vmf: VMF) -> None:
     target_to_pos: dict[str, Vec | tiling.TileDef] = {}
 
     for targ in vmf.by_class['info_target']:
+        if targ.hidden and not targ.vis_shown:
+            # We often place info_targets for debugging purposes.
+            # These are hidden by visgroup, ignore.
+            continue
         name = targ['targetname']
         # All should be faith targets, with this name.
         if not name.endswith('-target'):
