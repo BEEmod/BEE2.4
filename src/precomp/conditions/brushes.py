@@ -10,7 +10,7 @@ import srctools.logger
 
 from precomp import (
     conditions, tiling, texturing, rand, corridor, collisions,
-    instance_traits, brushLoc, faithplate, template_brush,
+    instance_traits, brushLoc, faithplate, template_brush, instanceLocs,
 )
 from editoritems_props import PanelAnimation
 import utils
@@ -731,31 +731,6 @@ def res_import_template(
             else:
                 inst.fixup[picker_var] = ''
     return place_template
-
-
-@conditions.make_result('MarkAntigel')
-def res_antigel(vmf: VMF, inst: Entity) -> None:
-    """Implement the Antigel marker."""
-    inst.remove()
-    origin = Vec.from_str(inst['origin'])
-    orient = Matrix.from_angstr(inst['angles'])
-
-    pos: Vec = round(origin - orient.up(128), 6)
-    norm: Vec = round(orient.up(), 6)
-    grid_pos = origin // 128
-    texturing.ANTIGEL_LOCS.add(grid_pos.freeze())
-    texturing.ANTIGEL_BY_NORMAL[norm.freeze()].add(pos.freeze())
-
-    add_debug = conditions.fetch_debug_visgroup(vmf, 'AntiGel')
-    add_debug(
-        'info_particle_system',
-        origin=(origin - orient.up(64)),
-        angles=norm.to_angle(),
-    )
-    add_debug(
-        'info_target',
-        origin=(grid_pos * 128) + (64, 64, 64),
-    )
 
 
 # Position -> entity

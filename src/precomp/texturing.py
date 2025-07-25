@@ -150,7 +150,7 @@ ORIENTS = {
 ANTIGEL_MATS: dict[str, str] = {}
 # The folder to add them to
 ANTIGEL_PATH = 'BEE2/antigel/gen/'
-# The center of each voxel containing an antigel marker.
+# The grid position of each voxel containing an antigel marker.
 # Surfaces inside here that aren't a voxel side will be converted.
 ANTIGEL_LOCS: set[FrozenVec] = set()
 # And then for each normal direction, if an antigel marker was defined there.

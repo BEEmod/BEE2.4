@@ -1169,7 +1169,7 @@ class TileDef:
             # Should not happen, don't crash.
             LOGGER.warning('Non-axis-aligned tiledef?: {!r}', self)
             return False
-        return self.pos.freeze() in plane
+        return self.pos.freeze() // 128 in plane
 
     def should_bevel(self, u: Axis, v: Axis) -> bool:
         """Check if this side of the TileDef should be bevelled.
