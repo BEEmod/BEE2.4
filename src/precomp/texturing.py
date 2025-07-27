@@ -386,20 +386,22 @@ class MaterialConf:
 
         uaxis.scale *= self.scale
         vaxis.scale *= self.scale
-        if self.rotation is not QuarterRot.NONE:
-            u_axis, v_axis = uaxis.vec(), vaxis.vec()
-            # Convert the offset values into an offset from the origin, then rotate.
-            # We can then extract the new offset via u/v axis dotting.
-            offset = u_axis * uaxis.offset + v_axis * vaxis.offset
-            orient = Matrix.axis_angle(face.normal(), self.rotation.value)
-            offset @= orient
-            u_axis @= orient
-            v_axis @= orient
-
-            face.uaxis = UVAxis(u_axis.x, u_axis.y, u_axis.z, Vec.dot(offset, u_axis), uaxis.scale)
-            face.vaxis = UVAxis(v_axis.x, v_axis.y, v_axis.z, Vec.dot(offset, v_axis), vaxis.scale)
-            # Doesn't actually do anything, but makes Hammer look nicer.
-            face.ham_rot = (face.ham_rot + self.rotation.value) % 360
+        match self.rotation:
+            case QuarterRot.NONE:
+                pass
+            case QuarterRot.ROT_90:
+                face.uaxis = UVAxis(-vaxis.x, -vaxis.y, -vaxis.z, vaxis.offset, vaxis.scale)
+                face.vaxis = UVAxis(uaxis.x, uaxis.y, uaxis.z, uaxis.offset, uaxis.scale)
+                # Doesn't actually do anything, but makes Hammer look nicer.
+                face.ham_rot = (face.ham_rot + 90) % 360
+            case QuarterRot.ROT_180:
+                face.uaxis = UVAxis(-uaxis.x, -uaxis.y, -uaxis.z, uaxis.offset, uaxis.scale)
+                face.vaxis = UVAxis(-vaxis.x, -vaxis.y, -vaxis.z, vaxis.offset, vaxis.scale)
+                face.ham_rot = (face.ham_rot + 180) % 360
+            case QuarterRot.ROT_270:
+                face.uaxis = UVAxis(vaxis.x, vaxis.y, vaxis.z, vaxis.offset, vaxis.scale)
+                face.vaxis = UVAxis(-uaxis.x, -uaxis.y, -uaxis.z, uaxis.offset, uaxis.scale)
+                face.ham_rot = (face.ham_rot + 270) % 360
 
     def apply_over(self, over: Entity) -> None:
         """Apply the config to an overlay."""
