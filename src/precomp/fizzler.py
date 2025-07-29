@@ -44,28 +44,6 @@ MATMOD_OFFSETS = [
 ]
 
 
-class TexGroup(Enum):
-    """Types of textures used for fizzlers."""
-    # These set for fizzlers.
-    LEFT = 'left'
-    RIGHT = 'right'
-    CENTER = 'center'
-    SHORT = 'short'  # 128 field
-
-    # Other types:
-    FITTED = 'fitted'  # If set, use this for all - scaled like laserfields do.
-    # If set, it's an invisible trigger/clip - just apply this to all sides.
-    TRIGGER = 'trigger'
-    # If set, overrides material used for the invisible 1/4 section to the top of goo.
-    GOO = 'goo'
-
-    # Special case - for Tag fizzlers, when it's on for that side.
-    TAG_ON_LEFT = 'tag_left'
-    TAG_ON_RIGHT = 'tag_right'
-    TAG_ON_CENTER = 'tag_center'
-    TAG_ON_SHORT = 'tag_short'
-
-
 class ModelName(Enum):
     """The method used to give names for models."""
     SAME = 'same'  # The same as the base
@@ -107,6 +85,53 @@ class FizzBeam:
     speed_max: int
 
 
+@final
+@attrs.frozen
+class FizzTexture:
+    """The set of textures for a fizzler."""
+    left: str
+    right: str
+    center: str
+    short: str | None  # 128 field
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, prefix: str) -> FizzTexture:
+        """Parse from keyvalues."""
+        return cls(
+            kv[f'{prefix}_left'],
+            kv[f'{prefix}_right'],
+            kv[f'{prefix}_center'],
+            kv[f'{prefix}_short', None],
+        )
+
+
+@attrs.frozen(kw_only=True)
+class Textures:
+    """Textures that can be used."""
+    # Either a FizzTexture, or one used for the whole surface.
+    primary: str | FizzTexture
+
+    # Only relevant if non-fizzler
+    # If set, fit the texture like a laserfield.
+    # Otherwise, it's a trigger/clip, apply to all sides.
+    is_fitted: bool = False
+
+    # If set, overrides material used for the invisible 1/4 section to the top of goo.
+    goo: str | None = None
+
+    # Special case - for Tag fizzlers, when it's on for that side.
+    tag_on: FizzTexture | None = None
+
+    def __attrs_post_init__(self) -> None:
+        """Both short mats must match."""
+        if isinstance(self.primary, FizzTexture) and self.tag_on is not None:
+            assert (self.primary.short is None) is (self.tag_on.short is None), self
+
+    @property
+    def is_trigger(self) -> bool:
+        return not self.is_fitted
+
+
 def read_configs(conf: Keyvalues) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
@@ -146,9 +171,7 @@ def read_configs(conf: Keyvalues) -> None:
         # Add a paint fizzler brush to these fizzlers.
         fizz.brushes.append(FizzlerBrush(
             brush_name,
-            textures={
-                TexGroup.TRIGGER: consts.Tools.TRIGGER,
-            },
+            textures=Textures(primary=consts.Tools.TRIGGER, is_fitted=False),
             keys={
                 'classname': 'trigger_paint_cleanser',
                 'startdisabled': brush_start_disabled or '0',
@@ -645,7 +668,7 @@ class FizzlerBrush:
     def __init__(
         self,
         name: str,
-        textures: dict[TexGroup, str | None],
+        textures: Textures,
         keys: dict[str, str],
         local_keys: dict[str, str],
         outputs: list[Output],
@@ -662,6 +685,7 @@ class FizzlerBrush:
         self.local_keys = local_keys
         self.name = name  # Local name of the fizzler brush.
         self.outputs = list(outputs)
+        self.textures = textures
         # Width of the brush.
         self.thickness = thickness
         # If set, a colour to apply to the sides.
@@ -674,7 +698,8 @@ class FizzlerBrush:
         self.stretch_center = stretch_center
 
         # If set, this is allowed to extend into the goo underneath the fizzler.
-        self.goo_extend = goo_extend
+        # If a custom texture is provided, force this on.
+        self.goo_extend = textures.goo is not None or goo_extend
 
         # If set, store a 'axis' variable in VScript to the plane.
         self.set_axis_var = set_axis_var
@@ -692,14 +717,6 @@ class FizzlerBrush:
         self.mat_mod_var = mat_mod_var
         self.mat_mod_name = mat_mod_name
 
-        # TODO: Make this some classes or something, enforce that all required textures are provided.
-        self.textures: dict[TexGroup, str | None] = {}
-        for group in TexGroup:
-            self.textures[group] = textures.get(group, None)
-
-        if self.textures[TexGroup.GOO]:
-            self.goo_extend = True
-
     @classmethod
     def parse(cls, conf: Keyvalues, fizz_id: utils.ObjectID) -> FizzlerBrush:
         """Parse from a config file."""
@@ -714,9 +731,36 @@ class FizzlerBrush:
             conf.find_children('Outputs')
         ]
 
-        textures: dict[TexGroup, str | None] = {}
-        for group in TexGroup:
-            textures[group] = conf['tex_' + group.value, None]
+        if 'tex_trigger' in conf:
+            textures = Textures(primary=conf['tex_trigger'], is_fitted=False)
+        elif 'tex_fitted' in conf:
+            textures = Textures(primary=conf['tex_fitted'], is_fitted=True)
+        else:
+            try:
+                tex_fiz = FizzTexture.parse(conf, 'tex')
+            except LookupError as exc:
+                raise LookupError(
+                    f'No textures defined for fizzler {fizz_id} - '
+                    f'must define "tex_fitted", "tex_trigger", or all of "tex_left"/"_right"/"_center"!'
+                ) from exc
+            if 'tex_tag_left' in conf or 'tex_tag_right' in conf or 'tex_tag_center' in conf:
+                try:
+                    tex_tag = FizzTexture.parse(conf, 'tex_tag')
+                    if (tex_tag.short is None) is not (tex_fiz.short is None):
+                        raise LookupError('Short definition mismatch.')
+                except LookupError as exc:
+                    raise LookupError(
+                        f'Fizzler {fizz_id} defined partial Aperture Tag on-fizzler definition! '
+                        'If specified, all "tex_tag_left"/"_right"/"_center" must be defined, '
+                        'plus "_short" if the original does.'
+                    ) from exc
+            else:
+                tex_tag = None
+            textures = Textures(primary=tex_fiz, tag_on=tex_tag)
+        try:
+            textures = attrs.evolve(textures, goo=conf['tex_goo'])
+        except LookupError:
+            pass  # No goo material
 
         keys = {
             prop.name: prop.value
@@ -808,20 +852,18 @@ class FizzlerBrush:
 
         origin = (pos + neg)/2
 
-        # If either of these, we only need 1 brush.
-        trigger_tex = self.textures[TexGroup.TRIGGER]
-        fitted_tex = self.textures[TexGroup.FITTED]
-        # If we don't have this, we can't be a single brush.
-        short_tex = self.textures[TexGroup.SHORT]
+        tex_primary = self.textures.primary
 
-        if trigger_tex or fitted_tex:
-            tex_size = LASER_TEX_SIZE
-        else:
-            # Fizzlers are larger resolution..
+        if isinstance(tex_primary, FizzTexture):
+            # Fizzlers are larger resolution.
             tex_size = FIZZLER_TEX_SIZE
+        else:
+            tex_size = LASER_TEX_SIZE
 
         # Treat 127.9999 as 128, etc.
-        if (round(field_length) == 128 and short_tex) or trigger_tex or fitted_tex:
+        if isinstance(tex_primary, str) or (
+            round(field_length) == 128 and tex_primary.short is not None
+        ):
             # We need only one brush.
             brush = vmf.make_prism((
                 origin
@@ -834,11 +876,18 @@ class FizzlerBrush:
                 - (field_length / 2) * field_axis
             )).solid
             yield brush
-            if trigger_tex:
+            if isinstance(tex_primary, str) and self.textures.is_trigger:
                 for side in brush.sides:
-                    side.mat = trigger_tex
-                used_tex_func(trigger_tex)
+                    side.mat = tex_primary
+                used_tex_func(tex_primary)
             else:
+                if isinstance(tex_primary, FizzTexture):
+                    tex_short_off = tex_primary.short
+                    tex_short_on = (self.textures.tag_on or tex_primary).short
+                    assert tex_short_off is not None, self.textures
+                    assert tex_short_on is not None, self.textures
+                else:
+                    tex_short_on = tex_short_off = tex_primary
                 for side in brush.sides:
                     side_norm = side.normal()
 
@@ -848,13 +897,11 @@ class FizzlerBrush:
                     if abs(side_norm) != normal:
                         continue
 
-                    side.mat = fitted_tex or self.textures[
-                        TexGroup.TAG_ON_SHORT if (
-                            fizz.tag_on_pos
-                            if normal.dot(side_norm) > 0 else
-                            fizz.tag_on_neg
-                        ) else TexGroup.SHORT
-                    ]
+                    side.mat = tex_short_on if (
+                        fizz.tag_on_pos
+                        if normal.dot(side_norm) > 0 else
+                        fizz.tag_on_neg
+                    ) else tex_short_off
                     used_tex_func(side.mat)
 
                     self._texture_fit(
@@ -863,8 +910,7 @@ class FizzlerBrush:
                         field_length,
                         fizz,
                         neg,
-                        pos,
-                        bool(fitted_tex),
+                        self.textures.is_fitted,
                     )
 
                     if not self.stretch_center:
@@ -939,11 +985,11 @@ class FizzlerBrush:
                     if abs(side_norm) != abs(normal):
                         continue
 
-                    tag_enabled = (
+                    tex_chosen = (self.textures.tag_on or tex_primary) if (
                         fizz.tag_on_pos
                         if normal.dot(side_norm) > 0 else
                         fizz.tag_on_neg
-                    )
+                    ) else tex_primary
 
                     self._texture_fit(
                         side,
@@ -951,16 +997,11 @@ class FizzlerBrush:
                         brush_length,
                         fizz,
                         neg,
-                        pos,
                     )
 
                     if model_normal is None:
                         # Center textures.
-                        side.mat = self.textures[
-                            TexGroup.TAG_ON_CENTER
-                            if tag_enabled else
-                            TexGroup.CENTER
-                        ]
+                        side.mat = tex_chosen.center
                         if not self.stretch_center:
                             side.uaxis.scale = 0.25
                     else:
@@ -968,17 +1009,9 @@ class FizzlerBrush:
                         # direction the texture should be in. The uaxis is
                         # in the direction of the surface.
                         if side.uaxis.vec() == model_normal:
-                            side.mat = self.textures[
-                                TexGroup.TAG_ON_RIGHT
-                                if tag_enabled else
-                                TexGroup.RIGHT
-                            ]
+                            side.mat = tex_chosen.right
                         else:
-                            side.mat = self.textures[
-                                TexGroup.TAG_ON_LEFT
-                                if tag_enabled else
-                                TexGroup.LEFT
-                            ]
+                            side.mat = tex_chosen.left
                     used_tex_func(side.mat)
 
     def _texture_fit(
@@ -988,7 +1021,6 @@ class FizzlerBrush:
         field_length: float,
         fizz: Fizzler,
         neg: Vec,
-        pos: Vec,
         is_laserfield: bool = False,
     ) -> None:
         """Calculate the texture offsets required for fitting a texture."""
@@ -1045,21 +1077,21 @@ def make_model_namer(fizz_type: FizzlerType, fizz_name: str) -> Callable[[int], 
     """Define a function which applies the model naming."""
     local_name = fizz_type.model_name
     if fizz_type.model_naming is ModelName.SAME:
-        def get_model_name(ind: int) -> str:
+        def get_model_name(_: int, /) -> str:
             """Give every emitter the base's name."""
             return fizz_name
     elif fizz_type.model_naming is ModelName.LOCAL:
-        def get_model_name(ind: int) -> str:
+        def get_model_name(_: int, /) -> str:
             """Give every emitter a name local to the base."""
             return f'{fizz_name}-{local_name}'
     elif fizz_type.model_naming is ModelName.PAIRED:
-        def get_model_name(ind: int) -> str:
+        def get_model_name(ind: int, /) -> str:
             """Give each pair of emitters the same unique name."""
             return f'{fizz_name}-{local_name}{ind:02}'
     elif fizz_type.model_naming is ModelName.UNIQUE:
         model_index = 0
 
-        def get_model_name(ind: int) -> str:
+        def get_model_name(_: int, /) -> str:
             """Give every model a unique name."""
             nonlocal model_index
             model_index += 1
@@ -1530,7 +1562,7 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
                 if brush_type.mat_mod_var is not None:
                     used_tex_func = mat_mod_tex[brush_type].add
                 else:
-                    def used_tex_func(texture: str, /) -> None:
+                    def used_tex_func(_: str, /) -> None:
                         """If not, ignore those calls."""
                         return None
 
@@ -1542,10 +1574,11 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
                 if brush_type.goo_extend and goo_runs:
                     # Extend this into the goo below. 96 would be the surface, but extend further to prevent
                     # dipping cubes into goo.
-                    mat = (
-                        brush_type.textures[TexGroup.GOO]
-                        or brush_type.textures[TexGroup.TRIGGER]
-                        or brush_type.textures[TexGroup.CENTER]
+                    tex_primary = brush_type.textures.primary
+                    mat = brush_type.textures.goo or (
+                        tex_primary.center
+                        if isinstance(tex_primary, FizzTexture)
+                        else tex_primary
                     )
                     normal = fizz.normal()
                     for start, end in goo_runs:
@@ -1554,7 +1587,7 @@ def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
                         else:
                             # Need a separate one. Don't bother with the mat-mod, this should be invisible.
                             goo_brush_ent = brush_type.generate_ent(
-                                vmf, fizz, (start + end) / 2 - (0, 0, 104),
+                                vmf, fizz, (start + end) / 2 - Vec(0.0, 0.0, 104.0),
                             )
                             if goo_brush_ent['classname'] == 'trigger_portal_cleanser':
                                 goo_brush_ent['visible'] = '0'
