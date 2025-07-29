@@ -8,8 +8,7 @@ from collections import deque
 from pathlib import Path, PurePath
 from typing import Literal, override
 
-from collections.abc import Callable, Generator, Iterable
-from tempfile import NamedTemporaryFile
+from collections.abc import Callable, Generator
 import contextlib
 import functools
 import os
@@ -162,7 +161,6 @@ class PygletSound(NullSound):
                 # We were called before the BG thread loaded em, load it now.
                 LOGGER.warning('Sound "{}" couldn\'t be loaded in time!', sound)
                 snd = await self.load(sound)
-            marker = object()
             if snd is None:
                 await trio.lowlevel.checkpoint()
                 return
@@ -270,7 +268,6 @@ try:
     from pyglet.clock import tick
     from pyglet.media.codecs import Source
     from pyglet.media.codecs.ffmpeg import FFmpegDecoder
-    import pyglet.media
 
     decoder = FFmpegDecoder()
     sounds = PygletSound()

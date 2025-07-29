@@ -15,9 +15,9 @@ pythonVersion = "3.12"
 strictParameterNoneValue = false
 
 [tool.isort]
-sections=["FUTURE", "TYPING", "FRAMEWORK", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-known_framework = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
-extra_standard_library = ["importlib_resources", "exceptiongroup"]
+sections=["FUTURE", "TYPING", "TK", "STDLIB", "FRAMEWORK", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+known_tk = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
+known_framework = ["wx", "trio"]
 known_typing = ["typing", "typing_extensions"]
 no_lines_before = ["TYPING", "STDLIB"]
 known_third_party = ["hammeraddons", "srctools", "trio_util", "aioresult"]
@@ -43,7 +43,7 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI",
+	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI", "FURB",
 	"PLC", "PLE", "PLW",  # Pylint.
 	"YTT",
 
@@ -51,9 +51,7 @@ select = [
 	"TC008",  # Remove type alias quotes
 	"TC010",  # String in union.
 ]
-allowed-confusables = [
-	"×",  # Multiplication sign
-]
+external = ["ASYNC"]
 extend-ignore = [
 	"E201", "E202", "E203", "E221", "E222", "E241", # Allow extra whitespace.
 	"E226",  # Allow 4*6 + 8
@@ -61,7 +59,7 @@ extend-ignore = [
 	"E731",  # Lambda assignment used intentionally for callbacks.
 	"F403",  # Allow *-imports,
 	"F405",  # name may be undefined, or defined from star imports: module
-	"F841",  # Unused local triggers on partial unpacks.
+	"RUF059",  # Allow unused locals inside tuple unpacks
 
 	# Flake8-annotations.
 	"ANN401",  # Allow typing.Any
@@ -102,6 +100,9 @@ extend-ignore = [
 	# Start arg for range is sometimes clearer
 	"PIE808",
 	]
+allowed-confusables = [
+	"×",  # Multiplication sign
+]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
@@ -153,8 +154,9 @@ warn_no_return = true
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
 disallow_untyped_decorators = true
-disallow_untyped_calls = true
+#disallow_untyped_calls = true
 disallow_any_generics = false
+#untyped_calls_exclude = ["tkinter", "tkinter.ttk"]
 
 enable_error_code = [
 	'comparison-overlap',
@@ -178,7 +180,6 @@ enable_error_code = [
 module = [
 	'app.backup',
 	'precomp.bottomlessPit',
-	'precomp.fizzler',
 	'ui_tk.check_table',
 ]
 strict_optional = false
