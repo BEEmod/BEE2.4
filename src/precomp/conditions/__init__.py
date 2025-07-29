@@ -878,7 +878,7 @@ def check_test(
     try:
         func = TEST_LOOKUP[name]
     except KeyError:
-        err_msg = f'"{name}" is not a valid condition flag!'
+        err_msg = f'The following is not a valid condition flag:\n{test!s}'
         if utils.DEV_MODE:
             # Crash here.
             raise ValueError(err_msg) from None
