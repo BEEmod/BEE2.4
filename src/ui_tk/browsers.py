@@ -110,6 +110,7 @@ class SoundBrowser(SoundBrowserBase):
 
     @override
     def _ui_get_selected(self) -> AnySound | None:
+        sel_ind: int
         try:
             [sel_ind] = self.wid_items.curselection()
             return self._item_data[sel_ind]

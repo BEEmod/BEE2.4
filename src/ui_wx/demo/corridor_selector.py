@@ -26,6 +26,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     sizer_main = wx.BoxSizer(wx.VERTICAL)
     panel_main.SetSizer(sizer_main)
 
+    test_sel: WxSelector
     button = wx.Button(panel_main, label='Select')
     button.SetMinSize((256, 32))
     button.Bind(wx.EVT_BUTTON, lambda evt: test_sel.show_trigger.trigger())
@@ -40,5 +41,5 @@ async def test(core_nursery: trio.Nursery) -> None:
     )
     core_nursery.start_soon(test_sel.task, button)
 
-    # Wait for it to be ready, trigger, wait for it to exit then shutdown.
+    # Wait for it to exit then shutdown.
     await test_sel.close_event.wait()
