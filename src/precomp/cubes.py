@@ -612,11 +612,10 @@ class CubePair:
             self.spawn_offset = Vec()
 
         # Addons to attach to the cubes.
-        # Use a set to ensure it doesn't have two copies.
-        self.addons: set[CubeAddon] = set()
+        self.addons: list[tuple[CubeAddon, EntityFixup]] = []
 
         if cube_type.overlay_addon is not None:
-            self.addons.add(cube_type.overlay_addon)
+            self.addons.append((cube_type.overlay_addon, cube_fixup))
 
         # Outputs to fire on the cubes.
         self.outputs: dict[CubeOutputs, list[Output]] = {
@@ -1087,7 +1086,7 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
         LOGGER.warning('Cube Addon applied to non cube ("{}")', res.value)
         return
 
-    pair.addons.add(addon)
+    pair.addons.append((addon, inst.fixup))
 
 
 @conditions.make_result(
@@ -1832,7 +1831,7 @@ def make_cube(
                 spawn_paint = CubePaintType.CLEAR
 
     has_addon_inst = False
-    for addon in pair.addons:
+    for addon, addon_fixup in pair.addons:
         if addon.inst:
             has_addon_inst = True
             inst = conditions.add_inst(
@@ -1847,6 +1846,10 @@ def make_cube(
                 ),
                 file=addon.inst,
             )
+            # The addon instance should override the cube, but cube values should be available.
+            fixup = EntityFixup()
+            fixup.update(pair.cube_fixup)
+            fixup.update(addon_fixup)
             if addon.fixups is not None:
                 for fixup_var, fixup_src in addon.fixups:
                     match fixup_src:
@@ -1863,11 +1866,11 @@ def make_cube(
                         case AddonFixups.SUPERPOS:
                             inst.fixup[fixup_var] = pair.superpos is not None
                         case str() as fixup_val:
-                            inst.fixup[fixup_var] = pair.cube_fixup.substitute(fixup_val, allow_invert=True)
+                            inst.fixup[fixup_var] = fixup.substitute(fixup_val, allow_invert=True)
                         case never:
                             assert_never(never)
             else:
-                inst.fixup.update(pair.cube_fixup)
+                inst.fixup.update(fixup)
         packing.pack_list(vmf, addon.pack)
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
@@ -2021,9 +2024,12 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
         cubes: list[Entity] = []
 
         # Transfer addon outputs to the pair data.
-        for addon in pair.addons:
+        for addon, addon_fixup in pair.addons:
             for out_type, out_list in addon.outputs.items():
-                pair.outputs[out_type].extend(out_list)
+                pair.outputs[out_type] += [
+                    out.substitute_fixup(addon_fixup)
+                    for out in out_list
+                ]
 
         # Generate the outputs to paint the cubes.
         if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
