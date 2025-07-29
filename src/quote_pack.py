@@ -291,6 +291,8 @@ class Quote:
                 priority = conv_int(child.value)
             elif child.name == 'name':
                 name = TransToken.parse(pak_id, child.value)
+            elif child.name == 'id':
+                LOGGER.warning('Quote does not require an ID value:\n{!s}', kv)
             else:
                 tests.append(child)
         return cls(tests, priority, name, lines)
