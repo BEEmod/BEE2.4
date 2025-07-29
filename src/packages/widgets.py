@@ -554,4 +554,4 @@ class TimerOptions:
 KIND_ITEM_VARIANT = WIDGET_KINDS['itemvariant']
 KIND_CHECKMARK = register_no_conf('boolean', 'bool', 'checkbox')
 KIND_COLOR = register_no_conf('color', 'colour', 'rgb')
-KIND_STRING = register_no_conf('string', 'str')
+KIND_STRING = register_no_conf('string', 'str', 'text')
