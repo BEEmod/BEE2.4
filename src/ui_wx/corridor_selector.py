@@ -26,9 +26,10 @@ from trio_util import AsyncValue
 
 from .img import ImageSlot, WXImages
 from . import (
-    MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel,
+    PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel,
     set_fixed_size,
 )
+from .mdown_win import MARKDOWN, RichWindow
 from .wid_transtoken import set_text, set_tooltip, set_win_title
 from .widgets import EnumButton
 
@@ -211,6 +212,7 @@ class WxSelector(Selector[IconUI, OptionRowUI, wx.Button]):
                 | wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER | wx.SYSTEM_MENU,
         )
         self.win.Bind(wx.EVT_CLOSE, lambda evt: self_ref.close_event.set())
+        self.win.SetMinSize(wx.Size(1600, 600))
         set_win_title(self.win, TRANS_TITLE)
 
         self.win_splitter = wx.SplitterWindow(self.win, style=wx.SP_BORDER)
@@ -252,7 +254,7 @@ class WxSelector(Selector[IconUI, OptionRowUI, wx.Button]):
         self.wid_authors = wx.StaticText(self.pane_right)
         sizer_right.Add(self.wid_authors, wx.SizerFlags().CenterHorizontal())
 
-        self.wid_desc = wx.html.HtmlWindow(self.pane_right, wx.ID_ANY)
+        self.wid_desc = RichWindow(self.pane_right)
         sizer_right.Add(self.wid_desc, 1, wx.EXPAND, 0)
 
         sizer_right.Add(0, 8)
@@ -378,7 +380,7 @@ class WxSelector(Selector[IconUI, OptionRowUI, wx.Button]):
     ) -> None:
         set_text(self.wid_title, title)
         set_text(self.wid_authors, authors)
-        self.wid_desc.SetPage(MARKDOWN.convert(desc))
+        self.wid_desc.set_markdown(desc)
         set_text(self.wid_options_title, options_title)
         self.wid_no_options.Show(show_no_options)
         self.sizer_right.Layout()

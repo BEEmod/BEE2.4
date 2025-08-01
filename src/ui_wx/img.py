@@ -1,13 +1,14 @@
 """Image integrations for WxWidgets."""
 from __future__ import annotations
 
-from typing import Final, override
+from typing import Final, override, Callable
 from weakref import ReferenceType as WeakRef, WeakKeyDictionary
-import wx
+import secrets
 import os
 
 from PIL import Image
 from srctools.logger import get_logger
+import wx
 import attrs
 
 from app import img
@@ -19,6 +20,8 @@ type WxImgWidgets = wx.StaticBitmap | wx.GenericStaticBitmap | wx.Button | wx.Bi
 LOGGER = get_logger(__name__)
 basic_users: WeakKeyDictionary[WxImgWidgets, BasicUser] = WeakKeyDictionary()
 menu_users: WeakKeyDictionary[wx.Menu, MenuUser] = WeakKeyDictionary()
+
+wx.Image.AddHandler(wx.PNGHandler())
 
 
 def get_app_icon(path: os.PathLike[str]) -> wx.Bitmap:
@@ -83,12 +86,13 @@ class Bundle(wx.BitmapBundleImpl):
                 bitmap.CopyFromBuffer(sized.tobytes(), wx.BitmapBufferFormat_RGB)
             case _:
                 raise ValueError(f'Unknown PIL mode: {sized.mode}!')
+        LOGGER.debug('GetBitmap() {} = {} valid={}', size_tup, bitmap, bitmap.IsOk())
         return bitmap
 
 
 class WxUser(img.User):
     """Common methods."""
-    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle, /) -> None:
         """Apply this Wx image to users of it."""
 
 
@@ -187,6 +191,63 @@ class ImageSlot(WxUser):
         """Handle the widget being destroyed."""
         if self._handle is not None:
             self._handle._decref(self)
+
+
+# noinspection PyProtectedMember
+class ImageFSHandler(wx.MemoryFSHandler, WxUser):
+    """A WX memory filesystem which makes images accessible."""
+    def __init__(self, refresh: Callable[[], object]) -> None:
+        super().__init__()
+        self._fnames: dict[img.Handle, tuple[str, wx.Bitmap]] = {}
+        self._old_names: list[str] = []
+        self._refresh = refresh
+        # Don't let users guess the filename used
+        self._prefix = f'image_{secrets.token_urlsafe(16)}_'
+
+    def OpenFile(self, fs, location):
+        res = super().OpenFile(fs, location)
+        return res
+
+    def _set_img(self, handle: img.Handle, bundle: wx.BitmapBundle) -> None:
+        """Change an image."""
+        try:
+            name, old_image = self._fnames[handle]
+        except KeyError:
+            return
+        new_image = bundle.GetBitmap(old_image.GetSize())
+        self._fnames[handle] = name, new_image
+        self.AddFile(name, new_image, wx.BITMAP_TYPE_BMP)
+        self._refresh()
+
+    def add(self, handle: img.Handle, window: wx.Window) -> str:
+        """Register this image handle to be loadable, then return the unique filename."""
+        try:
+            name, bundle = self._fnames[handle]
+            return name
+        except KeyError:
+            pass
+        if self._old_names:
+            name = self._old_names.pop()
+        else:
+            name = f'{self._prefix}{len(self._fnames):x}.png'
+        handle._incref(self)
+        bundle = WX_IMG._load_wx(handle, False)
+        bitmap = bundle.GetBitmapFor(window)
+        self.AddFile(name, bitmap, wx.BITMAP_TYPE_BMP)
+        self._fnames[handle] = name, bitmap
+        return 'memory:' + name
+
+    def clear(self) -> None:
+        """Remove all images."""
+        for handle, (fname, bitmap) in self._fnames.items():
+            handle._decref(self)
+            self.RemoveFile(fname)
+            self._old_names.append(fname)
+        self._fnames.clear()
+
+    def is_valid(self, url: str) -> bool:
+        """Return whether this is a potentially valid filename for this filesystem."""
+        return url.startswith('memory:' + self._prefix)
 
 
 class WXImages(img.UIImage):

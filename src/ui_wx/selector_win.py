@@ -18,8 +18,9 @@ from app.selector_win import (
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import CURRENT_LANG, TransToken
-from ui_wx import MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, RADIO_MENU_BITMAP, wid_transtoken
-from ui_wx.img import WX_IMG, ImageSlot
+from . import PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, RADIO_MENU_BITMAP, wid_transtoken
+from .mdown_win import RichWindow
+from .img import WX_IMG, ImageSlot
 import utils
 
 
@@ -230,7 +231,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
     wid_props_icon: wx.StaticBitmap
     wid_props_name: wx.StaticText
     wid_props_author: wx.StaticText
-    wid_props_desc: wx.html.HtmlWindow
+    wid_props_desc: RichWindow
     attr_text_labels: dict[AttrDef, wx.StaticText]
     attr_image_labels: dict[AttrDef, wx.StaticBitmap]
 
@@ -350,7 +351,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.wid_props_author = wx.StaticText(self.wid_panel_info)
         sizer_info.Add(self.wid_props_author, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
-        self.wid_props_desc = wx.html.HtmlWindow(self.wid_panel_info, wx.ID_ANY)
+        self.wid_props_desc = RichWindow(self.wid_panel_info)
         sizer_info.Add(self.wid_props_desc, 1, wx.ALL | wx.EXPAND, 6)
 
         if self.attrs:
@@ -644,7 +645,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_props_set_desc(self, desc: MarkdownData, /) -> None:
-        self.wid_props_desc.SetPage(MARKDOWN.convert(desc))
+        self.wid_props_desc.set_markdown(desc)
 
     @override
     def _ui_props_set_icon(self, image: img.Handle, /) -> None:

@@ -6,10 +6,8 @@ from collections.abc import Callable
 import logging
 
 import wx
-import mistletoe
 
 import utils
-from app import mdown
 
 
 APP = wx.App()
@@ -102,19 +100,6 @@ def discretise_scrollwheel(func: Callable[[Literal[-1, 1]], None]) -> Callable[[
 
     return handler
 
-
-class _MarkdownConverter(mdown.BaseRenderer[str]):
-    def _convert(self, text: str, package: utils.ObjectID | None) -> str:
-        """Convert to HTML."""
-        # TODO images?
-        return mistletoe.markdown(text)
-
-    def _join(self, children: list[str]) -> str:
-        """Join two fragments together."""
-        return '<br /><br />\n'.join(children)
-
-
-MARKDOWN = _MarkdownConverter(str)
 
 PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
 PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)

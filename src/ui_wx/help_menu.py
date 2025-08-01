@@ -14,7 +14,8 @@ from app.helpMenu import (
 )
 from app.mdown import MarkdownData
 
-from . import MAIN_WINDOW, MARKDOWN
+from . import MAIN_WINDOW
+from .mdown_win import RichWindow
 from .img import WX_IMG
 from .dialogs import DIALOG
 from .wid_transtoken import set_menu_text, set_win_title
@@ -34,7 +35,7 @@ class CreditsWindow(CreditsWindowBase):
         self.win.Bind(wx.EVT_CLOSE, lambda e: close())
         set_win_title(self.win, TRANS_CREDITS_TITLE)
 
-        self.text = wx.html.HtmlWindow(self.win)
+        self.text = RichWindow(self.win)
 
         ok = wx.Button(self.win, wx.ID_CLOSE, '')
         ok.SetDefault()
@@ -48,7 +49,7 @@ class CreditsWindow(CreditsWindowBase):
 
     @override
     async def _ui_apply_text(self, text: MarkdownData) -> None:
-        self.text.SetPage(MARKDOWN.convert(text))
+        self.text.set_markdown(text)
 
     @override
     async def _ui_show_window(self) -> None:
