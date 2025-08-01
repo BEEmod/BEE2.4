@@ -38,13 +38,11 @@ class RichWindow(HtmlWindow):
         self.fsys = wx.FileSystem()
         self.fsys.AddHandler(self.img_handler)
         self.Parser.SetFS(self.fsys)
-        self.unused_slots = []
-        self.fnames = {}
         self._markdown = ""
-        self.package = utils.ID_NONE
+        self.package: utils.SpecialID | None = utils.ID_NONE
 
     @deprecated("Use set_markdown() instead.")
-    def SetPage(self, source: str) -> None:
+    def SetPage(self, source: str) -> bool:
         """Use set_markdown instead."""
         raise ValueError("Use set_markdown()!")
 
@@ -69,7 +67,7 @@ class RichWindow(HtmlWindow):
                 if self.img_handler.is_valid(url):  # Already converted, pass through.
                     return wx.html.HTML_OPEN, url
                 try:
-                    handle = img.Handle.parse_uri(PackagePath.parse(url, self.package))
+                    handle = img.Handle.parse_uri(PackagePath.parse(url, self.package or utils.ID_NONE))
                 except ValueError as exc:
                     LOGGER.warning('Could not parse image URL: "{}"', url, exc_info=exc)
                     return wx.html.HTML_BLOCK, url

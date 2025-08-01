@@ -12,9 +12,7 @@ import abc
 import attrs
 import trio
 
-from srctools import (
-    FrozenMatrix, FrozenVec, Keyvalues, Matrix, Vec, conv_bool, conv_float,
-)
+from srctools import FrozenMatrix, FrozenVec, Keyvalues, Vec, conv_bool, conv_float
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import Entity, UVAxis, VisGroup, VMF, Side, Solid

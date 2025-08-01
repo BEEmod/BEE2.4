@@ -10,7 +10,7 @@ import srctools.logger
 
 from precomp import (
     conditions, tiling, texturing, rand, corridor, collisions,
-    instance_traits, brushLoc, faithplate, template_brush, instanceLocs,
+    instance_traits, brushLoc, faithplate, template_brush,
 )
 from editoritems_props import PanelAnimation
 import utils

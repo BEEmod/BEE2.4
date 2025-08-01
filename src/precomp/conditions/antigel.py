@@ -1,5 +1,5 @@
 """Implements the antigel marker item."""
-from srctools import VMF, Vec, Matrix, Entity, FrozenVec
+from srctools import VMF, Vec, Matrix, FrozenVec
 import attrs
 from srctools.logger import get_logger
 
@@ -49,7 +49,7 @@ def res_antigel(vmf: VMF) -> object:
         inst.remove()
         origin = FrozenVec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])
-        norm = FrozenVec(round(orient.up(), 6))
+        norm: FrozenVec | None = FrozenVec(round(orient.up(), 6))
         grid_pos = origin // 128
         match inst.fixup['$cube_type']:
             case '0':

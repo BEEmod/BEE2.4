@@ -1161,6 +1161,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities."""
     LOGGER.info('Generating barriers (glass/grating)...')
 
+    # We always generate this, in case items need it.
     if options.get_itemconf('BEE_PELLET:PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
         vmf.create_ent(

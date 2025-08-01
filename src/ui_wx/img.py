@@ -204,10 +204,6 @@ class ImageFSHandler(wx.MemoryFSHandler, WxUser):
         # Don't let users guess the filename used
         self._prefix = f'image_{secrets.token_urlsafe(16)}_'
 
-    def OpenFile(self, fs, location):
-        res = super().OpenFile(fs, location)
-        return res
-
     def _set_img(self, handle: img.Handle, bundle: wx.BitmapBundle) -> None:
         """Change an image."""
         try:
@@ -222,7 +218,7 @@ class ImageFSHandler(wx.MemoryFSHandler, WxUser):
     def add(self, handle: img.Handle, window: wx.Window) -> str:
         """Register this image handle to be loadable, then return the unique filename."""
         try:
-            name, bundle = self._fnames[handle]
+            name, bitmap = self._fnames[handle]
             return name
         except KeyError:
             pass

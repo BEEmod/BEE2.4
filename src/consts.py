@@ -276,6 +276,7 @@ class Theme(Enum):
     DARK = 'dark'
 
 
+# noinspection PyEnum
 class DefaultItems(Enum):
     """ A list of all the default items."""
     _value_: utils.ObjectID
