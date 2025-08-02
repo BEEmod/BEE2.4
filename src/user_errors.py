@@ -326,6 +326,12 @@ TOK_ANTLINE_CORNER_INVALID_TIMER = TransToken.ui(
     'reserved for future functionality. This time would have been equivalent to '
     '"<var>{corrected}</var>".'
 )
+TOK_ANTLINE_CHECKMARK_MIGRATION = TransToken.ui(
+    'This antline corner item is configured to be a checkmark, but has corners as both '
+    'inputs and outputs. This is likely a corner item, using the previous behaviour where corner '
+    'positions looped with higher timer values. The new timer value is "<var>{corrected}</var>". '
+    'If this was intended to be a checkmark, remove its output, connect to the input antline instead.'
+)
 
 TOK_BARRIER_ITEMNAME = TransToken.ui('Glass / Grating item')
 TOK_BARRIER_CUST_NO_OUTPUT = TransToken.ui(

@@ -1,5 +1,5 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
-from typing import Literal
+from typing import Literal, assert_never
 
 from collections.abc import Callable
 from enum import Enum
@@ -39,8 +39,9 @@ NAME_CABLE: Callable[[str, int], str] = '{}-cab_{}'.format
 NAME_MODEL: Callable[[str], str] = '{}-mdl'.format
 
 
-# The corner offset in the model for each timer delay value. This starts at delay=3.
-CORNER_POS = [
+# The configuration for each timer delay value. This starts at delay=3.
+# Vecs are corners, and define the offset in the model. The vec/matrix tuple is a checkmark.
+TIMER_VALUES = [
     Vec(8.0, 56.0, -64.0),
     Vec(8.0, 40.0, -64.0),
     Vec(8.0, 24.0, -64.0),
@@ -49,11 +50,19 @@ CORNER_POS = [
     Vec(-8.0, 40.0, -64.0),
     Vec(-8.0, 24.0, -64.0),
     Vec(-8.0, 8.0, -64.0),
+    (Matrix.from_yaw(180), Vec(0, 16.0, -64.0)),
+    (Matrix.from_yaw(270), Vec(0, 16.0, -64.0)),
+    (Matrix.from_yaw(0), Vec(0, 16.0, -64.0)),
+    (Matrix.from_yaw(90), Vec(0, 16.0, -64.0)),
+    (Matrix.from_yaw(180), Vec(0, 48.0, -64.0)),
+    (Matrix.from_yaw(270), Vec(0, 48.0, -64.0)),
+    (Matrix.from_yaw(0), Vec(0, 48.0, -64.0)),
+    (Matrix.from_yaw(90), Vec(0, 48.0, -64.0)),
 ]
 
 
 class NodeType(Enum):
-    """Handle our two types of item."""
+    """Handle the types of item."""
     CORNER = 'corner'
     LASER = 'laser'
 
@@ -96,19 +105,44 @@ class RopeState(Enum):
             return RopeState.UNLINKED, ent
 
 
+def make_dummy_conn_item(orig_item: connections.Item, pos: Vec, conf: connections.Config) -> connections.Item:
+    """Create a logic item for the antline group."""
+    # Create a comp_relay to attach I/O to.
+    logic_ent = orig_item.inst.map.create_ent(
+        'comp_relay',
+        origin=pos,
+        targetname=orig_item.name,
+        # Must be != to be enabled.
+        ctrl_type='1',
+        ctrl_value='0',
+    )
+
+    # Create the item for the entire group of markers.
+    item = connections.Item(
+        logic_ent, conf,
+        ind_style=orig_item.ind_style,
+    )
+    connections.ITEMS[item.name] = item
+    return item
+
+
 class Group:
     """Represents a group of markers."""
+    type: NodeType
+    item: connections.Item
+    nodes: list[Node]
+    # We use a frozenset here to ensure we don't double-up the links -
+    # users might accidentally do that.
+    links: set[frozenset[Node]]
+    # For antline corners, each endpoint + normal -> the segment
+    ant_seg: dict[tuple[FrozenVec, FrozenVec], antlines.Segment]
+
     def __init__(self, start: Node, typ: NodeType) -> None:
         self.type = typ  # Antlaser or corner?
-        self.nodes: list[Node] = [start]
-        # We use a frozenset here to ensure we don't double-up the links -
-        # users might accidentally do that.
-        self.links: set[frozenset[Node]] = set()
+        self.nodes = [start]
+        self.links = set()
+        self.ant_seg = {}
 
-        # For antline corners, each endpoint + normal -> the segment
-        self.ant_seg: dict[tuple[FrozenVec, FrozenVec], antlines.Segment] = {}
-
-        # Create a comp_relay to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
         if typ is NodeType.CORNER:
             logic_pos = start.pos + 8 * start.orient.up()
@@ -116,21 +150,8 @@ class Group:
         else:
             logic_pos = start.pos - 56 * start.orient.up()
             logic_conf = CONFIG_ANTLASER
-        logic_ent = start.inst.map.create_ent(
-            'comp_relay',
-            origin=logic_pos,
-            targetname=start.item.name,
-            # Must be != to be enabled.
-            ctrl_type='1',
-            ctrl_value='0',
-        )
 
-        # Create the item for the entire group of markers.
-        self.item = connections.Item(
-            logic_ent, logic_conf,
-            ind_style=start.item.ind_style,
-        )
-        connections.ITEMS[self.item.name] = self.item
+        self.item = make_dummy_conn_item(start.item, logic_pos, logic_conf)
 
     def add_ant_straight(self, normal: Vec, pos1: Vec, pos2: Vec) -> None:
         """Add a segment going from point 1 to 2."""
@@ -187,11 +208,15 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 
     In the instance, the emitter model must be named `mdl`, and have `$skin`/`$skinset` fixups.
     """
-    conf_inst_corner = instanceLocs.resolve_filter('<item_bee2_antline_corner>', silent=True)
+    # The original antline corner item, which only allows corners and loops values.
+    conf_inst_ant_legacy = instanceLocs.resolve_filter('<item_bee2_antline_corner>', silent=True)
+    # The new item, which produces corners and checkmarks, with additional indexes reserved.
+    conf_inst_antline = instanceLocs.resolve_filter('<item_bee2_antline>', silent=True)
     conf_inst_laser = instanceLocs.resolve_filter(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')
+    checkmark_file = instanceLocs.resolve_one('<item_indicator_panel_timer>', error=True)
 
     beam_conf = res.find_key('BeamKeys', or_blank=True)
     glow_conf = res.find_key('GlowKeys', or_blank=True)
@@ -230,14 +255,19 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     ]
     # Find all the markers.
     nodes: dict[str, Node] = {}
+    checkmarks: dict[connections.Item, Entity] = {}
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
         name = inst['targetname']
         if filename in conf_inst_laser:
             node_type = NodeType.LASER
-        elif filename in conf_inst_corner:
+        elif filename in conf_inst_ant_legacy:
             node_type = NodeType.CORNER
+            legacy = True
+        elif filename in conf_inst_antline:
+            node_type = NodeType.CORNER
+            legacy = False
         else:
             continue
 
@@ -255,15 +285,41 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             timer_delay = item.inst.fixup.int('$timer_delay')
             timer_ind = max(0, timer_delay - 3)
             try:
-                pos = CORNER_POS[timer_ind] @ orient + pos
+                timer_val = TIMER_VALUES[timer_ind]
             except IndexError:
                 raise user_errors.UserError(
                     user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
                         value=timer_delay,
                         corrected=timer_ind % 8 + 3,
                     ),
-                    points=[(point @ orient + pos) for point in CORNER_POS],
+                    points=[(point @ orient + pos) for point in TIMER_VALUES if isinstance(point, Vec)],
                 ) from None
+            match timer_val:
+                case Vec() as ant_pos:
+                    # Antline Corner
+                    pos = ant_pos @ orient + pos
+                case [Matrix() as check_orient, Vec() as check_pos]:
+                    if any(conn.to_item.config.id == 'item_bee2_antline_corner' for conn in item.outputs):
+                        # Previously, we allowed all timer values, cycling between corners after the
+                        # first 8. That means checkmarks are ambiguous. To try and catch that case,
+                        # disallow checkmarks with outputs to antlines.
+                        raise user_errors.UserError(
+                            user_errors.TOK_ANTLINE_CHECKMARK_MIGRATION.format(
+                                value=timer_delay,
+                                corrected=timer_ind % 8 + 3,
+                            ),
+                            points=[check_pos],
+                        )
+                    # For checkmarks, create a new logic item, connect the instance up as the
+                    # panel.
+                    inst['origin'] = check_pos @ orient + pos
+                    inst['angles'] = (check_orient @ orient).to_angle()
+                    inst['file'] = checkmark_file
+                    conditions.ALL_INST.add(checkmark_file)
+                    checkmarks[item] = inst
+                    continue
+                case never:
+                    assert_never(never)
         nodes[name] = Node(node_type, inst, item, pos, orient)
 
     if not nodes:
@@ -293,9 +349,11 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     todo.discard(neigh_node)
                 if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
-                    # be a target of our logic.
+                    # be a target of our logic. Reconnect, and preserve antlines
+                    # if it's not a checkmark
                     conn.from_item = group.item
-                    has_output = True
+                    if neighbour not in checkmarks:
+                        has_output = True
                     continue
                 elif not neigh_node.is_grouped:
                     # Another node.
@@ -333,6 +391,17 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 # For nodes, connect link.
                 conn.remove()
                 group.links.add(frozenset({neigh_node, node}))
+
+    # Setup each checkmark. If they have exactly 1 input, we move them into the caller so they
+    # inherit timer values. Otherwise, they become an OR gate with a dummy item.
+    for item, inst in checkmarks:
+        try:
+            [conn] = item.inputs
+        except ValueError:
+            logic_item = make_dummy_conn_item(item, Vec.from_str(inst['origin']), CONFIG_ANTLINE)
+            logic_item.ind_panels.add(inst)
+        else:
+            conn.from_item.ind_panels.add(inst)
 
     # Now every node is in a group. Generate the actual entities.
     for group in groups:
