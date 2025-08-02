@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2024-12-17 18:35+1000\n"
+"POT-Creation-Date: 2025-08-02 14:36+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -23,7 +23,8 @@ msgstr ""
 msgid "Version: {ver}"
 msgstr "バージョン："
 
-#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/selector_win.py
+#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/browsers.py
+#: ui_tk/dialogs.py ui_tk/selector_win.py
 msgid "Cancel"
 msgstr "キャンセル"
 
@@ -91,11 +92,11 @@ msgstr ""
 msgid "P-Body (SP/Coop)"
 msgstr ""
 
-#: app/CompilerPane.py quote_pack.py
+#: quote_pack.py
 msgid "Bendy"
 msgstr "Bendy"
 
-#: app/CompilerPane.py quote_pack.py
+#: quote_pack.py
 msgid "Chell"
 msgstr "Chell"
 
@@ -154,6 +155,21 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Open Archive Folder"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Chamber Preview"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Geometry Compile Log"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Lighting / Packing Compile Log"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -368,6 +384,16 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid ""
+"This antline corner has a timer value of \"<var>{value}</var>\", which is"
+" not allowed. Valid values are from <var>&inf;-10</var>. Previously "
+"values looped past this, but these are now reserved for future "
+"functionality. This time would have been equivalent to "
+"\"<var>{corrected}</var>\"."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid "Glass / Grating item"
 msgstr ""
 
@@ -421,6 +447,13 @@ msgstr ""
 msgid ""
 "A Barrier Hole (\"<var>{hole}</var>\") was placed on top of a "
 "\"<var>{barrier}</var>\" barrier, which does not allow holes."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The highlighted barrier items have inputs connected, but this is "
+"currently permitted only to transform them into custom barrier types."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -495,14 +528,6 @@ msgstr ""
 #: user_errors.py
 msgid "Failed to load error!"
 msgstr ""
-
-#: app/CompilerPane.py
-msgid "ATLAS"
-msgstr "ATLAS"
-
-#: app/CompilerPane.py
-msgid "P-Body"
-msgstr "P-Body"
 
 #: app/CompilerPane.py
 msgid "Image Files"
@@ -745,10 +770,6 @@ msgid "Player Model (SP):"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Compile Options"
-msgstr ""
-
-#: app/CompilerPane.py
 msgid "Compiler Options - {ver}"
 msgstr ""
 
@@ -861,6 +882,22 @@ msgstr "なし！"
 
 #: app/SubPane.py
 msgid "Hide/Show the \"{window}\" window."
+msgstr ""
+
+#: app/SubPane.py
+msgid "Palettes"
+msgstr ""
+
+#: app/SubPane.py
+msgid "Export Options"
+msgstr ""
+
+#: app/SubPane.py
+msgid "Style/Item Properties"
+msgstr ""
+
+#: app/SubPane.py
+msgid "Compile Options"
 msgstr ""
 
 #: app/UI.py
@@ -1011,14 +1048,6 @@ msgstr ""
 
 #: app/UI.py
 msgid "Select"
-msgstr ""
-
-#: app/UI.py
-msgid "Palettes"
-msgstr ""
-
-#: app/UI.py
-msgid "Export Options"
 msgstr ""
 
 #: app/UI.py
@@ -1202,6 +1231,57 @@ msgstr ""
 
 #: app/backup.py
 msgid ".. As"
+msgstr ""
+
+#: app/browsers.py
+msgid "Sounds Browser"
+msgstr ""
+
+#: app/browsers.py
+msgid "Choreographed Scene Browser"
+msgstr ""
+
+#: app/browsers.py
+msgid "Sounds:"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Sound Name:"
+msgstr "名前ありません！"
+
+#: app/browsers.py
+msgid "Sound File:"
+msgstr ""
+
+#: app/browsers.py
+msgid "Sound Type:"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Filter:"
+msgstr "ファイル"
+
+#: app/browsers.py
+msgid "Autoplay Sounds"
+msgstr ""
+
+#: app/browsers.py
+msgid "Preview"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Soundscript"
+msgstr "オプションありません！"
+
+#: app/browsers.py
+msgid "Raw Sounds"
+msgstr ""
+
+#: app/browsers.py
+msgid "Choreo Scenes"
 msgstr ""
 
 #: app/contextWin.py
@@ -1418,8 +1498,17 @@ msgid "Attachment Surface"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "Flat"
+msgid "Select ({selected}/{total})"
 msgstr ""
+
+#: app/corridor_selector.py
+msgid "Select + Configure ({selected}/{total})"
+msgstr ""
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Wall"
+msgstr "全："
 
 #: app/corridor_selector.py
 msgid "Floor"
@@ -1433,6 +1522,19 @@ msgstr ""
 #, fuzzy
 msgid "BEEmod"
 msgstr "BEEMod"
+
+#: app/dialogs.py
+#, fuzzy
+msgid "Skip"
+msgstr "SP"
+
+#: app/dialogs.py
+msgid "Discard"
+msgstr ""
+
+#: app/dialogs.py app/menu_bar.py ui_tk/errors.py
+msgid "Quit"
+msgstr "終了"
 
 #: app/dialogs.py
 msgid "A value must be provided!"
@@ -1583,7 +1685,6 @@ msgid "Credits..."
 msgstr "クレジット。。。"
 
 #: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
-#: ui_tk/errors.py
 msgid "Close"
 msgstr "閉じる"
 
@@ -1703,10 +1804,6 @@ msgstr ""
 #: app/menu_bar.py
 msgid "Options"
 msgstr "環境設定"
-
-#: app/menu_bar.py
-msgid "Quit"
-msgstr "終了"
 
 #: app/menu_bar.py
 msgid "Palette"
@@ -1892,7 +1989,7 @@ msgstr ""
 msgid "Enable development options"
 msgstr ""
 
-#: app/optionWindow.py app/packageMan.py ui_tk/selector_win.py
+#: app/optionWindow.py app/packageMan.py ui_tk/dialogs.py ui_tk/selector_win.py
 msgid "OK"
 msgstr "OK"
 
@@ -2343,16 +2440,42 @@ msgstr ""
 msgid "Style Properties"
 msgstr ""
 
-#: app/itemconfig/__init__.py
-msgid "Style/Item Properties"
-msgstr ""
-
 #: app/itemconfig/color.py
 msgid "Choose a Color"
 msgstr ""
 
 #: app/itemconfig/slider.py
 msgid "Off"
+msgstr ""
+
+#: config/__init__.py
+msgid "Version Mismatch"
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"The palette \"{name}\" has unknown config versions for the following "
+"sections:"
+msgstr ""
+
+#: config/__init__.py
+msgid "The primary config has unknown versions for the following sections:"
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"Either discard this data to load the rest of the palette, skip it "
+"tempoarily, or quit the app to leave it unchanged."
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"Either discard this data to load the rest of the palette, or quit the app"
+" to leave it unchanged."
+msgstr ""
+
+#: config/__init__.py
+msgid "Continue (discarding these sections), or quit and leave it unchanged?"
 msgstr ""
 
 #: exporting/__init__.py
@@ -2473,6 +2596,10 @@ msgid "Potential package file has no info.txt: {path}"
 msgstr ""
 
 #: packages/__init__.py
+msgid "Package has invalid info.txt file: {path}"
+msgstr ""
+
+#: packages/__init__.py
 msgid "Package has no ID defined: {path}"
 msgstr ""
 
@@ -2560,6 +2687,11 @@ msgstr "オプションありません！"
 msgid "<Multiverse Cave only>"
 msgstr ""
 
+#: ui_tk/browsers.py
+#, fuzzy
+msgid "Ok"
+msgstr "OK"
+
 #: ui_tk/check_table.py
 msgid "Toggle all checkboxes."
 msgstr ""
@@ -2590,6 +2722,10 @@ msgstr ""
 
 #: ui_tk/context_win.py
 msgid "Change which signs are specified by each timer value."
+msgstr ""
+
+#: ui_tk/errors.py
+msgid "Continue"
 msgstr ""
 
 #: ui_tk/rich_textbox.py
@@ -2633,4 +2769,10 @@ msgstr ""
 
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
+
+#~ msgid "ATLAS"
+#~ msgstr "ATLAS"
+
+#~ msgid "P-Body"
+#~ msgstr "P-Body"
 

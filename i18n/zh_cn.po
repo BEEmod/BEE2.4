@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-12-17 18:35+1000\n"
+"POT-Creation-Date: 2025-08-02 14:36+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -23,7 +23,8 @@ msgstr "跳过！"
 msgid "Version: {ver}"
 msgstr "版本："
 
-#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/selector_win.py
+#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/browsers.py
+#: ui_tk/dialogs.py ui_tk/selector_win.py
 msgid "Cancel"
 msgstr "取消"
 
@@ -92,11 +93,11 @@ msgstr ""
 msgid "P-Body (SP/Coop)"
 msgstr ""
 
-#: app/CompilerPane.py quote_pack.py
+#: quote_pack.py
 msgid "Bendy"
 msgstr "Bendy（纸片人小黑）"
 
-#: app/CompilerPane.py quote_pack.py
+#: quote_pack.py
 msgid "Chell"
 msgstr "Chell（主角雪儿）"
 
@@ -157,6 +158,21 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Open Archive Folder"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Chamber Preview"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Geometry Compile Log"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Lighting / Packing Compile Log"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -371,6 +387,16 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid ""
+"This antline corner has a timer value of \"<var>{value}</var>\", which is"
+" not allowed. Valid values are from <var>&inf;-10</var>. Previously "
+"values looped past this, but these are now reserved for future "
+"functionality. This time would have been equivalent to "
+"\"<var>{corrected}</var>\"."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid "Glass / Grating item"
 msgstr ""
 
@@ -424,6 +450,13 @@ msgstr ""
 msgid ""
 "A Barrier Hole (\"<var>{hole}</var>\") was placed on top of a "
 "\"<var>{barrier}</var>\" barrier, which does not allow holes."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The highlighted barrier items have inputs connected, but this is "
+"currently permitted only to transform them into custom barrier types."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -498,14 +531,6 @@ msgstr ""
 #: user_errors.py
 msgid "Failed to load error!"
 msgstr ""
-
-#: app/CompilerPane.py
-msgid "ATLAS"
-msgstr "ATLAS（蓝色机器人）"
-
-#: app/CompilerPane.py
-msgid "P-Body"
-msgstr "P-Body（橙色机器人）"
 
 #: app/CompilerPane.py
 msgid "Image Files"
@@ -787,10 +812,6 @@ msgid "Player Model (SP):"
 msgstr "玩家模型（单人模式）"
 
 #: app/CompilerPane.py
-msgid "Compile Options"
-msgstr "编译选项"
-
-#: app/CompilerPane.py
 #, fuzzy
 msgid "Compiler Options - {ver}"
 msgstr "开发者选项 - {ver}"
@@ -912,6 +933,22 @@ msgstr "无！"
 #, fuzzy
 msgid "Hide/Show the \"{window}\" window."
 msgstr "隐藏/显示 \"{window}\" 窗口。"
+
+#: app/SubPane.py
+msgid "Palettes"
+msgstr "模板列表"
+
+#: app/SubPane.py
+msgid "Export Options"
+msgstr "导出设置"
+
+#: app/SubPane.py
+msgid "Style/Item Properties"
+msgstr "风格/物品 属性"
+
+#: app/SubPane.py
+msgid "Compile Options"
+msgstr "编译选项"
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
@@ -1069,14 +1106,6 @@ msgstr "启用或禁用特定的台词，以防止添加它们。"
 #, fuzzy
 msgid "Select"
 msgstr "所选风格"
-
-#: app/UI.py
-msgid "Palettes"
-msgstr "模板列表"
-
-#: app/UI.py
-msgid "Export Options"
-msgstr "导出设置"
 
 #: app/UI.py
 msgid "Remove all items from the palette."
@@ -1267,6 +1296,60 @@ msgstr "备份/恢复 谜题"
 
 #: app/backup.py
 msgid ".. As"
+msgstr ""
+
+#: app/browsers.py
+msgid "Sounds Browser"
+msgstr ""
+
+#: app/browsers.py
+msgid "Choreographed Scene Browser"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Sounds:"
+msgstr "播放音效:"
+
+#: app/browsers.py
+#, fuzzy
+msgid "Sound Name:"
+msgstr "没有名称:"
+
+#: app/browsers.py
+msgid "Sound File:"
+msgstr ""
+
+#: app/browsers.py
+msgid "Sound Type:"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Filter:"
+msgstr "文件:"
+
+#: app/browsers.py
+#, fuzzy
+msgid "Autoplay Sounds"
+msgstr "播放音效"
+
+#: app/browsers.py
+msgid "Preview"
+msgstr ""
+
+#: app/browsers.py
+#, fuzzy
+msgid "Soundscript"
+msgstr "台词："
+
+#: app/browsers.py
+#, fuzzy
+msgid "Raw Sounds"
+msgstr "播放音效"
+
+#: app/browsers.py
+msgid "Choreo Scenes"
 msgstr ""
 
 #: app/contextWin.py
@@ -1489,8 +1572,17 @@ msgid "Attachment Surface"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "Flat"
+msgid "Select ({selected}/{total})"
 msgstr ""
+
+#: app/corridor_selector.py
+msgid "Select + Configure ({selected}/{total})"
+msgstr ""
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Wall"
+msgstr "所有风格："
 
 #: app/corridor_selector.py
 msgid "Floor"
@@ -1504,6 +1596,19 @@ msgstr ""
 #, fuzzy
 msgid "BEEmod"
 msgstr "BEE模组物品"
+
+#: app/dialogs.py
+#, fuzzy
+msgid "Skip"
+msgstr "单人模式"
+
+#: app/dialogs.py
+msgid "Discard"
+msgstr ""
+
+#: app/dialogs.py app/menu_bar.py ui_tk/errors.py
+msgid "Quit"
+msgstr "退出"
 
 #: app/dialogs.py
 msgid "A value must be provided!"
@@ -1664,7 +1769,6 @@ msgid "Credits..."
 msgstr "声明..."
 
 #: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
-#: ui_tk/errors.py
 msgid "Close"
 msgstr "关闭"
 
@@ -1787,10 +1891,6 @@ msgstr "管理资源包..."
 #: app/menu_bar.py
 msgid "Options"
 msgstr "设置"
-
-#: app/menu_bar.py
-msgid "Quit"
-msgstr "退出"
 
 #: app/menu_bar.py
 msgid "Palette"
@@ -1979,7 +2079,7 @@ msgstr ""
 msgid "Enable development options"
 msgstr "开发者选项"
 
-#: app/optionWindow.py app/packageMan.py ui_tk/selector_win.py
+#: app/optionWindow.py app/packageMan.py ui_tk/dialogs.py ui_tk/selector_win.py
 msgid "OK"
 msgstr "确定"
 
@@ -2455,16 +2555,42 @@ msgstr ""
 msgid "Style Properties"
 msgstr "风格/物品 属性"
 
-#: app/itemconfig/__init__.py
-msgid "Style/Item Properties"
-msgstr "风格/物品 属性"
-
 #: app/itemconfig/color.py
 msgid "Choose a Color"
 msgstr "选择一种颜色"
 
 #: app/itemconfig/slider.py
 msgid "Off"
+msgstr ""
+
+#: config/__init__.py
+msgid "Version Mismatch"
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"The palette \"{name}\" has unknown config versions for the following "
+"sections:"
+msgstr ""
+
+#: config/__init__.py
+msgid "The primary config has unknown versions for the following sections:"
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"Either discard this data to load the rest of the palette, skip it "
+"tempoarily, or quit the app to leave it unchanged."
+msgstr ""
+
+#: config/__init__.py
+msgid ""
+"Either discard this data to load the rest of the palette, or quit the app"
+" to leave it unchanged."
+msgstr ""
+
+#: config/__init__.py
+msgid "Continue (discarding these sections), or quit and leave it unchanged?"
 msgstr ""
 
 #: exporting/__init__.py
@@ -2595,6 +2721,10 @@ msgid "Potential package file has no info.txt: {path}"
 msgstr ""
 
 #: packages/__init__.py
+msgid "Package has invalid info.txt file: {path}"
+msgstr ""
+
+#: packages/__init__.py
 msgid "Package has no ID defined: {path}"
 msgstr ""
 
@@ -2684,6 +2814,11 @@ msgstr "描述："
 msgid "<Multiverse Cave only>"
 msgstr "<仅使用平行宇宙的凯文>"
 
+#: ui_tk/browsers.py
+#, fuzzy
+msgid "Ok"
+msgstr "确定"
+
 #: ui_tk/check_table.py
 msgid "Toggle all checkboxes."
 msgstr "反选所有复选框"
@@ -2715,6 +2850,10 @@ msgstr "建议"
 
 #: ui_tk/context_win.py
 msgid "Change which signs are specified by each timer value."
+msgstr ""
+
+#: ui_tk/errors.py
+msgid "Continue"
 msgstr ""
 
 #: ui_tk/rich_textbox.py
@@ -2857,4 +2996,10 @@ msgstr "建议"
 #~ msgstr ""
 #~ "允许放置和删除强制性的进/出门和大型观察室。\n"
 #~ "谨慎使用，可能会产生奇怪的结果！"
+
+#~ msgid "ATLAS"
+#~ msgstr "ATLAS（蓝色机器人）"
+
+#~ msgid "P-Body"
+#~ msgstr "P-Body（橙色机器人）"
 
