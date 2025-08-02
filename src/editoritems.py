@@ -634,11 +634,10 @@ def bounding_boxes(voxels: Iterable[Coord]) -> Iterator[tuple[Coord, Coord]]:
                 z1 = z
             else:
                 break
-
-        for x in range(x1, x2+1):
-            for y in range(y1, y2+1):
-                for z in range(z1, z2+1):
-                    todo.discard(Coord(x, y, z))
+        todo.difference_update(itertools.starmap(
+            Coord,
+            itertools.product(range(x1, x2+1), range(y1, y2+1), range(z1, z2+1))
+        ))
         yield Coord(x1, y1, z1), Coord(x2, y2, z2)
 
 
@@ -714,7 +713,7 @@ class SubType:
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> SubType:
+    def __deepcopy__(self, memodict: dict[int, Any]) -> SubType:
         """Duplicate this subtype.
 
         We don't need to deep-copy the contents of the containers,
@@ -869,7 +868,7 @@ class SubType:
             f.write('\t\t\t\t}\n')
         if self.anims:
             f.write('\t\t\t"Animations"\n\t\t\t\t{\n')
-            for anim_name, anim_ind in sorted(self.anims.items(), key=lambda t: t[1]):
+            for anim_name, anim_ind in sorted(self.anims.items(), key=itemgetter(1)):
                 f.write(f'\t\t\t\t"{anim_name.value}" "{anim_ind}"\n')
             f.write('\t\t\t\t}\n')
         f.write('\t\t\t}\n')
@@ -1498,9 +1497,11 @@ class Item:
                     added_parts.add((sub_pos, sub_normal))
             if len(subpos_pairs) % 2 != 0:
                 raise tok.error('Subpos positions must be provided in pairs.')
-            for subpos1, subpos2 in itertools.batched(subpos_pairs, 2):
-                for sub_pos in Coord.bbox(subpos1, subpos2):
-                    added_parts.add((sub_pos, normal))
+            added_parts |= {
+                (sub_pos, normal)
+                for subpos1, subpos2 in itertools.batched(subpos_pairs, 2)
+                for sub_pos in Coord.bbox(subpos1, subpos2)
+            }
 
             if not added_parts:
                 # Default to a single voxel.
