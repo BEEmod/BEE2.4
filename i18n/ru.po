@@ -1,15 +1,16 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version:  BEEMOD2\n"
+"Project-Id-Version: BEE2 Mod For Portal 2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-08-02 14:36+1000\n"
-"PO-Revision-Date: 2021-11-18 17:18+0300\n"
-"Last-Translator: \n"
+"POT-Creation-Date: 2025-08-02 15:42+1000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ru\n"
-"Language-Team: Russian\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10 >= 2 &&"
-" n%10<=4 &&(n%100<10||n%100 >= 20)? 1 : 2);\n"
+"Language-Team: ru <LL@li.org>\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) "
+"|| (n%100>=11 && n%100<=14)? 2 : 3);\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -17,12 +18,11 @@ msgstr ""
 
 #: loadScreen.py
 msgid "Skipped!"
-msgstr "Пропущено!"
+msgstr "Пропущенно!"
 
 #: loadScreen.py
-#, fuzzy
 msgid "Version: {ver}"
-msgstr "Версия: "
+msgstr "Версия: {ver}"
 
 #: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/browsers.py
 #: ui_tk/dialogs.py ui_tk/selector_win.py
@@ -35,24 +35,23 @@ msgstr "Очистить"
 
 #: loadScreen.py
 msgid "Copy"
-msgstr "Скопировать"
+msgstr "Копировать"
 
 #: loadScreen.py
 msgid "Show:"
 msgstr "Показать:"
 
 #: loadScreen.py
-#, fuzzy
 msgid "Logs - {ver}"
-msgstr "Логи - {}"
+msgstr "Логи - {ver}"
 
 #: loadScreen.py
 msgid "Debug messages"
-msgstr "Сообщения дебага"
+msgstr "Отладочные сообщения"
 
 #: loadScreen.py
 msgid "Default"
-msgstr "Стандартный"
+msgstr "По умолчанию"
 
 #: loadScreen.py
 msgid "Warnings Only"
@@ -80,7 +79,7 @@ msgstr "Нет имени!"
 
 #: quote_pack.py
 msgid "Singleplayer"
-msgstr "Один игрок"
+msgstr "Однопользовательский"
 
 #: quote_pack.py
 msgid "Cooperative"
@@ -88,11 +87,11 @@ msgstr "Кооператив"
 
 #: quote_pack.py
 msgid "ATLAS (SP/Coop)"
-msgstr "АТЛАС (один игрок/кооп)"
+msgstr "АТЛАС (SP/Coop)"
 
 #: quote_pack.py
 msgid "P-Body (SP/Coop)"
-msgstr "Пи-Боди (один игрок/кооп)"
+msgstr "П-Боди (SP/Coop)"
 
 #: quote_pack.py
 msgid "Bendy"
@@ -108,16 +107,15 @@ msgstr "Человеческие персонажи (Бенди и Челл)"
 
 #: quote_pack.py
 msgid "AI characters (ATLAS, P-Body, or Coop)"
-msgstr "ИИ-персонажи (АТЛАС, Пи-Боди или кооп)"
+msgstr "Персонажи ИИ (АТЛАС, П-Боди или Кооп)"
 
 #: quote_pack.py
-#, fuzzy
 msgid "Death - Generic"
-msgstr "Смерть - Лазерное поле"
+msgstr "Смерть - Общая"
 
 #: quote_pack.py
 msgid "Death - Toxic Goo"
-msgstr "Смерть - Токсичная жижа"
+msgstr "Смерть - Токсическая слизь"
 
 #: quote_pack.py
 msgid "Death - Turrets"
@@ -125,20 +123,19 @@ msgstr "Смерть - Турели"
 
 #: quote_pack.py
 msgid "Death - Crusher"
-msgstr "Смерть - Пресс"
+msgstr "Смерть - Дробилка"
 
 #: quote_pack.py
 msgid "Death - LaserField"
-msgstr "Смерть - Лазерное поле"
+msgstr "Смерть - Лазерное Поле"
 
 #: quote_pack.py
-#, fuzzy
 msgid "Gesture - Generic"
-msgstr "Смерть - Лазерное поле"
+msgstr "Жест - Общий"
 
 #: quote_pack.py
 msgid "Gesture - Camera"
-msgstr ""
+msgstr "Жест - Камера"
 
 #. i18n: Special token, must be exactly two lines, shown via game_text if an
 #. error occurs in Coop.
@@ -147,6 +144,8 @@ msgid ""
 "Compile Error. Open the following URL\n"
 "in a browser on this computer to see:"
 msgstr ""
+"Ошибка компиляции. Открыть следующее URL \n"
+" в браузере на этом компьютере, чтобы увидеть:"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -158,8 +157,9 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+#, fuzzy
 msgid "Open Archive Folder"
-msgstr ""
+msgstr "Открыть папку..."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -168,8 +168,9 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+#, fuzzy
 msgid "Geometry Compile Log"
-msgstr ""
+msgstr "Копировать компилятор"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -182,21 +183,23 @@ msgid ""
 "Invalid <code>{option}=</code>\"<code>{value}</code>\" for {kind} "
 "\"<var>{id}</var>\"!"
 msgstr ""
+"Недопустимый <code>{option}=</code>\"<code>{value}</code>\" for {kind} "
+"\"<var>{id}</var>\"!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Option <code>{option}</code> is required for {kind} \"<var>{id}</var>\"!"
-msgstr ""
+msgstr "Опция <code>{option}</code> требуется для {kind} \"<var>{id}</var>\"!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Duplicate {kind} ID \"<var>{id}</var>\". Change the ID of one of them."
-msgstr ""
+msgstr "Дублировать {kind} ID \"<var>{id}</var>\". Изменить ID одного из них."
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Unknown {kind} ID \"<var>{id}</var>\"."
-msgstr ""
+msgstr "Неизвестный {kind} ID \"<var>{id}</var>\"."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -204,6 +207,8 @@ msgid ""
 "The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
 "<code>{inst}</code>"
 msgstr ""
+"Предмет \"<var>{item}</var>\" не является {kind}!<br>Instance: "
+"<code>{inst}</code>"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -211,11 +216,13 @@ msgid ""
 "The instance \"<var>{inst}</var>\" does not have any connection "
 "information defined!"
 msgstr ""
+"Для экземпляра \"<var>{inst}</var>\" не определена информация о "
+"подключении!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "See the documentation"
-msgstr ""
+msgstr "Смотреть документацию"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -224,6 +231,10 @@ msgid ""
 "map, or delete them. Items with no collision (like Half Walls or Logic "
 "Gates) can be left when rooms are moved, look for those."
 msgstr ""
+"Один или несколько предметов были размещены за пределами карты! "
+"Переместите их обратно на карту или удалите. Предметы без столкновений "
+"(например, полу-стены или логические ворота) могут остаться после "
+"перемещения комнат, ищите их."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -235,6 +246,13 @@ msgid ""
 " removing/modifying items in that area. Please submit a bug report to the"
 " author of the item so this can be resolved. Leak coordinates:"
 msgstr ""
+"На этой карте есть <a "
+"href=\"https://developer.valvesoftware.com/wiki/Leak\">\"leaked\"</a>. "
+"Это ошибка в предмете или стиле, которая должна быть исправлена. "
+"Отображаемая линия указывает на место утечки, возможно, вы сможете "
+"устранить ее, удалив/изменив предметы в этой области. Пожалуйста, "
+"отправьте сообщение об ошибке автору предмета, чтобы ее можно было "
+"устранить. Координаты утечки:"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -243,6 +261,9 @@ msgid ""
 "be compiled! Try other configurations for this item, it may be the case "
 "that only some are missing."
 msgstr ""
+"Экземпляр <code>{inst}</code> не существует, значит, карта не может быть "
+"скомпилирована! Попробуйте другие конфигурации для этого предмета, "
+"возможно, отсутствуют только некоторые."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -250,6 +271,8 @@ msgid ""
 "Bad Glass Floorbeam template! The template must have a single brush, "
 "aligned along the <var>X</var> axis."
 msgstr ""
+"Плохой шаблон Glass Floorbeam! Шаблон должен иметь одну кисть, "
+"выровненную по оси <var>X</var>."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -257,6 +280,8 @@ msgid ""
 "No I/O configuration specified for special indicator item "
 "\"<var>{item}</var>\"! This is required for antlines to work."
 msgstr ""
+"Не указана конфигурация ввода/вывода для специального предмета индикатора"
+" \"<var>{item}</var>\"! Это необходимо для работы анти-линий."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -265,6 +290,9 @@ msgid ""
 "swapped styles and exported, you will need to restart Portal 2. Otherwise"
 " check the relevant package."
 msgstr ""
+"Экземпляр с именем \"<var>{item}</var>\" не распознан! Если вы только что"
+" поменяли стили местами и экспортировали, вам нужно перезапустить Portal "
+"2. В противном случае проверьте соответствующий пакет."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -273,6 +301,10 @@ msgid ""
 "configured in the item. Check for reuse of the instance in multiple "
 "items, or restart Portal 2 if you just exported."
 msgstr ""
+"Экземпляр \"<var>{inst}</var>\" получает входные данные, но ни один из "
+"них не был настроен в этом предмете. Проверьте, не используется ли "
+"экземпляр повторно в нескольких предметах, или перезапустите Portal 2, "
+"если вы только что экспортировали."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -280,12 +312,14 @@ msgid ""
 "No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group."
 " Try moving this door back onto a wall."
 msgstr ""
+"Для группы <var>{orient}_{mode}_{dir}</var> не определены коридоры. "
+"Попробуйте перенести эту дверь обратно на стену."
 
 #. i18n: Reference to the stylevar
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Unlock Default Items"
-msgstr "Разблокировать стандартные предметы"
+msgstr "Разблокировать предметы по умолчанию"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -297,6 +331,12 @@ msgid ""
 " the door is present, this is likely an issue with the style definitions."
 " "
 msgstr ""
+"Похоже, что на карте отсутствует дверь {kind}. Это может быть вызвано "
+"экспортом из BEE2, когда игра была открыта - закройте и снова откройте "
+"игру, если это так. Если она была удалена, включите \"{stylevar}\" в "
+"Свойствах стиля, а затем добавьте ее в палитру, чтобы она снова появилась"
+" на карте. Если дверь присутствует, это, скорее всего, проблема с "
+"определениями стилей. "
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -305,28 +345,30 @@ msgid ""
 "can happen if they are manually added using the \"{stylevar}\" stylevar. "
 "In that case delete one of them."
 msgstr ""
+"Карта содержит коридоры входа/выхода как для одиночной, так и для "
+"кооператива. Это может произойти, если они были добавлены вручную с "
+"помощью стилей \"{stylevar}\". В этом случае удалите один из них"
 
 #. This uses HTML syntax.
 #: app/corridor_selector.py user_errors.py
-#, fuzzy
 msgid "Entry"
-msgstr "Бенди"
+msgstr "Вход"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
 #: app/corridor_selector.py user_errors.py
 msgid "Exit"
-msgstr ""
+msgstr "Выход"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "\"CubeType\" test used but with no type specified!"
-msgstr ""
+msgstr "Используется тест \"CubeType\", но не указан тип!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Unrecognised special cube type \"<var>{type}</var>\"!"
-msgstr ""
+msgstr "Нераспознанный специальный куб типа \"<var>{type}</var>\"!"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -336,6 +378,10 @@ msgid ""
 "together, so the cube is preplaced in the map but respawns from the "
 "specified dropper."
 msgstr ""
+"Два или более куба/dropper'а имеют одинаковое значение таймера "
+"(<var>{timer}</var>). Они используются для связи куба и dropper'а, так "
+"что куб предварительно размещается на карте, но возрождается из "
+"указанного dropper'а."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -344,6 +390,10 @@ msgid ""
 "match any droppers. A dropper should be placed with a matching timer "
 "value, to specify the respawn point for this preplaced cube."
 msgstr ""
+"Указанный куб имеет значение таймера <var>{timer}</var>, которое не "
+"совпадает ни с одним dropper'ом. Необходимо поместить dropper с "
+"соответствующим значением таймера, чтобы указать точку респауна для этого"
+" предварительно помещенного куба."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -352,6 +402,9 @@ msgid ""
 "Custom cubes convertdroppers above them into their type, to allow having "
 "droppers."
 msgstr ""
+"Dropper над пользовательским кубом типа <var>{type}</var> уже связан! "
+"Пользовательские кубы конвертируют dropper'ы над ними в их тип, чтобы "
+"позволить иметь dropper'ы."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -359,6 +412,8 @@ msgid ""
 "A cube colouriser must be placed onto a dropper or cube to set the "
 "colour, it cannot be placed by itself."
 msgstr ""
+"Цвето-куб должен быть помещен на dropper или кубик, чтобы задать цвет, "
+"сам по себе он не может быть помещен."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -368,11 +423,15 @@ msgid ""
 "you're wanting to paint the floor below the cube differently to the "
 "dropper, place a different splat on the ceiling."
 msgstr ""
+"На этом кубике было несколько брызг краски, поэтому неясно, каким гелем "
+"начинать красить кубик. Удалите все, кроме одного типа. Если вы хотите "
+"покрасить пол под кубом иначе, чем dropper, поместите на потолок другой "
+"сплэт."
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Superposition Entanglers must be placed on top of a single dropper."
-msgstr ""
+msgstr "Superposition Entanglers должны быть размещены поверх одного dropper'а."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -380,11 +439,13 @@ msgid ""
 "Superposition Entanglers must be connected to a single dropper, not any "
 "other items."
 msgstr ""
+"Superposition Entanglers должны быть подключены к одному dropper'у, а не "
+"к каким-либо другим предметам."
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Two Superposition Entanglers cannot be connected to a single dropper!"
-msgstr ""
+msgstr "Два Superposition Entanglers не могут быть подключены к одному dropper'у!"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -399,7 +460,7 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Glass / Grating item"
-msgstr ""
+msgstr "Стекло / Решетка item"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -408,6 +469,9 @@ msgid ""
 "output to one or more regular glass or grating items. It will then change"
 " the type of that barrier."
 msgstr ""
+"Пользовательский предмет барьера \"<var>{name}</var>\" должен быть "
+"подключен через выход к одному или нескольким обычным стеклянным или "
+"решетчатым предметам. Тогда он изменит тип этого барьера."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -415,6 +479,8 @@ msgid ""
 "The barrier at this posiiton has been connected to multiple custom "
 "barrier items. Remove all but one connection."
 msgstr ""
+"Барьер в этой позиции был связан с несколькими пользовательскими "
+"предметами барьера. Удалите все соединения, кроме одного."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -423,6 +489,9 @@ msgid ""
 " entire highlighted yellow area should be occupied by continous "
 "glass/grating/etc which isnot itself occupied by a different hole."
 msgstr ""
+"Барьерная дыра (\"<var>{hole}</var>\") не имеет достаточного "
+"пространства. Вся выделенная желтым область должна быть занята сплошным "
+"стеклом/решеткой/и т.д, которая сама не занята другим отверстием."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -436,6 +505,15 @@ msgid ""
 "then carve into the block from a side to remove it while keeping the hole"
 " in the same position."
 msgstr ""
+"Барьерное отверстие (\"<var>{hole}</var>\") было неправильно размещено. "
+"Этот предмет необходимо поместить на лист стекла/решетки/и т.д, в котором"
+" он затем прорежет отверстие. Чтобы правильно повернуть предмет, вам "
+"может понадобиться сначала поместить его на стену с той же ориентацией, а"
+" затем перетащить его на стекло, не перетаскивая его по поверхностям с "
+"другой ориентацией. В качестве альтернативы можно временно поставить блок"
+" на место барьера, чтобы расположить предмет с отверстием, а затем "
+"вырезать блок со стороны, чтобы удалить его, сохранив отверстие в том же "
+"положении."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -445,6 +523,10 @@ msgid ""
 "type of hole. The barrier allows ({types_barrier}), but the hole only has"
 " ({types_hole}) available."
 msgstr ""
+"Отверстие барьера (\"<var>{hole}</var>\") было размещено поверх барьера "
+"\"<var>{barrier}</var>\", но этот барьер не поддерживает этот тип "
+"отверстия. Барьер допускает ({types_barrier}), но отверстие имеет только "
+"({types_hole})."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -452,6 +534,8 @@ msgid ""
 "A Barrier Hole (\"<var>{hole}</var>\") was placed on top of a "
 "\"<var>{barrier}</var>\" barrier, which does not allow holes."
 msgstr ""
+"Отверстие барьера (\"<var>{hole}</var>\") было размещено поверх барьера "
+"\"<var>{barrier}</var>\", который не допускает наличия отверстий."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -466,6 +550,8 @@ msgid ""
 "A chain of items has multiple inputs to a single item. The chain should "
 "form a single path, not have branches."
 msgstr ""
+"Цепочка предметов имеет несколько входов для одного предмета. Цепочка "
+"должна образовывать один путь, а не иметь разветвлений."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -473,6 +559,8 @@ msgid ""
 "A chain of items has multiple outputs from a single item. The chain "
 "should form a single path, not have branches."
 msgstr ""
+"A chain of items has multiple outputs from a single item. The chain "
+"should form a single path, not have branches."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -480,6 +568,8 @@ msgid ""
 "A chain of items has been constructed with a loop, but this type of item "
 "does not support a loop. Break the connection at some point."
 msgstr ""
+"Цепочка предметов была построена с помощью петли, но этот тип предметов "
+"не поддерживает петлю. Прервите соединение в какой-то момент."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -487,6 +577,8 @@ msgid ""
 "The highlighted items in this chain do not support being linked together "
 "in this fashion. Check the order of connections."
 msgstr ""
+"Выделенные предметы в этой цепочке не поддерживают соединение таким "
+"образом. Проверьте порядок соединений."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -495,26 +587,31 @@ msgid ""
 "\"<var>{groups}</var>\". Brushes andoverlays in templates may currently "
 "only use one visgroup each."
 msgstr ""
+"Шаблон \"<var>{id}</var>\" имеет {type} с двумя виз-группами: "
+"\"<var>{groups}</var>\". Кисти и наложения в шаблонах в настоящее время "
+"могут использовать только одну виз-группу каждая."
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "No item ID for fizzler instance \"<var>{inst}</var>\"!"
-msgstr ""
+msgstr "Нет идентификатора предмета для экземпляра fizzler \"<var>{inst}</var>\"!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "No fizzler type for {item} (\"<var>{inst}</var>\")!"
-msgstr ""
+msgstr "Нет типа fizzler'а для {item} (\"<var>{inst}</var>\")!"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "No model specified for one side of \"{id}\" fizzlers."
-msgstr ""
+msgstr "Для одной стороны \"{id}\" Fizzler'а не указана модель."
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Instance lookup path \"<code>{path}</code>\" returned no instances."
 msgstr ""
+"Путь поиска экземпляров \"<code>{path}</code>\" не вернул ни одного "
+"экземпляра."
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -522,20 +619,22 @@ msgid ""
 "Instance lookup path \"<code>{path}</code>\" was expected to provide one "
 "instance, but it returned multiple instances:"
 msgstr ""
+"Ожидалось, что путь поиска экземпляра \"<code>{path}</code>\" предоставит"
+" один экземпляр, но он вернул несколько экземпляров:"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "<strong>No error?</strong>"
-msgstr ""
+msgstr "<strong>Нет ошибки?</strong>"
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Failed to load error!"
-msgstr ""
+msgstr "Ошибка при загрузке!"
 
 #: app/CompilerPane.py
 msgid "Image Files"
-msgstr "Изображения"
+msgstr "Файлы изображений"
 
 #: app/CompilerPane.py
 msgid "Map Settings"
@@ -552,9 +651,9 @@ msgid ""
 "select.\n"
 "Images will be converted to JPEGs if necessary."
 msgstr ""
-"Использовать другое изображение для превью. Нажмите на скриншот, чтобы "
-"выбрать его.\n"
-"Изображения будут конвертированы в JPEG при необходимости."
+"Используйте пользовательское изображение для предварительного просмотра "
+"карты. Нажмите на снимок экрана, чтобы выбрать его.\n"
+"При необходимости изображения будут преобразованы в JPEG."
 
 #: app/CompilerPane.py
 msgid "Filename: {path}"
@@ -572,26 +671,24 @@ msgid ""
 "Options on this panel can be changed \n"
 "without exporting or restarting the game."
 msgstr ""
-"Эти настройки могут быть \n"
-"изменены без экспорта или\n"
-"перезапуска игры."
+"Опции этой панели могут быть изменены \n"
+" без экспорта или перезапуска игры."
 
 #: app/CompilerPane.py
 msgid "Thumbnail"
-msgstr "Превью"
+msgstr "Миниатюра"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid "Screenshot"
-msgstr "Авто"
+msgstr "Скриншот"
 
 #: app/CompilerPane.py
 msgid "Editor View"
-msgstr ""
+msgstr "Редакторский вид"
 
 #: app/CompilerPane.py
 msgid "Custom:"
-msgstr "Своё:"
+msgstr "Пользовательский:"
 
 #: app/CompilerPane.py
 msgid "Cleanup old screenshots"
@@ -604,32 +701,33 @@ msgid ""
 " not been previewed recently (within the last few hours), the default "
 "PeTI screenshot will be used instead."
 msgstr ""
-"Перезапишите изображение карты, чтобы использовать скриншот, "
-"автоматически сделанный с начала камеры. Нажмите клавишу F5, чтобы "
-"сделать новый скриншот. Если карта не была просмотрена в последнее время "
-"(в течение последних нескольких часов), будет использоваться стандартный "
-"скриншот PeTI."
+"Замените изображение карты, чтобы использовать скриншот, автоматически "
+"сделанный из начала камеры. Нажмите F5, чтобы сделать новый скриншот. "
+"Если карта не просматривалась в последнее время (в течение последних "
+"нескольких часов), вместо нее будет использован скриншот PeTI по "
+"умолчанию."
 
 #: app/CompilerPane.py
 msgid "Use the normal editor view for the map preview image."
-msgstr "Использовать превью карты как в редакторе уровней."
+msgstr ""
+"Используйте обычный вид редактора для изображения предварительного "
+"просмотра карты."
 
 #: app/CompilerPane.py
 msgid ""
 "Automatically delete unused Automatic screenshots. Disable if you want to"
 " keep things in \"portal2/screenshots\". "
 msgstr ""
-"Автоматически удалять неиспользованные авто-скриншоты. Выключите, если вы"
-" хотите оставить их в \"portal2/screenshots\". "
+"Автоматическое удаление неиспользуемых Автоматических скриншотов. "
+"Отключите, если хотите сохранить все в \"portal2/screenshots\". "
 
 #: app/CompilerPane.py
 msgid "Lighting:"
 msgstr "Освещение:"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid "None"
-msgstr "Нету!"
+msgstr "Ничего"
 
 #: app/CompilerPane.py
 msgid "Fast"
@@ -640,15 +738,16 @@ msgid "Full"
 msgstr "Полное"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid ""
 "{desc}\n"
 "\n"
 "You can hold down Shift during the start of the Lighting stage to switch "
 "to {keymode} lighting on the fly."
 msgstr ""
-"Вы можете зажать Shift во время стадии \"Освещение\", чтобы переключить "
-"эту настройку на ходу."
+"{desc}\n"
+"\n"
+"Вы можете удерживать Shift во время начала этапа освещения, чтобы "
+"переключиться на освещение в режиме {keymode} на лету."
 
 #: app/CompilerPane.py
 msgid ""
@@ -657,6 +756,10 @@ msgid ""
 "will run in fullbright. \n"
 "When publishing, this is ignored."
 msgstr ""
+"Компиляция без освещения. Это значительно ускоряет время компиляции, но "
+"при этом не будет никакого освещения, гель будет невидим, а карта будет "
+"работать в режиме Полное. \n"
+"При публикации это игнорируется."
 
 #: app/CompilerPane.py
 msgid ""
@@ -664,9 +767,9 @@ msgid ""
 "but does not appear as good. Some shadows may appear wrong.\n"
 "When publishing, this is ignored."
 msgstr ""
-"Компилируйте с более низким качеством и быстрым освещением. Это ускоряет "
+"Компилируйте с менее качественным и быстрым освещением. Это ускоряет "
 "время компиляции, но выглядит не так хорошо. Некоторые тени могут "
-"казаться неправильными.\n"
+"выглядеть неправильно.\n"
 "При публикации это игнорируется."
 
 #: app/CompilerPane.py
@@ -675,14 +778,14 @@ msgid ""
 "to compute. Use if you're arranging lights.\n"
 "When publishing, this is always used."
 msgstr ""
-"Компилируйте с высококачественным освещением. Это выглядит правильно, но "
-"для вычисления требуется больше времени. Используйте, если вы работаете с"
-" освещением.\n"
-"При публикации это всегда используется."
+"Скомпилируйте с высококачественным освещением. Это выглядит правильно, но"
+" требует больше времени на вычисление. Используйте, если вы расставляете "
+"освещение.\n"
+"При публикации всегда используется этот вариант."
 
 #: app/CompilerPane.py
 msgid "Enable packing"
-msgstr ""
+msgstr "Включить упаковку"
 
 #: app/CompilerPane.py
 msgid ""
@@ -691,18 +794,22 @@ msgid ""
 "cause some resources to not work correctly. Regardless of this setting, "
 "packing is enabled when publishing. "
 msgstr ""
+"Отключает автоматическую упаковку ресурсов на карте. Это может ускорить "
+"создание карты, позволяет редактировать файлы и выполнять команды "
+"перезагрузка, но может привести к некорректной работе некоторых ресурсов."
+" Независимо от этой настройки, упаковка будет включена при публикации. "
 
 #: app/CompilerPane.py
 msgid "Dump packed files to:"
-msgstr "Дампить файлы пакетов в:"
+msgstr "Сбросить упакованные файлы в:"
 
 #: app/CompilerPane.py
 msgid ""
 "When compiling, dump all files which were packed into the map. Useful if "
 "you're intending to edit maps in Hammer."
 msgstr ""
-"При компиляции дампить все файлы, которые были использованы в карте. "
-"Полезно, если вы собираетесь редактировать карты в Hammer."
+"При компиляции, сбрасывайте все файлы, которые были упакованы в карту. "
+"Полезно, если вы собираетесь редактировать карту в Hammer."
 
 #: app/CompilerPane.py
 msgid "Last Compile:"
@@ -723,17 +830,17 @@ msgid ""
 "don't affect the ingame limit, while others may generate additional "
 "entities at runtime."
 msgstr ""
-"Сущности - это функциональные объекты на карте. Удаление сложных "
-"движущихся элементов поможет уменьшить это. Количество объектов элементов"
-" указано в окне описания элементов.\n"
+"Сущности - это объекты на карте, обладающие функциональностью. Удаление "
+"сложных перемещаемых предметов поможет уменьшить этот показатель. "
+"Количество предметов указано в окне описания предмета.\n"
 "\n"
-"Это не совсем точно, некоторые типы сущностей учитываются, но не влияют "
-"на ограничение в игре, в то время как другие могут генерировать "
-"дополнительных сущностей во время выполнения."
+"Это не совсем точно, некоторые типы сущностей учитываются здесь, но не "
+"влияют на игровой лимит, в то время как другие могут генерировать "
+"дополнительные сущности во время выполнения."
 
 #: app/CompilerPane.py
 msgid "Overlay"
-msgstr "Оверлей"
+msgstr "Накладка"
 
 #. i18n: Progress bar description
 #: app/CompilerPane.py
@@ -742,21 +849,21 @@ msgid ""
 "lights. Hiding complex antlines or setting them to signage will reduce "
 "this."
 msgstr ""
-"Оверлеи - это небольшие изображения, прикрепленные к поверхностям, таким "
-"как знаки или индикаторы. Скрытие сложных антлайнов или установка "
-"соединений в значки уменьшит это."
+"Накладки - это небольшие изображения, прикрепленные к поверхностям, "
+"например к знакам или индикаторам. Скрытие сложных анти-линий или "
+"установка их на знаки уменьшит это."
 
 #: app/CompilerPane.py
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
 msgstr ""
-"Обновление индикаторов компиляции. Нажмите после компиляции, чтобы "
-"отобразить новые значения."
+"Обновление индикаторов выполнения компиляции. Нажмите после выполнения "
+"компиляции, чтобы отобразить новые значения."
 
 #: app/CompilerPane.py
 msgid "Brush"
-msgstr "Браш"
+msgstr "Кисть"
 
 #: app/CompilerPane.py
 msgid ""
@@ -764,43 +871,42 @@ msgid ""
 "high, it may help to reduce the size of the map or remove intricate "
 "shapes."
 msgstr ""
-"Браши образуют стенки или другие части испытательной камеры. Если она "
-"высока, это может помочь уменьшить размер карты и удалить сложные фигуры."
+"Кисти формируют стены или другие части тестовой камеры. Если этот "
+"показатель высок, может помочь уменьшение размера карты или удаление "
+"замысловатых форм."
 
 #: app/CompilerPane.py
 msgid "Voicelines:"
-msgstr "Озвучка:"
+msgstr "Голосовые линии:"
 
 #: app/CompilerPane.py
 msgid "Use voiceline priorities"
-msgstr "Использовать приоритетную озвучку"
+msgstr "Использовать приоритеты голосовых линий"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
 "lines will only be chosen if few test elements are in the map. If "
 "disabled a random applicable lines will be used."
 msgstr ""
-"Выбирать только самые приоритетные фразы. Это значит, что более общие "
-"линии будут выбраны только в том случае, если на карте будет несколько "
-"тестовых элементов. Если отключено, будут использоваться любые возможные "
-"фразы."
+"Выбирайте только голосовые линии с наивысшим приоритетом. Это означает, "
+"что более общие линии будут выбраны только в том случае, если на карте "
+"мало тестовых предметов. Если отключено, будут использоваться случайные "
+"применимые линии."
 
 #: app/CompilerPane.py
 msgid "Spawn at:"
-msgstr "Начинать с:"
+msgstr "Появляться в:"
 
 #: app/CompilerPane.py
 msgid "Entry Door"
-msgstr "Дверей входа"
+msgstr "Входная дверь"
 
 #: app/CompilerPane.py
 msgid "Elevator"
-msgstr "Лифта"
+msgstr "Лифт"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
 "examine the entry and exit corridors.\n"
@@ -808,55 +914,54 @@ msgid ""
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap which location you spawn at on the fly."
 msgstr ""
-"При одиночном предпросмотре, вы спавнитесь внутри лифта. Используйте это "
-"для изучения коридоров входа и выхода.\n"
+"При предварительном просмотре в SP появляетесь в лифте на входе. "
+"Используйте его, чтобы изучить коридоры входа и выхода.\n"
 "\n"
-"Вы можете зажать Shift во время стадии \"Геометрия\" для переключения "
-"места возрождения на ходу."
+"Вы можете удерживать Shift во время начала этапа «Геометрия», чтобы "
+"быстро поменять место появления на лету."
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid ""
 "When previewing in SP, spawn just before the entry door.\n"
 "\n"
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap which location you spawn at on the fly."
 msgstr ""
-"При одиночном предпросмотре, вы спавнитесь на входе.\n"
+"При предварительном просмотре в SP появляетесь прямо перед входной "
+"дверью.\n"
 "\n"
-"Вы можете зажать Shift во время стадии \"Геометрия\" для переключения "
-"места возрождения на ходу."
+"Вы можете удерживать Shift во время начала этапа «Геометрия», чтобы "
+"быстро поменять место появления на лету."
 
 #: app/CompilerPane.py
 msgid "Player Model (SP):"
-msgstr "Моделька игрока:"
+msgstr "Модель игрока (Однопользовательский):"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid "Compiler Options - {ver}"
-msgstr "Опции компилятора - {}"
+msgstr "Опции компилятора - {ver}"
 
 #: app/StyleVarPane.py
 msgid "Multiverse Cave"
-msgstr "Кейв Мултивселенной"
+msgstr "Мультивселенная Кейва"
 
 #: app/StyleVarPane.py
 msgid "Play the Workshop Cave Johnson lines on map start."
-msgstr "Проигрывать реплики Кейва Джонсона из мастерской в начале."
+msgstr ""
+"Проиграть реплики Кейва Джонсона в начале карты, в опубликованной версии "
+"карты в Мастерской."
 
 #: app/StyleVarPane.py
 msgid "Suppress Mid-Chamber Dialogue"
-msgstr "Заглушить диалоги посередине карты"
+msgstr "Подавить диалог в середине камеры"
 
 #: app/StyleVarPane.py
 msgid "Disable all voicelines other than entry and exit lines."
-msgstr ""
-"Заглушает все реплики за исключением тех, которые проигрываются на "
-"входе/выходе."
+msgstr "Отключить все голосовые линии, кроме входных и выходных линий."
 
 #: app/StyleVarPane.py
 msgid "Allow Adding Goo Mist"
-msgstr "Добавление тумана над токсичной жидкостью"
+msgstr "Разрешить добавление тумана"
 
 #: app/StyleVarPane.py
 msgid ""
@@ -864,13 +969,13 @@ msgid ""
 "the entity count significantly with large, complex goo pits, so disable "
 "if needed."
 msgstr ""
-"Добавляет туман над токсичной жидкостью. Может значительно увеличить "
-"количество сущностей с большими и сложными ямами с жижей, поэтому, "
-"выключите если требуется."
+"Добавляет частицы тумана над Токсичной жижой в некоторых стилях. Это "
+"может значительно увеличить количество сущностей в больших сложных ямах, "
+"поэтому отключите это при необходимости."
 
 #: app/StyleVarPane.py
 msgid "Light Reversible Excursion Funnels"
-msgstr "Подсвечивать разворачиваемые экскурсионные воронки"
+msgstr "Реверсивное освещение экскурсионных воронок"
 
 #: app/StyleVarPane.py
 msgid ""
@@ -879,50 +984,51 @@ msgid ""
 " Disable this to prevent that by disabling lights. Non-reversible Funnels"
 " do not have this issue."
 msgstr ""
-"Воронки могут создавать небольшое количество света. Если несколько "
-"воронок находятся рядом друг с другом, они могут создавать проблемы с "
-"освещением. Отключите, чтобы решить эти проблемы отключением света от "
-"воронок. Воронки с одной полярностью не имеют такой проблемы."
+"Воронки излучают небольшое количество света. Однако если несколько "
+"воронок находятся рядом друг с другом и могут менять полярность, это "
+"может вызвать проблемы с освещением. Чтобы предотвратить это, отключите "
+"освещение. У нереверсивных воронок такой проблемы нет."
 
 #: app/StyleVarPane.py
 msgid "Enable Shape Framing"
-msgstr "Рамки символов"
+msgstr "Включить обрамление формы"
 
 #: app/StyleVarPane.py
 msgid ""
 "After 10 shape-type antlines are used, the signs repeat. With this "
 "enabled, colored frames will be added to distinguish them."
 msgstr ""
-"Если используется больше 10 антлайнов-символов, сами символы начинают "
-"повторятся. Эта функция добавляет цветные рамки по краям символов."
+"После того, как 10 анти-линий заданного типа формы используются, знаки "
+"повторяются. При включении, к ним будут добавлены цветные рамки для "
+"различия"
 
 #. i18n: StyleVar default value.
 #: app/StyleVarPane.py
 msgid "Default: Off"
-msgstr "По умолчанию: Выкл"
+msgstr "По умолчанию: выключено"
 
 #: app/StyleVarPane.py
 msgid "Default: On"
-msgstr "По умолчанию: Вкл"
+msgstr "По умолчанию: включено"
 
 #. i18n: Tooltip when specific styles are used
 #: app/StyleVarPane.py
-#, fuzzy
 msgid "Style: {styles}"
 msgid_plural "Styles: {styles}"
-msgstr[0] "Стиль: {}"
-msgstr[1] "Стили: {}"
-msgstr[2] "Стили: {}"
+msgstr[0] "Стиль: {styles}"
+msgstr[1] "Стили: {styles}"
+msgstr[2] ""
+msgstr[3] ""
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
 msgid "Styles: Unstyled"
-msgstr "Стиль: без стиля"
+msgstr "Стили: Без стиля"
 
 #. i18n: StyleVar which matches all styles.
 #: app/StyleVarPane.py
 msgid "Styles: All"
-msgstr "Стиль: все"
+msgstr "Стили: Все"
 
 #. i18n: Order of lines in the tooltip.
 #: app/StyleVarPane.py
@@ -954,12 +1060,11 @@ msgstr "Нет опций!"
 
 #: app/StyleVarPane.py
 msgid "None!"
-msgstr "Нету!"
+msgstr "Ничего!"
 
 #: app/SubPane.py
-#, fuzzy
 msgid "Hide/Show the \"{window}\" window."
-msgstr "Показать/скрыть окно \"{}\"."
+msgstr "Скрыть/показать окно \"{window}\"."
 
 #: app/SubPane.py
 msgid "Palettes"
@@ -967,11 +1072,11 @@ msgstr "Палитры"
 
 #: app/SubPane.py
 msgid "Export Options"
-msgstr "Экспорт опций"
+msgstr "Опции экспорта"
 
 #: app/SubPane.py
 msgid "Style/Item Properties"
-msgstr "Параметры объектов и стилей"
+msgstr "Свойства стиля/предметов"
 
 #: app/SubPane.py
 msgid "Compile Options"
@@ -979,11 +1084,11 @@ msgstr "Опции компиляции"
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
-msgstr "Выбранные предметы и стили успешно экспортированы!"
+msgstr "Выбранные предметы и стиль успешно экспортированы!"
 
 #: app/UI.py
 msgid "BEE2 - Export Complete"
-msgstr ""
+msgstr "BEE2 - Экспорт завершен"
 
 #: app/UI.py
 msgid "BEEMOD {version} - {game}"
@@ -992,20 +1097,20 @@ msgstr ""
 #: app/UI.py
 msgid "Add no extra voice lines, only Multiverse Cave if enabled."
 msgstr ""
-"Не добавлять дополнительную озвучку, только Кейва мультивселенной, если "
-"он включён."
+"Не добавляйте никаких дополнительных голосовых линий, только "
+"Мультивселенная Кейва, если она включена."
 
 #: app/UI.py
 msgid "Random"
-msgstr "Случайно"
+msgstr "Случайный"
 
 #: app/UI.py
 msgid "Choose a random video."
-msgstr "Выбрать случайное видео."
+msgstr "Выберите случайное видео."
 
 #: app/UI.py
 msgid "Select Skyboxes"
-msgstr "Выберите скайбоксы"
+msgstr "Выбрать Skybox"
 
 #: app/UI.py
 msgid ""
@@ -1013,21 +1118,22 @@ msgid ""
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers)."
 msgstr ""
-"Скайбокс решает, как выглядит область за пределами камеры. Он выбирает "
-"цвет неба (видимый в некоторых предметах), стиль бездонной ямы (если "
-"таковая имеется), а также цвет \"тумана\" (видимый в больших камерах)."
+"Skybox определяет, каким будет пространство за пределами камеры. Он "
+"выбирает цвет неба (встречается в некоторых предметах), стиль бездонной "
+"ямы (если она есть), а также цвет «тумана» (встречается в больших "
+"камерах)."
 
 #: app/UI.py
 msgid "3D Skybox"
-msgstr "3D скайбокс"
+msgstr ""
 
 #: app/UI.py
 msgid "Fog Color"
-msgstr "Цвет дыма"
+msgstr "Цвет тумана"
 
 #: app/UI.py
 msgid "Select Additional Voice Lines"
-msgstr "Выберите дополнительную озвучку"
+msgstr "Выбрать дополнительные голосовые линии"
 
 #: app/UI.py
 msgid ""
@@ -1036,10 +1142,10 @@ msgid ""
 "The additional \"Multiverse\" Cave lines are controlled separately in "
 "Style Properties."
 msgstr ""
-"Выберите, какая дополнительная озвучка будет воспроизводиться, когда "
-"игрок входит или выходит из камеры. Они выбираются в зависимости от того,"
-" какие элементы присутствуют на карте. Дополнительные линии Кейва "
-"Мультивселенной управляются отдельно в Свойствах стиля."
+"Голосовые линии определяют, какие дополнительные голоса будут звучать, "
+"когда игрок входит или выходит из камеры. Они выбираются в зависимости от"
+" того, какие предметы присутствуют на карте. Дополнительные линии Кейва "
+"\"Мультивселенная\" управляются отдельно в Свойствах стиля."
 
 #: app/UI.py
 msgid "Characters"
@@ -1047,15 +1153,15 @@ msgstr "Персонажи"
 
 #: app/UI.py
 msgid "Turret Shoot Monitor"
-msgstr "Турель будет стрелять в монитор"
+msgstr "Турель стреляет в монитор"
 
 #: app/UI.py
 msgid "Monitor Visuals"
-msgstr "Картинка для мониторов"
+msgstr "Визуальные эффекты монитора"
 
 #: app/UI.py
 msgid "Select Style"
-msgstr "Выберите стиль"
+msgstr "Выбрать стиль"
 
 #: app/UI.py
 msgid ""
@@ -1067,22 +1173,22 @@ msgid ""
 msgstr ""
 "Стиль управляет многими аспектами карты. Он определяет материалы, "
 "используемые для стен, внешний вид входов и выходов, дизайн большинства "
-"предметов и другие параметры.\n"
+"предметов, а также другие параметры.\n"
 "\n"
-"Стиль в широком смысле определяет период времени, в котором была создана "
-"камера."
+"Стиль в значительной степени определяет временной период, в котором "
+"находится камера."
 
 #: app/UI.py
 msgid "Elevator Videos"
-msgstr "Видео лифта"
+msgstr "Видео в лифте"
 
 #: app/UI.py packages/corridor.py
 msgid "Corridor"
-msgstr ""
+msgstr "Коридор"
 
 #: app/UI.py
 msgid "Select Elevator Video"
-msgstr "Выберите видео лифта"
+msgstr "Выбрать видео в лифте"
 
 #: app/UI.py
 msgid ""
@@ -1090,32 +1196,31 @@ msgid ""
 "rooms. Not all styles feature these. If set to \"None\", a random video "
 "will be selected each time the map is played, like in the default PeTI."
 msgstr ""
-"Установите видео, воспроизводимое на экранах в современных лифтовых "
-"помещениях. Не все стили имеют такую возможность. Если установлено "
-"значение \"Нет\", то при каждом воспроизведении карты будет выбираться "
+"Установите видео, воспроизводимое на видеоэкранах в современных лифтовых "
+"комнатах Aperture. Они есть не во всех стилях. Если установить значение "
+"\"Ничего\", то при каждом воспроизведении карты будет выбираться "
 "случайное видео, как в PeTI по умолчанию."
 
 #: app/UI.py
 msgid "This style does not have a elevator video screen."
-msgstr "В этом стиле нет экранов в лифтовых помещениях."
+msgstr "В этом стиле нет видеоэкрана с лифтом."
 
 #. i18n: Text when elevators are not present in the style.
 #: app/UI.py
 msgid "<Not Present>"
-msgstr ""
+msgstr "<Не присутствует>"
 
 #: app/UI.py
 msgid "Multiple Orientations"
-msgstr "Несколько ориентаций"
+msgstr "Различные ориентации"
 
 #: app/UI.py
 msgid "Music: "
 msgstr "Музыка: "
 
 #: app/UI.py
-#, fuzzy
 msgid "{down_arrow} Use Suggested {down_arrow}"
-msgstr "{arr} Использовать предложенное {arr}"
+msgstr "{down_arrow} Использовать предложенное {down_arrow}"
 
 #: app/UI.py
 msgid "Style: "
@@ -1127,43 +1232,41 @@ msgstr "Голос: "
 
 #: app/UI.py
 msgid "Skybox: "
-msgstr "Скайбокс: "
+msgstr ""
 
 #: app/UI.py
 msgid "Elev Vid: "
-msgstr "Видео лифта: "
+msgstr "Видео в лифте: "
 
 #: app/UI.py
 msgid "Corridor: "
-msgstr ""
+msgstr "Коридор: "
 
 #: app/UI.py
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr ""
-"Включить или отключить определенную озвучку, чтобы предотвратить её "
-"добавление."
+"Включите или отключите определенные голосовые линии, чтобы предотвратить "
+"их добавление."
 
 #: app/UI.py
-#, fuzzy
 msgid "Select"
-msgstr "Выбран."
+msgstr "Выбрать"
 
 #: app/UI.py
 msgid "Remove all items from the palette."
-msgstr ""
+msgstr "Удалить все предметы из палитры."
 
 #: app/UI.py
 msgid "Fill empty spots in the palette with random items."
-msgstr "Заполнить пустые слоты в наборе случайными предметами."
+msgstr "Заполнить пустые места в палитре случайными предметами."
 
 #: app/__init__.py
 msgid "BEEMOD {version} Error!"
-msgstr ""
+msgstr "BEEMOD {version} Ошибка!"
 
 #: app/__init__.py
-#, fuzzy
 msgid ""
 "An error occurred: \n"
 "{err}\n"
@@ -1171,73 +1274,73 @@ msgid ""
 "This has been copied to the clipboard."
 msgstr ""
 "Произошла ошибка: \n"
-"{}\n"
-"\n"
-"Этот текст был скопирован в буфер обмена."
+" {err} \n"
+" \n"
+" Это было скопировано в буфер обмена."
 
 #: app/backup.py app/packageMan.py
-#, fuzzy
 msgid "Name"
-msgstr "Игра"
+msgstr "Имя"
 
 #: app/backup.py
 msgid "Mode"
-msgstr ""
+msgstr "Режим"
 
 #: app/backup.py
 msgid "Date"
-msgstr ""
+msgstr "Дата"
 
 #: app/backup.py app/corridor_selector.py
 msgid "SP"
-msgstr "Один игрок"
+msgstr "Одиночная"
 
 #: app/backup.py app/corridor_selector.py
 msgid "Coop"
 msgstr "Кооператив"
 
 #: app/backup.py
-#, fuzzy
 msgid "Do you wish to delete {n} map?"
 msgid_plural "Do you wish to delete {n} maps?"
-msgstr[0] "Вы хотите удалить {} карту?\n"
-msgstr[1] "Вы хотите удалить {} карты?\n"
-msgstr[2] "Вы хотите удалить {} карт?\n"
+msgstr[0] "Вы хотите удалить карту {n}?"
+msgstr[1] "Вы хотите удалить {n} карты?"
+msgstr[2] ""
+msgstr[3] ""
 
 #: app/backup.py
-#, fuzzy
 msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Эта карта уже в папке игры. Хотите перезаписать? ({})"
+msgstr "Эта карта уже есть в каталоге игры. Вы хотите перезаписать её? ({mapname})"
 
 #: app/backup.py
-#, fuzzy
 msgid ""
 "This filename is already in the backup. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Бэкап с таким именем уже имеется. Вы хотите его перезаписать? ({})"
+msgstr ""
+"Это имя файла уже есть в резервной копии. Хотите ли вы перезаписать его? "
+"({mapname})"
 
 #: app/backup.py
 msgid "Overwrite File?"
-msgstr ""
+msgstr "Перезаписать файл?"
 
 #: app/backup.py
 msgid "Failed to parse this puzzle file. It can still be backed up."
-msgstr "Не удалось прочитать файл карты. Он всё ещё может быть помещен в бэкап."
+msgstr ""
+"Не удалось разобрать этот файл головоломки. Он все еще может быть "
+"сохранен резервной копией."
 
 #: app/backup.py
 msgid "No description found."
-msgstr "Не найдено описания."
+msgstr "Описание не найдено."
 
 #: app/backup.py
 msgid "Unsaved Backup"
-msgstr "Несохранённый бекап"
+msgstr "Несохраненное резервное копирование"
 
 #: app/backup.py
-#, fuzzy
 msgid "Backup ZIP archive"
-msgstr "Бэкап"
+msgstr "Архив ZIP резервной копии"
 
 #: app/backup.py
 msgid "Copying maps"
@@ -1253,23 +1356,23 @@ msgstr "Удаление карт"
 
 #: app/backup.py
 msgid "BEE2 Backup"
-msgstr "Бэкап BEE2"
+msgstr "BEE2 Резервное копирование"
 
 #: app/backup.py
 msgid "No maps were chosen to backup!"
-msgstr "Не выбраны карты для резервирования!"
+msgstr "Ни одна карта не была выбрана для резервного копирования!"
 
 #: app/backup.py
 msgid "Load Backup"
-msgstr "Загрузить бекап"
+msgstr "Загрузка резервного копирования"
 
 #: app/backup.py
 msgid "Save Backup As"
-msgstr "Сохранить бекап как"
+msgstr "Сохранить резервное копирование как"
 
 #: app/backup.py
 msgid "Confirm Deletion"
-msgstr "Подтвердите удаление"
+msgstr "Подтвердить удаление"
 
 #: app/backup.py
 msgid "Restore:"
@@ -1277,39 +1380,35 @@ msgstr "Восстановить:"
 
 #: app/backup.py
 msgid "Backup:"
-msgstr "Бэкап:"
+msgstr "Резервная копия:"
 
 #: app/backup.py
 msgid "Checked"
-msgstr "Выбр."
+msgstr "Проверено"
 
 #: app/backup.py
 msgid "Delete Checked"
-msgstr "Удалить выбр."
+msgstr "Удалить проверенную"
 
 #: app/backup.py
 msgid "Reload the map list."
-msgstr ""
+msgstr "Перезагрузите список карт."
 
 #: app/backup.py
-#, fuzzy
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - Бэкап/Восстановление головоломок"
+msgstr "BEEMOD {version} - Резервное / Восстановление Головоломки"
 
 #: app/backup.py
 msgid "New Backup"
-msgstr "Новый бэкап"
+msgstr "Новое резервное копирование"
 
-# "Открыть бэкап" is too long for the button, so it should be just "Открыть"
 #: app/backup.py
 msgid "Open Backup"
-msgstr "Открыть"
+msgstr "Открыть резервное копирование"
 
-# "Сохранить бэкап" is too long for the button, so it should be just
-# "Сохранить"
 #: app/backup.py
 msgid "Save Backup"
-msgstr "Сохранить"
+msgstr "Сохранить резервное копирование"
 
 #: app/backup.py app/menu_bar.py
 msgid "File"
@@ -1321,7 +1420,7 @@ msgstr "Добавить игру"
 
 #: app/backup.py
 msgid "Remove Game"
-msgstr "Удалить BEE2 из текущей игры"
+msgstr "Удалить игру"
 
 #: app/backup.py
 msgid "Game"
@@ -1333,19 +1432,19 @@ msgstr "Помощь"
 
 #: app/backup.py
 msgid "Automatic Backup After Export"
-msgstr "Создавать авто-бэкап после экспортирования"
+msgstr "Автоматическая резервная копия после экспорта"
 
 #: app/backup.py
 msgid "Keep (Per Game):"
-msgstr "Сохранять (в течение игры):"
+msgstr "Сохранить (за игру):"
 
 #: app/backup.py
 msgid "Backup/Restore Puzzles"
-msgstr "Бэкап/Восстановление головоломок"
+msgstr "Резервное копирование/восстановление говоломки"
 
 #: app/backup.py
 msgid ".. As"
-msgstr ""
+msgstr ".. Как"
 
 #: app/browsers.py
 msgid "Sounds Browser"
@@ -1358,7 +1457,7 @@ msgstr ""
 #: app/browsers.py
 #, fuzzy
 msgid "Sounds:"
-msgstr "Проигрывать звуки"
+msgstr "Воспроизводить звуки"
 
 #: app/browsers.py
 #, fuzzy
@@ -1381,7 +1480,7 @@ msgstr "Файл"
 #: app/browsers.py
 #, fuzzy
 msgid "Autoplay Sounds"
-msgstr "Проигрывать звуки"
+msgstr "Воспроизводить звуки"
 
 #: app/browsers.py
 #, fuzzy
@@ -1391,12 +1490,12 @@ msgstr "Вид"
 #: app/browsers.py
 #, fuzzy
 msgid "Soundscript"
-msgstr "Текст:"
+msgstr "Транскрипт:"
 
 #: app/browsers.py
 #, fuzzy
 msgid "Raw Sounds"
-msgstr "Проигрывать звуки"
+msgstr "Воспроизводить звуки"
 
 #: app/browsers.py
 msgid "Choreo Scenes"
@@ -1404,114 +1503,111 @@ msgstr ""
 
 #: app/contextWin.py
 msgid "This item may not be rotated."
-msgstr "Этот предмет нельзя повернуть."
+msgstr "Этот предмет не подлежит вращению."
 
 #: app/contextWin.py
 msgid "This item can be pointed in 4 directions."
-msgstr "Этот предмет может быть повёрнут в 4 стороны."
+msgstr "Этот предмет можно направить в 4 стороны."
 
 #: app/contextWin.py
 msgid "This item can be positioned on the sides and center."
-msgstr "Этот предмет может быть размещён по сторонам и по центру."
+msgstr "Этот предмет может быть размещен по сторонам и в центре."
 
 #: app/contextWin.py
 msgid "This item can be centered in two directions, plus on the sides."
-msgstr "Этот предмет может находиться по центру в 2 направлениях и по сторонам."
+msgstr "Этот предмет можно центрировать в двух направлениях, а также по бокам."
 
 #: app/contextWin.py
 msgid "This item can be placed like light strips."
-msgstr "Этот предмет может быть размещён как световая лента."
+msgstr "Этот предмет можно разместить как световые полосы."
 
 #: app/contextWin.py
 msgid "This item can be rotated on the floor to face 360 degrees."
-msgstr "Этот предмет может быть повёрнут на 360 градусов."
+msgstr "Этот предмет можно поворачивать на полу на 360 градусов."
 
 #: app/contextWin.py
 msgid "This item is positioned using a catapult trajectory."
-msgstr "Этот предмет устанавливается с помощью мишени катапульты."
+msgstr "Этот предмет устанавливается по траектории катапульты."
 
 #: app/contextWin.py
 msgid "This item positions the dropper to hit target locations."
-msgstr "Этот предмет создаёт раздатчик."
+msgstr "Этот предмет позиционирует dropper для попадания в цель."
 
 #: app/contextWin.py
 msgid "This item does not accept any inputs."
-msgstr "К этому предмету нельзя подключать."
+msgstr "Этот предмет не принимает никаких входов."
 
 #: app/contextWin.py
 msgid "This item accepts inputs."
-msgstr "К этому предмету можно подключать."
+msgstr "Этот предмет принимает входные данные."
 
 #: app/contextWin.py
 msgid "This item has two input types (A and B), using the Input A and B items."
-msgstr ""
-"У этого предмета есть два типа входящих соединений (А и Б), он использует"
-" \"A/B Input\"."
+msgstr "Этот предмет имеет два типа входа (A и B), используя предметы Input A и B."
 
 #: app/contextWin.py
 msgid "This item does not output."
-msgstr "Этот предмет нельзя подключать."
+msgstr "Этот предмет не выводит."
 
 #: app/contextWin.py
 msgid "This item has an output."
-msgstr "Этот предмет можно подключать."
+msgstr "Этот предмет имеет вывод."
 
 #: app/contextWin.py
 msgid "This item has a timed output."
-msgstr "Этот предмет можно подключать с таймером."
+msgstr "Этот предмет имеет временной выход."
 
 #: app/contextWin.py
 msgid "This item does not take up any space inside walls."
-msgstr "Этот предмет не занимает место под собой."
+msgstr "Этот предмет не занимает места внутри стен."
 
 #: app/contextWin.py
 msgid "This item takes space inside the wall."
-msgstr "Этот предмет занимает место под собой."
+msgstr "Этот предмет занимает место внутри стены."
 
 #: app/contextWin.py
 msgid "This item cannot be placed anywhere..."
-msgstr "Этот предмет нельзя разместить нигде..."
+msgstr "Этот предмет не может быть помещен куда-либо..."
 
 #: app/contextWin.py
 msgid "This item can only be attached to ceilings."
-msgstr "Этот предмет можно разметить только на потолке."
+msgstr "Этот предмет можно крепить только к потолкам."
 
 #: app/contextWin.py
 msgid "This item can only be placed on the floor."
-msgstr "Этот предмет можно разместить только на стене."
+msgstr "Этот предмет можно поставить только на пол."
 
 #: app/contextWin.py
 msgid "This item can be placed on floors and ceilings."
-msgstr "Этот предмет можно разместить на полу и потолке."
+msgstr "Этот предмет можно размещать на полу и потолке."
 
 #: app/contextWin.py
 msgid "This item can be placed on walls only."
-msgstr "Этот предмет можно разместить только на стене."
+msgstr "Этот предмет можно размещать только на стенах."
 
 #: app/contextWin.py
 msgid "This item can be attached to walls and ceilings."
-msgstr "Этот предмет можно разместить на стене и потолке."
+msgstr "Этот предмет можно крепить к стенам и потолкам."
 
 #: app/contextWin.py
 msgid "This item can be placed on floors and walls."
-msgstr "Этот предмет может быть помещён на стене и на полу."
+msgstr "Этот предмет можно размещать на полу и стенах."
 
 #: app/contextWin.py
 msgid "This item can be placed in any orientation."
-msgstr "Этот предмет может быть помещён где угодно."
+msgstr "Этот предмет можно разместить в любой ориентации."
 
 #: app/contextWin.py
 msgid "Excursion Funnels accept a on/off input and a directional input."
-msgstr ""
-"У экскурсионных воронок есть вкл/выкл переключение и переключение "
-"направления."
+msgstr "Экскурсионные воронки имеют вход включения/выключения и вход направления."
 
 #: app/contextWin.py
-#, fuzzy
 msgid ""
 "{generic_rot} However when this is set to Reflection Cube, this item can "
 "instead rotated on the floor to face 360 degrees."
-msgstr "Этот предмет может быть повёрнут на 360 градусов."
+msgstr ""
+"{generic_rot} Однако если установить значение Отражающий куб, этот "
+"предмет можно повернуть на полу на 360 градусов."
 
 #: app/contextWin.py
 msgid ""
@@ -1519,12 +1615,17 @@ msgid ""
 "directly. Instead the Fizzler Output Relay item should be placed on top "
 "of this fizzler."
 msgstr ""
+"У этого Fizzler есть выход. Из-за ошибки редактора его нельзя "
+"использовать напрямую. Вместо этого следует поместить предмет Fizzler "
+"Output Relay поверх этого Fizzler'а."
 
 #: app/contextWin.py
 msgid ""
 "Failed to open a web browser. Do you wish for the URL to be copied to the"
 " clipboard instead?"
-msgstr "Не удалось открыть браузер. Вы хотите оставить URL в буфере обмена?"
+msgstr ""
+"Не удалось открыть веб-браузер. Вы хотите, чтобы URL-адрес был скопирован"
+" в буфер обмена?"
 
 #: app/contextWin.py
 msgid ""
@@ -1532,10 +1633,13 @@ msgid ""
 "used directly. Instead the Fizzler Output Relay item should be placed on "
 "top of this fizzler."
 msgstr ""
+"Этот Fizzler имеет временный выход. Из-за ошибки редактора его нельзя "
+"использовать напрямую. Вместо этого следует поместить предмет Fizzler "
+"Output Relay поверх этого Fizzler'а."
 
 #: app/contextWin.py
 msgid "No Alternate Versions"
-msgstr "Нет других версий"
+msgstr "Нет альтернативных версий"
 
 #: app/contextWin.py
 msgid ""
@@ -1543,9 +1647,9 @@ msgid ""
 "to 2048 in total. This provides a guide to how many of these items can be"
 " placed in a map at once."
 msgstr ""
-"Количество сущностей для этого объекта. Source позволяет разместить на "
-"одной карте всего 2048 объектов. Это число показывает, сколько таких "
-"предметов может быть размещено на одной карте."
+"Количество сущностей, используемых для этого предмета. Движок Source "
+"ограничивает это число до 2048. Это дает представление о том, сколько "
+"таких элементов может быть размещено на карте одновременно."
 
 #: app/contextWin.py
 msgid ""
@@ -1558,72 +1662,69 @@ msgstr ""
 
 #: app/contextWin.py
 msgid "BEE2 - Error"
-msgstr ""
+msgstr "BEE2 - Ошибка"
 
 #: app/corridor_selector.py
 msgid "BEEmod - Select Corridor"
-msgstr ""
+msgstr "BEEmod - Выбрать коридор"
 
 #: app/corridor_selector.py app/selector_win.py
-#, fuzzy
 msgid "Author: {authors}"
 msgid_plural "Authors: {authors}"
-msgstr[0] "Автор: {}"
-msgstr[1] "Авторы: {}"
-msgstr[2] "Авторы: {}"
+msgstr[0] "Автор: {authors}"
+msgstr[1] "Авторы: {authors}"
+msgstr[2] ""
+msgstr[3] ""
 
 #: app/corridor_selector.py app/selector_win.py
 msgid "Authors: Unknown"
-msgstr ""
+msgstr "Авторы: Неизвестные"
 
 #: app/corridor_selector.py
 msgid ""
 "Check the boxes to specify which corridors may be used. Ingame, a random "
 "corridor will be picked for each map."
 msgstr ""
+"Установите флажки, чтобы указать, какие коридоры могут быть использованы."
+" В игре для каждой карты будет выбран случайный коридор."
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "Singleplayer Entry Options:"
-msgstr "Один игрок"
+msgstr "Варианты входа в однопользовательской:"
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "Singleplayer Exit Options:"
-msgstr "Один игрок"
+msgstr "Варианты выхода в однопользовательской:"
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "Cooperative Entry Options:"
-msgstr "Опции компиляции"
+msgstr "Варианты входа в кооперативе:"
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "Cooperative Exit Options:"
-msgstr "Опции компиляции"
+msgstr "Варианты выхода в кооперативе:"
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "No options!"
 msgstr "Нет опций!"
 
 #: app/corridor_selector.py
-#, fuzzy
 msgid "Randomise"
 msgstr "Случайно"
 
 #: app/corridor_selector.py
 msgid "Use Only This"
-msgstr ""
+msgstr "Использовать только это"
 
 #: app/corridor_selector.py
 #, fuzzy
 msgid "Game Mode"
-msgstr "Игра"
+msgstr "{game} Папка"
 
 #: app/corridor_selector.py
+#, fuzzy
 msgid "Corridor Type"
-msgstr ""
+msgstr "Коридор"
 
 #: app/corridor_selector.py
 msgid "Attachment Surface"
@@ -1651,14 +1752,13 @@ msgid "Ceiling"
 msgstr ""
 
 #: app/dialogs.py
-#, fuzzy
 msgid "BEEmod"
-msgstr "BEEMod"
+msgstr ""
 
 #: app/dialogs.py
 #, fuzzy
 msgid "Skip"
-msgstr "Один игрок"
+msgstr "Одиночная"
 
 #: app/dialogs.py
 msgid "Discard"
@@ -1666,26 +1766,25 @@ msgstr ""
 
 #: app/dialogs.py app/menu_bar.py ui_tk/errors.py
 msgid "Quit"
-msgstr "Выход"
+msgstr "Выйти"
 
 #: app/dialogs.py
 msgid "A value must be provided!"
-msgstr ""
+msgstr "Необходимо указать значение!"
 
 #: app/errors.py
-#, fuzzy
 msgid "BEEmod Error"
-msgstr "BEEMod"
+msgstr "Ошибка BEEmod"
 
 #: app/errors.py
 msgid "An error occurred while performing this task:"
 msgid_plural "Multiple errors occurred while performing this task:"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "При выполнении этого задания произошла ошибка:"
+msgstr[1] "При выполнении этого задания возникли многочисленные ошибки:"
 msgstr[2] ""
+msgstr[3] ""
 
 #: app/errors.py
-#, fuzzy
 msgid ""
 "An error occurred while performing this task, but it was partially "
 "successful:"
@@ -1693,18 +1792,21 @@ msgid_plural ""
 "Multiple errors occurred while performing this task, but it was partially"
 " successful:"
 msgstr[0] ""
+"При выполнении этого задания произошла ошибка, но оно было частично "
+"успешным:"
 msgstr[1] ""
+"При выполнении этого задания возникли многочисленные ошибки, но оно было "
+"частично успешным:"
 msgstr[2] ""
+msgstr[3] ""
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Export to \"{game}\"..."
-msgstr "Экспортировать в \"{}\"..."
+msgstr "Экспортировать в \"{game}\"..."
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Export to \"{game}\"*..."
-msgstr "Экспортировать в \"{}\"..."
+msgstr "Экспортировать в \"{game}\"*..."
 
 #: app/gameMan.py
 msgid ""
@@ -1714,6 +1816,11 @@ msgid ""
 "\n"
 "Move the application folder elsewhere, then re-run."
 msgstr ""
+"Похоже, что приложение BEE2 было установлено непосредственно в каталог "
+"игры. Имя папки bee2/ используется для экспортируемых ресурсов, поэтому "
+"это приведет к проблемам.\n"
+"\n"
+"Переместите папку приложения в другое место, а затем запустите заново."
 
 #: app/gameMan.py
 msgid "BEE2 - Add Game"
@@ -1721,11 +1828,11 @@ msgstr "BEE2 - Добавить игру"
 
 #: app/gameMan.py
 msgid "Select the folder where the game executable is located ({appname})..."
-msgstr "Выберите папку с .exeшником {appname}..."
+msgstr "Выберите папку, в которой находится исполняемый файл игры ({appname})..."
 
 #: app/gameMan.py
 msgid "Find Game Exe"
-msgstr "Найдите .exeшник игры"
+msgstr "Поиск исполняемого файла игры"
 
 #: app/gameMan.py
 msgid "Executable"
@@ -1733,11 +1840,11 @@ msgstr "Исполняемый файл"
 
 #: app/gameMan.py
 msgid "Find Game Binaries"
-msgstr ""
+msgstr "Поиск бинарных файлов игр"
 
 #: app/gameMan.py
 msgid "This does not appear to be a valid game folder!"
-msgstr "Это не похоже на верную папку с игрой!"
+msgstr "Это не похоже на действительную папку игры!"
 
 #: app/gameMan.py
 msgid "Portal Stories: Mel doesn't have an editor!"
@@ -1745,34 +1852,31 @@ msgstr "В Portal Stories: Mel нет редактора!"
 
 #: app/gameMan.py
 msgid "Enter the name of this game:"
-msgstr "Введите название игры:"
+msgstr "Введите название этой игры:"
 
 #: app/gameMan.py
 msgid "This name is already taken!"
-msgstr "Это название уже занято!"
+msgstr "Это имя уже занято!"
 
 #: app/gameMan.py
 msgid "Please enter a name for this game!"
-msgstr "Пожалуйста, введите название игры!"
+msgstr "Пожалуйста, введите имя для этой игры!"
 
 #: app/gameMan.py
-#, fuzzy
 msgid ""
 "Are you sure you want to delete \"{game}\"?\n"
 "(BEE2 will quit, this is the last game set!)"
 msgstr ""
-"\n"
-"(BEE2 закроется, это последняя указанная игра!)"
+"Вы уверены, что хотите удалить \"{game}\"?\n"
+"(BEE2 выйдет из игры, это последняя установленная игра!)"
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Are you sure you want to delete \"{game}\"?"
-msgstr "Вы точно хотите удалить \"{}\"?"
+msgstr "Вы уверены, что хотите удалить \"{game}\"?"
 
 #: app/gameMan.py
-#, fuzzy
 msgid "BEE2 - Remove Game"
-msgstr "Удалить BEE2 из текущей игры"
+msgstr "BEE2 - Удалить игру"
 
 #: app/helpMenu.py
 msgid "Wiki..."
@@ -1780,55 +1884,52 @@ msgstr "Вики..."
 
 #: app/helpMenu.py
 msgid "Original Items..."
-msgstr "Стандартные предметы..."
+msgstr "Оригинальные предметы..."
 
 #. i18n: The chat program.
 #: app/helpMenu.py
 msgid "Discord Server..."
-msgstr "Сервер в Discord..."
+msgstr "Дискорд сервер..."
 
 #: app/helpMenu.py
-#, fuzzy
 msgid "aerond's Music Package Creator..."
-msgstr "aerond's Music Changer..."
-
-#: app/helpMenu.py
-msgid "Purchase Portal 2"
 msgstr ""
 
 #: app/helpMenu.py
+msgid "Purchase Portal 2"
+msgstr "Покупка Portal 2"
+
+#: app/helpMenu.py
 msgid "Application Repository..."
-msgstr "Репозиторий приложения..."
+msgstr "Репозиторий приложений..."
 
 #: app/helpMenu.py
 msgid "Items Repository..."
-msgstr "Репозиторий предметов..."
+msgstr "Репозиторий с предметами..."
 
 #: app/helpMenu.py
-#, fuzzy
 msgid "Music Repository..."
-msgstr "Репозиторий предметов..."
+msgstr "Музыкальный репозиторий..."
 
 #: app/helpMenu.py
 msgid "Submit Application Bugs..."
-msgstr "Сообщить о баге в приложении..."
+msgstr "Отправить Ошибки в Приложении..."
 
 #: app/helpMenu.py
 msgid "Submit Item Bugs..."
-msgstr "Сообщить о баге с предметами..."
+msgstr "Отправить Ошибки в предметах..."
 
 #: app/helpMenu.py
-#, fuzzy
 msgid "Submit Music Bugs..."
-msgstr "Сообщить о баге с предметами..."
+msgstr "Отправить Ошибки в Музыке..."
 
 #: app/helpMenu.py
 msgid "BEE2 Credits"
-msgstr "Титры BEE2"
+msgstr "Кредиты BEE2"
 
 #: app/helpMenu.py
 msgid "Credits..."
-msgstr "Титры..."
+msgstr "Кредиты..."
 
 #: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
 msgid "Close"
@@ -1836,25 +1937,29 @@ msgstr "Закрыть"
 
 #: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
-msgstr ""
+msgstr "BEEMOD2 - Не удалось открыть URL"
 
 #: app/helpMenu.py
 msgid ""
 "Failed to download list of URLs. Help menu links will not function. Check"
 " your Internet?"
 msgstr ""
+"Не удалось загрузить список URL-адресов. Ссылки меню справки не работают."
+" Проверьте свой интернет?"
 
 #: app/helpMenu.py
 msgid "Failed to parse help menu URLs file. Help menu links will not function."
 msgstr ""
+"Не удалось разобрать файл URL-адресов меню справки. Ссылки меню справки "
+"не будут работать."
 
 #: app/helpMenu.py
 msgid "BEEMOD 2 - Open URL"
-msgstr ""
+msgstr "BEEMOD 2 - Открыть URL"
 
 #: app/helpMenu.py
 msgid "Do you wish to open the following URL?"
-msgstr ""
+msgstr "Вы хотите открыть следующее URL?"
 
 #: app/item_picker.py
 msgid "All Items: "
@@ -1863,37 +1968,39 @@ msgstr "Все предметы: "
 #: app/item_picker.py
 #, fuzzy
 msgid "Unknown: <{id}>"
-msgstr "Знак: {}"
+msgstr "Неизвестное обозначение: {id}"
 
 #: app/item_properties.py
 msgid "BEE2 - {item}"
 msgstr ""
 
 #: app/item_properties.py
-#, fuzzy
 msgid "Settings for \"{item}\""
-msgstr "Настройки для \"{}\""
+msgstr "Настройки для \"{item}\""
 
 #: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
 "        ({tim:00})"
 msgstr ""
+"Таймер задержки:\n"
+"        ({tim:00})"
 
 #: app/item_properties.py
 msgid "When Oscillating mode is disabled, Start Active has no effect."
-msgstr ""
+msgstr "Если режим колебаний отключен, Запустить активно не действует."
 
 #: app/item_properties.py
 msgid ""
 "This option picks which sub-item is used. Put a different item on the "
 "palette to change the default instead."
 msgstr ""
+"Этот параметр выбирает, какой под-предмет будет использоваться. Чтобы "
+"изменить значение по умолчанию, поместите в палитру другой элемент."
 
 #: app/item_properties.py
-#, fuzzy
 msgid "Position: "
-msgstr "Конечная позиция"
+msgstr "Позиция: "
 
 #: app/item_properties.py
 msgid "No Properties available!"
@@ -1904,50 +2011,48 @@ msgid "Search:"
 msgstr "Поиск:"
 
 #: app/lifecycle.py
-#, fuzzy
 msgid "An error occurred when loading packages:"
 msgid_plural "Multiple errors occurred when loading packages:"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "При загрузке пакетов произошла ошибка:"
+msgstr[1] "При загрузке пакетов возникло несколько ошибок:"
 msgstr[2] ""
+msgstr[3] ""
 
 #: app/lifecycle.py
 msgid "Loading packages was partially successful:"
-msgstr ""
+msgstr "Загрузка пакетов была частично успешной:"
 
 #: app/menu_bar.py
 msgid "{game} Puzzle Folder"
-msgstr ""
+msgstr "{game} Папка головоломок"
 
 #: app/menu_bar.py
 msgid "{game} Folder"
-msgstr ""
+msgstr "{game} Папка"
 
 #: app/menu_bar.py
-#, fuzzy
 msgid "Palettes Folder"
-msgstr "Палитры"
+msgstr "Папка с палитрами"
 
 #: app/menu_bar.py
-#, fuzzy
 msgid "Packages Folder"
-msgstr "Сброс пакетов"
+msgstr "Папка с пакетами"
 
 #: app/menu_bar.py
 msgid "Export"
-msgstr "Экспорт"
+msgstr "Экспортировать"
 
 #: app/menu_bar.py
 msgid "Uninstall from Selected Game"
-msgstr "Убрать из выбранной игры"
+msgstr "Удаление из выбранной игры"
 
 #: app/menu_bar.py
 msgid "Backup/Restore Puzzles..."
-msgstr "Бэкап/Восстановление головоломок..."
+msgstr "Резервное копирование/восстановление говоломки..."
 
 #: app/menu_bar.py
 msgid "Open Folder..."
-msgstr ""
+msgstr "Открыть папку..."
 
 #: app/menu_bar.py
 msgid "Manage Packages..."
@@ -1966,90 +2071,91 @@ msgid "View"
 msgstr "Вид"
 
 #: app/music_conf.py
-#, fuzzy
 msgid "Music:"
-msgstr "Музыка: "
+msgstr "Музыка:"
 
 #: app/music_conf.py
-#, fuzzy
 msgid "Base:"
-msgstr "Основа: "
+msgstr "Основа:"
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid ""
 "Add no music to the map at all. Testing Element-specific music may still "
 "be added."
 msgstr ""
-"Не добавлять музыку в карту. Музыку для отдельных тестовых элементов всё "
-"ещё можно будет добавить."
+"Не добавляйте музыку на карту вообще. Музыка для конкретных предметов "
+"тестирования может быть добавлена."
 
 #: app/music_conf.py
 msgid "The regular base track will continue to play normally."
-msgstr ""
+msgstr "Обычная базовая дорожка продолжит воспроизводиться в обычном режиме."
 
 #: app/music_conf.py
 msgid "Add no music when jumping on Repulsion Gel."
-msgstr "Не добавлять музыку при отскоке от геля."
+msgstr "Не добавляет музыку при прыжках на отталкивающем геле."
 
 #: app/music_conf.py
 msgid "Add no music while running fast."
-msgstr "Не добавлять музыку при быстром беге."
+msgstr "Не добавляет музыку во время быстрого бега."
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Select Background Music - Base"
-msgstr "Выберите основную фоновую музыку"
+msgstr "Выбрать фоновую музыку - Основа"
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid ""
 "This controls the background music used for a map. Expand the dropdown to"
 " set tracks for specific test elements."
 msgstr ""
-"Это позволяет выбрать фоновую музыку для карты. Разверните выпадающий "
-"список, чтобы установить музыку для отдельных тестовых элементов."
+"Этот параметр управляет фоновой музыкой, используемой для карты. "
+"Раскройте выпадающий список, чтобы установить треки для определенных "
+"предметов теста."
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Propulsion Gel SFX"
-msgstr "Звук ускорающего геля"
+msgstr "Звуковые эффекты для ускоряющего геля"
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Repulsion Gel SFX"
-msgstr "Звук отталкивающего геля"
+msgstr "Звуковые эффекты для отталкивающего геля"
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Excursion Funnel Music"
-msgstr "Музыка экскурсионной воронки"
+msgstr "Музыка для экскурсионных воронок"
 
 #: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Synced Funnel Music"
-msgstr "Синхронная музыка воронки"
+msgstr "Синхронизация музыки в воронке"
 
 #: app/music_conf.py
 msgid "Select Excursion Funnel Music"
-msgstr "Выбрать музыку для экскурсионной воронки"
+msgstr "Выбрать музыку для экскурсионных воронок"
 
 #: app/music_conf.py
 msgid "Set the music used while inside Excursion Funnels."
-msgstr "Устанавливает музыку, которая проигрывается внутри экскурсионных воронок."
+msgstr "Установить музыку, используемую внутри экскурсионных воронок."
 
 #: app/music_conf.py
 msgid "Select Repulsion Gel Music"
-msgstr "Выберите музыку для отталкивающего геля"
+msgstr "Выбрать музыку отталкивающего гелия"
 
 #: app/music_conf.py
 msgid "Select the music played when players jump on Repulsion Gel."
-msgstr "Устанавливает музыку, проигрывающуюся при отскоке от геля."
+msgstr ""
+"Выберите музыку, которая будет звучать, когда игроки прыгают на "
+"отталкивающий гель."
 
 #: app/music_conf.py
 msgid "Select Propulsion Gel Music"
-msgstr "Выберите музыку для ускоряющего геля"
+msgstr "Выбрать музыку ускоряющего гелия"
 
 #: app/music_conf.py
 msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr ""
-"Устанавливает музыку, которая проигрывается при развитии большой "
-"горизонтальной скорости."
+"Выберите музыку, которая будет воспроизводиться, когда игроки имеют "
+"большую горизонтальную скорость."
 
 #: app/music_conf.py
 msgid "Funnel:"
@@ -2057,37 +2163,34 @@ msgstr "Воронка:"
 
 #: app/music_conf.py
 msgid "Bounce:"
-msgstr "Отскок:"
+msgstr "Отталкивать:"
 
 #: app/music_conf.py
 msgid "Speed:"
-msgstr "Ускорение:"
+msgstr "Скорость:"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "{msg}\n"
 "Launch Game?"
 msgstr ""
-"\n"
+"{msg}\n"
 "Запустить игру?"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "{msg}\n"
 "Minimise BEE2?"
 msgstr ""
-"\n"
+"{msg}\n"
 "Свернуть BEE2?"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "{msg}\n"
 "Launch Game and minimise BEE2?"
 msgstr ""
-"\n"
+"{msg}\n"
 "Запустить игру и свернуть BEE2?"
 
 #: app/optionWindow.py
@@ -2095,19 +2198,20 @@ msgid ""
 "{msg}\n"
 "Quit BEE2?"
 msgstr ""
+"{msg}\n"
+"Выйти из BEE2?"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "{msg}\n"
 "Launch Game and quit BEE2?"
 msgstr ""
-"\n"
+"{msg}\n"
 "Запустить игру и выйти из BEE2?"
 
 #: app/optionWindow.py
 msgid "BEE2 Options"
-msgstr "Настройки BEE2"
+msgstr "Опции BEE2"
 
 #: app/optionWindow.py
 msgid "General"
@@ -2115,7 +2219,7 @@ msgstr "Основное"
 
 #: app/optionWindow.py
 msgid "Windows"
-msgstr "Окно"
+msgstr "Окна"
 
 #: app/optionWindow.py
 msgid "Development"
@@ -2130,24 +2234,26 @@ msgid ""
 "Package cache times have been reset. These will now be extracted during "
 "the next export."
 msgstr ""
-"Время кэширования пакетов было сброшено. Они будут загружены полностью во"
-" время следующего экспорта."
+"Время кэширования пакетов было сброшено. Теперь они будут извлечены при "
+"следующем экспорте."
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "{cache_reset}\n"
 "\n"
 "\"Preserve Game Resources\" has been disabled."
-msgstr "\"Предохранение игровых директорий\" отключено."
+msgstr ""
+"{cache_reset}\n"
+"\n"
+"\"Резервирование игровых ресурсов\" было отключено."
 
 #: app/optionWindow.py
 msgid "UI translations rebuilt from sources successfully."
-msgstr ""
+msgstr "Переводы UI успешно восстановлены из источников."
 
 #: app/optionWindow.py
 msgid "Package translations rebuilt successfully."
-msgstr ""
+msgstr "Пакет переводов успешно восстановлен."
 
 #: app/optionWindow.py
 msgid ""
@@ -2155,15 +2261,17 @@ msgid ""
 "and debugging purposes. Changing these may prevent BEEmod\n"
 "from functioning correctly until reverted to their original settings."
 msgstr ""
+"Опции на вкладке «Разработка» предназначены для авторов пакетов\n"
+"и отладки. Их изменение может помешать BEEmod\n"
+"корректной работе до тех пор, пока не будут возвращены исходные настройки."
 
 #: app/optionWindow.py
-#, fuzzy
 msgid "Enable development options"
-msgstr "Режим разработчика"
+msgstr "Включить параметры разработки"
 
 #: app/optionWindow.py app/packageMan.py ui_tk/dialogs.py ui_tk/selector_win.py
 msgid "OK"
-msgstr "ОК"
+msgstr ""
 
 #: app/optionWindow.py
 msgid "After Export:"
@@ -2183,44 +2291,43 @@ msgstr "Выйти из BEE2"
 
 #: app/optionWindow.py
 msgid "After exports, do nothing and keep the BEE2 in focus."
-msgstr "Не делать ничего после экспорта, и оставлять BEE2 развёрнутым."
+msgstr "После экспорта, ничего не делать и держать BEE2 в фокусе."
 
 #: app/optionWindow.py
 msgid "After exports, minimise to the taskbar/dock."
-msgstr "После экспорта сворачивать в панель задач."
+msgstr "После экспорта, свернуть программу на панель задач/в док."
 
 #: app/optionWindow.py
 msgid "After exports, quit the BEE2."
-msgstr "После экспорта, выходить из BEE2."
+msgstr "После экспорта, выйти из BEE2."
 
 #: app/optionWindow.py
 msgid "Launch Game"
-msgstr "Запустить игру"
+msgstr "Запуск игры"
 
 #: app/optionWindow.py
 msgid "After exporting, launch the selected game automatically."
-msgstr "Автоматически запускать выбранную игру после экспорта."
+msgstr "После экспорта, запускает выбранную игру автоматически."
 
 #: app/optionWindow.py
-#, fuzzy
 msgid "Language:"
-msgstr "Русский (Russian)"
+msgstr "Язык:"
 
 #: app/optionWindow.py
 msgid "Play Sounds"
-msgstr "Проигрывать звуки"
+msgstr "Воспроизводить звуки"
 
 #: app/optionWindow.py
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
 msgstr ""
-"Pyglet не установлен или сломан.\n"
-"Звуковы эффекты отключены."
+"Pyglet либо не установлен или сломан.\n"
+"Звуковые эффекты отключены."
 
 #: app/optionWindow.py
 msgid "Compress Items"
-msgstr ""
+msgstr "Сжимать предметы"
 
 #: app/optionWindow.py
 msgid ""
@@ -2228,18 +2335,21 @@ msgid ""
 "Type option. This helps to shrink the item list, if you have a lot of "
 "items installed."
 msgstr ""
+"Если включено, скроет все предметы, кроме одного, для тех, которые можно "
+"заменить с помощью параметра X типа. Это помогает сократить список "
+"элементов, если у вас установлено много элементов."
 
 #: app/optionWindow.py
 msgid "Show Hidden Palettes"
-msgstr ""
+msgstr "Показать скрытые палитры"
 
 #: app/optionWindow.py
 msgid "Show all builtin palettes that you may have hidden."
-msgstr ""
+msgstr "Показать все встроенные палитры, которые вы могли спрятать."
 
 #: app/optionWindow.py
 msgid "Reset Package Caches"
-msgstr "Сбросить кеширование пакетов"
+msgstr "Сбросить кэши пакетов"
 
 #: app/optionWindow.py
 msgid "Force re-extracting all package resources."
@@ -2247,7 +2357,7 @@ msgstr "Принудительное повторное извлечение в�
 
 #: app/optionWindow.py
 msgid "Keep loading screens on top"
-msgstr "Держать экран загрузки поверх всех окон"
+msgstr "Держать экраны загрузки на самом верху"
 
 #: app/optionWindow.py
 msgid ""
@@ -2255,16 +2365,19 @@ msgid ""
 "appear on the taskbar/dock, they can't be brought to the top easily "
 "again."
 msgstr ""
-"Заставить загрузочные экраны располагаться поверх других окон. Поскольку "
-"они не отображаются на панели задач, их невозможно снова показать сверху."
+"Заставить экраны загрузки быть поверх других окон. Поскольку они не "
+"отображаются на панели задач/в доке, их нельзя легко переместить обратно "
+"наверх."
 
 #: app/optionWindow.py
 msgid "Use compact splash screen"
-msgstr ""
+msgstr "Использовать компактный splash экран"
 
 #: app/optionWindow.py
 msgid "Use an alternate smaller splash screen, which takes up less screen space."
 msgstr ""
+"Использовать альтернативную заставку меньшего размера, которая занимает "
+"меньше места на экране."
 
 #: app/optionWindow.py
 msgid "Keep windows inside screen"
@@ -2275,8 +2388,8 @@ msgid ""
 "Prevent sub-windows from moving outside the screen borders. If you have "
 "multiple monitors, disable this."
 msgstr ""
-"Запрещать перемещение подокон за пределы границ экрана. Если у вас "
-"несколько мониторов, отключите это."
+"Предотвращает перемещение вложенных окон за границы экрана. Если у вас "
+"несколько мониторов, отключите эту функцию."
 
 #: app/optionWindow.py
 msgid "Reset All Window Positions"
@@ -2284,68 +2397,69 @@ msgstr "Сбросить все позиции окон"
 
 #: app/optionWindow.py
 msgid "Log missing entity counts"
-msgstr "[Логировать] количество утерянных сущностей"
+msgstr "Вести журнал подсчета отсутствующих сущностей"
 
 #: app/optionWindow.py
 msgid ""
 "When loading items, log items with missing entity counts in their "
 "properties.txt file."
 msgstr ""
-"При загрузке предметов [логировать] предметы без максимально допустимого "
-"количества в их properties.txt файле."
+"При загрузке предметов регистрировать предметы с отсутствующим "
+"количеством сущностей в файле properties.txt."
 
 #: app/optionWindow.py
 msgid "Log when item doesn't have a style"
-msgstr "[Логировать] предметы без стилей"
+msgstr "Вести журнал, когда у предмета нет стиля"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid ""
 "Log items have no applicable version for a particular style. This usually"
 " means it will look very bad."
 msgstr ""
-"[Логировать] предметы, которые не имеют применимой версии для "
-"определенного стиля. Обычно это означает, что предмет будет выглядеть "
-"очень плохо."
+"Элементы журнала не имеют применимой версии для определенного стиля. "
+"Обычно это означает, что это будет выглядеть очень плохо."
 
 #: app/optionWindow.py
 msgid "Log when item uses parent's style"
-msgstr "[Логировать] предметы, использующие родительские стили"
+msgstr "Вести журнал, когда элемент использует родительский стиль"
 
 #: app/optionWindow.py
 msgid ""
 "Log when an item reuses a variant from a parent style (1970s using 1950s "
 "items, for example). This is usually fine, but may need to be fixed."
 msgstr ""
-"[Логировать] предметы, повторно использующие вариант из родительского "
-"стиля (например, 1970-е годы с использованием элементов 1950-х годов). "
-"Обычно это нормально, но, возможно, потребуется исправить."
+"Вести журнал, когда предмет повторно использует вариант из родительского "
+"стиля (например, 1970-е годы используют элементы 1950-х годов). Обычно "
+"это нормально, но может потребоваться исправление."
 
 #: app/optionWindow.py
 msgid "Display item inheritance"
-msgstr ""
+msgstr "Наследование предметов отображения"
 
 #: app/optionWindow.py
 msgid ""
 "Add overlays to item icons to display which inherit from parent styles or"
 " have no applicable style."
 msgstr ""
+"Добавьте накладки на иконки предметов, которые наследуются от "
+"родительских стилей или не имеют применимого стиля."
 
 #: app/optionWindow.py
 msgid "Development Mode"
-msgstr "Режим разработчика"
+msgstr "Режим разработки"
 
 #: app/optionWindow.py
 msgid ""
 "Enables displaying additional UI specific for development purposes. "
 "Requires restart to have an effect."
 msgstr ""
-"Включает отображение дополнительного интерфейса для разработки. Для "
-"применения требуется перезапуск."
+"Позволяет отображать дополнительный пользовательский интерфейс, "
+"специфичный для целей разработки. Для получения эффекта требуется "
+"перезапуск."
 
 #: app/optionWindow.py
 msgid "Preserve Game Directories"
-msgstr "Сохранять папки игры"
+msgstr "Сохраните каталог игры"
 
 #: app/optionWindow.py
 msgid ""
@@ -2354,13 +2468,14 @@ msgid ""
 "Only enable if you're developing new content, to ensure it is not "
 "overwritten."
 msgstr ""
-"При экспорте, не копируйте ресурсы в \"bee2/\" и "
-"\"sdk_content/maps/bee2/\". Включите только в том случае, если вы "
-"разрабатываете новый контент, чтобы он не был перезаписан."
+"При экспорте не копировать ресурсы в \n"
+"\"bee2/\" и \"sdk_content/maps/bee2/\".\n"
+"Включайте эту функцию только при разработке нового контента, чтобы не "
+"допустить его перезаписи."
 
 #: app/optionWindow.py
 msgid "Preserve FGD"
-msgstr ""
+msgstr "Сохранить FGD"
 
 #: app/optionWindow.py
 msgid ""
@@ -2368,18 +2483,21 @@ msgid ""
 "Enable this if you have a custom one, to prevent it from being "
 "overwritten."
 msgstr ""
+"При экспорте не изменять файлы FGD. \n"
+"Включите это, если у вас есть пользовательский, чтобы не было "
+"перезаписано."
 
 #: app/optionWindow.py
 msgid "Show Log Window"
-msgstr "Показывать окно с логом"
+msgstr "Показать окно журнала"
 
 #: app/optionWindow.py
 msgid "Show the log file in real-time."
-msgstr "Показывать лог в реальном времени."
+msgstr "Показывать файл журнала в режиме реального времени."
 
 #: app/optionWindow.py
 msgid "Force Editor Models"
-msgstr "Форсить модели редактора"
+msgstr "Принудительные модели редактора"
 
 #: app/optionWindow.py
 msgid ""
@@ -2388,63 +2506,66 @@ msgid ""
 "ones to free this up."
 msgstr ""
 "Сделать все модели props_map_editor доступными для использования. Portal "
-"2 имеет ограничение в 1024 модели, загруженные в память одновременно, "
-"поэтому нам нужно отключить неиспользуемые, чтобы освободить их."
+"2 имеет ограничение в 1024 модели, загружаемых в память одновременно, "
+"поэтому нам нужно отключить неиспользуемые, чтобы освободить ее."
 
 #: app/optionWindow.py
-#, fuzzy
 msgid "Dump All Objects"
-msgstr "Дампить все объекты"
+msgstr "Сбросить все объекты"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid "Dump Items List"
-msgstr "Дампить список объектов"
+msgstr "Сбросить список предметов"
 
 #: app/optionWindow.py
-#, fuzzy
 msgid "Dump Editor Models"
-msgstr "Форсить модели редактора"
+msgstr "Сбросить модели редактора"
 
 #: app/optionWindow.py
 msgid "Reload Images"
-msgstr "Перезагрузить все изображения"
+msgstr "Перезагрузить изображения"
 
 #: app/optionWindow.py
 msgid "Build UI Translations"
-msgstr ""
+msgstr "Создание переводов пользовательского интерфейса"
 
 #: app/optionWindow.py
 msgid "Build Package Translations"
-msgstr ""
+msgstr "Создание переводов для пакета"
 
 #: app/optionWindow.py
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
-"Перезагрузить все изображения в приложении. От этого приложение зависнет "
-"ненадолго."
+"Перезагрузите все изображения в приложении. Ожидайте, что приложение на "
+"мгновение зависнет."
 
 #: app/optionWindow.py
 msgid ""
 "Compile '.po' UI translation files into '.mo'. This requires those to "
 "have been downloaded from the source repo."
 msgstr ""
+"Скомпилируйте файлы перевода пользовательского интерфейса '.po' в '.mo'. "
+"Для этого необходимо, чтобы они были загружены из исходного репозитория"
 
 #: app/optionWindow.py
 msgid ""
 "Export translation files for all unzipped packages. This will update "
 "existing localisations, creating them for packages that don't have any."
 msgstr ""
+"Экспортируйте файлы перевода для всех распакованных пакетов. Это обновит "
+"существующие локализации и создаст их для пакетов, у которых их нет."
 
 #: app/packageMan.py
 msgid "BEE2 - Restart Required!"
-msgstr "BEE2 - Необходим перезапуск!"
+msgstr "BEE2 - Требуется перезагрузка!"
 
 #: app/packageMan.py
 msgid ""
 "Changing enabled packages requires a restart.\n"
 "Continue?"
-msgstr "Изменение доступных пакетов требует перезагрузки. Продолжить?"
+msgstr ""
+"Изменение включенных пакетов требует перезапуска.\n"
+"Продолжить?"
 
 #: app/packageMan.py
 msgid "BEE2 - Manage Packages"
@@ -2458,69 +2579,64 @@ msgstr "<Последний экспорт>"
 #. i18n: Empty palette name
 #: app/paletteLoader.py
 msgid "Blank"
-msgstr "Пустая"
+msgstr "Пустой"
 
 #. i18n: BEEmod 1 palette.
 #: app/paletteLoader.py
 msgid "BEEMod"
-msgstr "BEEMod"
+msgstr ""
 
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
-msgstr "Portal 2 (Сжатая)"
+msgstr "Portal 2 - Свернутый"
 
 #. i18n: Original Palette
 #: app/paletteLoader.py
 msgid "Portal 2"
-msgstr "Portal 2"
+msgstr ""
 
 #. i18n: Aperture Tag's palette
 #: app/paletteLoader.py packages/__init__.py
 msgid "Aperture Tag"
-msgstr "Aperture Tag"
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "Delete"
-msgstr "Выбран."
-
-#: app/paletteUI.py
-msgid "Hide"
 msgstr ""
 
 #: app/paletteUI.py
-#, fuzzy
-msgid "Delete Palette \"{name}\""
-msgstr "Удалить палитру \"{}\""
+msgid "Delete"
+msgstr "Удалить"
 
 #: app/paletteUI.py
-#, fuzzy
+msgid "Hide"
+msgstr "Скрыть"
+
+#: app/paletteUI.py
+msgid "Delete Palette \"{name}\""
+msgstr "Удалить палитру \"{name}\""
+
+#: app/paletteUI.py
 msgid "Hide Palette \"{name}\""
-msgstr "Удалить палитру \"{}\""
+msgstr "Скрыть палитру \"{name}\""
 
 #: app/paletteUI.py
 msgid "Enter a name:"
-msgstr "Введите название:"
+msgstr "Введите имя:"
 
 #: app/paletteUI.py
-#, fuzzy
 msgid "Are you sure you want to delete \"{palette}\"?"
-msgstr "Вы точно хотите удалить \"{}\"?"
+msgstr "Вы уверены, что хотите удалить \"{palette}\"?"
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
-msgstr "Встроенные / Только чтение"
+msgstr "Встроенный / Только для чтения"
 
 #. i18n: Palette group title.
 #: app/paletteUI.py
 msgid "BEE2 - Save Palette"
-msgstr "BEE2 - Сохранить Палитру"
+msgstr "BEE2 - Сохранить палитру"
 
 #: app/paletteUI.py
-#, fuzzy
 msgid "BEE2 - Delete Palette"
-msgstr "Удалить палитру"
+msgstr "BEE2 - Удалить палитру"
 
 #: app/paletteUI.py
 msgid "BEE2 - Change Palette Group"
@@ -2532,11 +2648,11 @@ msgstr "Сохранить"
 
 #: app/paletteUI.py
 msgid "Save As"
-msgstr ""
+msgstr "Сохранить как"
 
 #: app/paletteUI.py
 msgid "Save Settings in Palettes"
-msgstr "Сохранить настройки в палитре"
+msgstr "Сохранить параметры в палитрах"
 
 #: app/paletteUI.py
 msgid "Save Palette"
@@ -2556,7 +2672,7 @@ msgstr "Переименовать палитру..."
 
 #: app/paletteUI.py
 msgid "Fill Palette"
-msgstr "Заполнить набор"
+msgstr "Заполнить палитру"
 
 #: app/paletteUI.py
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
@@ -2574,12 +2690,12 @@ msgstr ""
 #. i18n: Window titles.
 #: app/selector_win.py
 msgid "Preview - {item}"
-msgstr ""
+msgstr "Предварительный просмотр - {item}"
 
 #. i18n: Preview window.
 #: app/selector_win.py
 msgid "Suggested"
-msgstr "Предложенное"
+msgstr "Предложенный"
 
 #: app/selector_win.py
 msgid "Other"
@@ -2587,17 +2703,15 @@ msgstr "Другое"
 
 #: app/itemconfig/__init__.py app/selector_win.py
 msgid "Loading..."
-msgstr ""
+msgstr "Загрузка..."
 
 #: app/signage_ui.py
-#, fuzzy
 msgid "Signage: {name}"
-msgstr "Знак: {}"
+msgstr "Обозначение: {name}"
 
 #: app/signage_ui.py
-#, fuzzy
 msgid "Unknown Signage: {id}"
-msgstr "Знак: {}"
+msgstr "Неизвестное обозначение: {id}"
 
 #: app/itemconfig/__init__.py app/signage_ui.py
 msgid "Configure Signage"
@@ -2605,51 +2719,49 @@ msgstr "Настроить обозначения"
 
 #: app/signage_ui.py
 msgid "Selected"
-msgstr "Выбран."
+msgstr "Выбрано"
 
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
-msgstr "Реакция"
+msgstr "Респ"
 
 #. i18n: 'Response' tab header.
 #: app/voiceEditor.py
 msgid "Responses"
-msgstr "Реакции"
+msgstr "Ответы"
 
 #: app/voiceEditor.py
 msgid "Lines played in response to certain events in Coop."
-msgstr "Реплики для реакций на события в кооперативе."
+msgstr "Линии, воспроизводимые в ответ на определенные события в Кооп."
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
-msgstr "Тестовая камера"
+msgstr "Середина - Камера"
 
 #: app/voiceEditor.py
 msgid ""
 "Lines played during the actual chamber, after specific events have "
 "occurred."
 msgstr ""
-"Реплики, проигрываемые во время прохождения самой тестовой камеры, или "
-"после специальных событий."
+"Линии, воспроизводимые во время настоящей камеры, после того как "
+"произошли определенные события."
 
 #: app/voiceEditor.py
 msgid "Transcript:"
-msgstr "Текст:"
+msgstr "Транскрипт:"
 
 #: app/voiceEditor.py
-#, fuzzy
 msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - Управление \"{}\""
+msgstr "BEE2 - Настроить \"{item}\""
 
 #: app/itemconfig/__init__.py
 msgid "{name} ({page}/{count})"
 msgstr ""
 
 #: app/itemconfig/__init__.py
-#, fuzzy
 msgid "Style Properties"
-msgstr "Параметры объектов и стилей"
+msgstr "Свойства стиля"
 
 #: app/itemconfig/color.py
 msgid "Choose a Color"
@@ -2657,7 +2769,7 @@ msgstr "Выберите цвет"
 
 #: app/itemconfig/slider.py
 msgid "Off"
-msgstr ""
+msgstr "Выключить"
 
 #: config/__init__.py
 msgid "Version Mismatch"
@@ -2691,71 +2803,68 @@ msgstr ""
 
 #: exporting/__init__.py
 msgid "Overall Progress"
-msgstr ""
+msgstr "Общий прогресс"
 
 #: exporting/__init__.py
 msgid "Backup Original Files"
-msgstr ""
+msgstr "Резервное копирование ориг. файлов"
 
 #: exporting/__init__.py
-#, fuzzy
 msgid "Backup Puzzles"
-msgstr "Бэкап/Восстановление головоломок"
+msgstr "Резервное копи. головоломок"
 
 #: exporting/__init__.py
 msgid "Copy Compiler"
-msgstr ""
+msgstr "Копировать компилятор"
 
 #: exporting/__init__.py
 msgid "Copy Resources"
-msgstr ""
+msgstr "Копировать ресурсы"
 
 #: exporting/__init__.py
 msgid "Copy Music"
-msgstr ""
+msgstr "Копировать музыку"
 
 #: exporting/__init__.py
-#, fuzzy
 msgid "Exporting"
-msgstr "Экспорт"
+msgstr "Экспортирование"
 
 #: exporting/__init__.py
-#, fuzzy
 msgid "BEE2 Export - {game}"
-msgstr "Экспортировать в \"{}\"..."
+msgstr "BEE2 Экспорт - {game}"
 
 #: exporting/__init__.py
 msgid "Exporting failed. The following error occurred:"
 msgid_plural "Exporting failed. The following errors occurred:"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Экспорт не удался. Произошла следующая ошибка:"
+msgstr[1] "Экспорт не удался. Возникли следующие ошибки:"
 msgstr[2] ""
+msgstr[3] ""
 
 #: exporting/__init__.py
 msgid "Exporting was partially successful, but the following issue occurred:"
 msgid_plural "Exporting was partially successful, but the following issues occurred:"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Экспорт был частично успешным, но возникла следующая проблема:"
+msgstr[1] "Экспорт был частично успешным, но возникли следующие проблемы:"
 msgstr[2] ""
+msgstr[3] ""
 
 #: exporting/compiler.py
-#, fuzzy
 msgid ""
 "Compiler file {file} missing. You will need to verify the game's files in"
 " Steam to get these files back. You can then export again."
 msgstr ""
-"Файл компилятора {file} не найден. Закройте приложение Steam, затем "
-"нажмите ОК для проверки кэша игры. Затем, вы сможете экспортировать "
-"снова."
+"Отсутствует файл компилятора {file}. Вам нужно проверить файлы игры в "
+"Steam, чтобы вернуть эти файлы. После этого вы сможете снова "
+"экспортировать игру."
 
 #: exporting/compiler.py
-#, fuzzy
 msgid ""
 "Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
 "running."
 msgstr ""
-"Не удалось скопировать файл компилсятора {file}. Убедитесь, что игра "
-"{game} не запущена."
+"Копирование файла компилятора {file} не удалось. Убедитесь, что "
+"компилятор карт {game} не запущен."
 
 #: exporting/compiler.py
 msgid ""
@@ -2763,10 +2872,14 @@ msgid ""
 "running. The webserver for the error display may also be running, quit "
 "the vrad process or wait a few minutes."
 msgstr ""
+"Копирование файла компилятора {file} не удалось. Убедитесь, что "
+"компилятор карт {game} не запущен. Веб-сервер для отображения ошибок "
+"также может быть запущен, завершите процесс vrad или подождите несколько "
+"минут."
 
 #: exporting/compiler.py
 msgid "No compiler files were found in \"{folder}\"."
-msgstr ""
+msgstr "В папке \"{folder}\" не найдено ни одного файла компилятора."
 
 #: exporting/corridors.py
 msgid "No corridor definitions found for style \"{id}\"!"
@@ -2781,21 +2894,20 @@ msgid "Signage \"{id}\"'s {child} \"{sub_id}\" does not exist."
 msgstr ""
 
 #: exporting/vpks.py
-#, fuzzy
 msgid ""
 "VPK files were not exported, quit Portal 2 and Hammer to ensure editor "
 "wall previews are changed."
 msgstr ""
-"\n"
-"\n"
-"Внимание: VPK-файлы не были экспортированы. Выйдите из Portal 2 и Hammer "
-"для экспорта."
+"Файлы VPK не были экспортированы, выйдите из Portal 2 и Hammer, чтобы "
+"убедиться, что предварительный просмотр стен редактора изменен."
 
 #: exporting/vpks.py
 msgid ""
 "The VPK \"{filename}\" could not be parsed. If this was made by BEE, "
 "delete it, otherwise check if it is corrupt."
 msgstr ""
+"Не удалось разобрать VPK \"{filename}\". Если он был создан BEE, удалите "
+"его, иначе проверьте, не поврежден ли он."
 
 #: exporting/vpks.py
 msgid ""
@@ -2804,45 +2916,50 @@ msgid ""
 msgstr ""
 
 #: packages/__init__.py
-#, fuzzy
 msgid "Portal Stories: Mel"
-msgstr "В Portal Stories: Mel нет редактора!"
+msgstr ""
 
 #: packages/__init__.py
 msgid "Package directory does not exist: \"{path}\""
-msgstr ""
+msgstr "Каталог пакетов не существует: \"{path}\""
 
 #: packages/__init__.py
 msgid "Package directory did not contain any packages: \"{path}\""
-msgstr ""
+msgstr "Каталог пакетов не содержит ни одного пакета: \"{path}\""
 
 #: packages/__init__.py
 msgid ""
 "Package file has the incorrect file format: {path}\n"
 "Valid formats are zip archives (.zip or .bee_pack) and VPKs (.vpk)"
 msgstr ""
+"Файл пакета имеет неправильный формат: {path}\n"
+"Допустимыми форматами являются zip-архивы (.zip или .bee_pack) и VPK "
+"(.vpk)"
 
 #: packages/__init__.py
 msgid "Potential package file has no info.txt: {path}"
-msgstr ""
+msgstr "В файле потенциального пакета нет файла info.txt: {path}"
 
 #: packages/__init__.py
+#, fuzzy
 msgid "Package has invalid info.txt file: {path}"
-msgstr ""
+msgstr "Пакет не имеет определенного идентификатора: {path}"
 
 #: packages/__init__.py
 msgid "Package has no ID defined: {path}"
-msgstr ""
+msgstr "Пакет не имеет определенного идентификатора: {path}"
 
 #: packages/__init__.py
 msgid "Package \"{pak_id}\" could not be enabled - {req} is not installed."
-msgstr ""
+msgstr "Пакет \"{pak_id}\" не может быть включен - {req} не установлен."
 
 #: packages/__init__.py
 msgid ""
 "Package \"{pak_id}\" could not be enabled - required package \"{req}\" "
 "not installed."
 msgstr ""
+"Не удалось включить пакет \"{pak_id}\" - не установлен требуемый пакет "
+"\"{req}\"."
 
 #: packages/__init__.py
 msgid ""
@@ -2851,14 +2968,18 @@ msgid ""
 "Package 1: {path1}\n"
 "Package 2: {path2}"
 msgstr ""
+"Дублируется пакет с идентификатором \"{pak_id}\"!\n"
+"Если вы только что обновили мод, удалите все старые файлы в packages/.\n"
+"Пакет 1: {path1}\n"
+"Пакет 2: {path2}"
 
 #: packages/__init__.py
-#, fuzzy
 msgid "{n} option"
 msgid_plural "{n} options"
-msgstr[0] "Нет опций!"
-msgstr[1] ""
+msgstr[0] "{n} опция"
+msgstr[1] "{n} опции"
 msgstr[2] ""
+msgstr[3] ""
 
 #. i18n: Corridor options count
 #: packages/__init__.py
@@ -2867,11 +2988,11 @@ msgstr ""
 
 #: packages/__init__.py
 msgid "<None>"
-msgstr "<Нет>"
+msgstr "<Ничего>"
 
 #: packages/__init__.py
 msgid "Do not add anything."
-msgstr "Ничего не добавляйте."
+msgstr "Ничего не добавлять."
 
 #: packages/__init__.py
 #, fuzzy
@@ -2887,11 +3008,11 @@ msgid "This object is missing from loaded packages. Exporting it will fail."
 msgstr ""
 
 #: packages/__init__.py
-#, fuzzy
 msgid "No packages found!"
-msgstr "Сброс пакетов"
+msgstr "Пакеты не найдены!"
 
 #: packages/__init__.py
+#, fuzzy
 msgid ""
 "Critical package missing: {pack}These are required for some essential "
 "resources and objects."
@@ -2899,14 +3020,19 @@ msgid_plural ""
 "Critical packages missing: {pack}These are required for some essential "
 "resources and objects."
 msgstr[0] ""
+"Пакет Clean стиль отсутствует! Он необходим для некоторых важных ресурсов"
+" и объектов."
 msgstr[1] ""
 msgstr[2] ""
+msgstr[3] ""
 
 #: packages/__init__.py
 msgid ""
 "one of the following locations:\n"
 "{loc}"
 msgstr ""
+"одно из следующих мест:\n"
+"{loc}"
 
 #: packages/__init__.py
 msgid ""
@@ -2914,24 +3040,25 @@ msgid ""
 "Get the packages from \"https://github.com/BEEmod/BEE2-items\" and place "
 "them in {trailer}"
 msgstr ""
+"{msg}\n"
+"Получите пакеты с сайта \"https://github.com/BEEmod/BEE2-items\" и "
+"поместите их в {trailer}"
 
 #: packages/__init__.py
-#, fuzzy
 msgid "No description!"
-msgstr "Описание:"
+msgstr "Нет описания!"
 
 #: packages/quote_pack.py
 msgid "<Multiverse Cave only>"
-msgstr "<Только Кейв мультивселенной>"
+msgstr "<Только мультивселенная кейва>"
 
 #: ui_tk/browsers.py
-#, fuzzy
 msgid "Ok"
-msgstr "ОК"
+msgstr ""
 
 #: ui_tk/check_table.py
 msgid "Toggle all checkboxes."
-msgstr "Выбрать все чекбоксы."
+msgstr "Включить/Отключить все галочки"
 
 #: ui_tk/context_win.py
 msgid "Properties:"
@@ -2947,147 +3074,41 @@ msgstr "Больше информации>>"
 
 #: ui_tk/context_win.py
 msgid "Change Defaults..."
-msgstr "Изменить значения по умолчанию..."
+msgstr "Изменить по умолчанию..."
 
 #: ui_tk/context_win.py
 msgid "Change the default settings for this item when placed."
-msgstr "Изменить стандартные настройки объекта при размещении."
+msgstr "Изменить параметры по умолчанию для этого предмета при размещении."
 
 #: ui_tk/context_win.py
-#, fuzzy
 msgid "Select Signage..."
-msgstr "Выбрать предложенное"
+msgstr "Выбрать сигнал..."
 
 #: ui_tk/context_win.py
 msgid "Change which signs are specified by each timer value."
-msgstr ""
+msgstr "Измените знаки, указанные каждым значением таймера."
 
 #: ui_tk/errors.py
 msgid "Continue"
 msgstr ""
 
 #: ui_tk/rich_textbox.py
-#, fuzzy
 msgid "Open \"{url}\" in the default browser?"
-msgstr "Открыть \"{}\" в стандартном браузере?"
+msgstr "Открыть \"{url}\" в браузере по умолчанию?"
 
 #: ui_tk/selector_win.py
 msgid "Play a sample of this item."
-msgstr "Воспроизвести сэмпл."
+msgstr "Воспроизведите образец этого предмета."
 
 #: ui_tk/selector_win.py ui_wx/selector_win.py
 msgid "Select Suggested"
 msgstr "Выбрать предложенное"
 
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "Такая палитра уже существует. Перезаписать?"
+#~ msgid "ATLAS"
+#~ msgstr "АТЛАС"
 
-#~ msgid "Corridor"
-#~ msgstr "Коридор"
-
-#~ msgid "Corridor:"
-#~ msgstr "Коридор:"
-
-#~ msgid "Singleplayer Entry Corridor"
-#~ msgstr "Коридор входа"
-
-#~ msgid "Singleplayer Exit Corridor"
-#~ msgstr "Коридор выхода"
-
-#~ msgid "Coop Exit Corridor"
-#~ msgstr "Коридор выхода в кооперативном режиме"
-
-#~ msgid "SP Entry:"
-#~ msgstr "Вход:"
-
-#~ msgid "SP Exit:"
-#~ msgstr "Выход:"
-
-#~ msgid "Coop Exit:"
-#~ msgstr "Выход в коопе:"
-
-#~ msgid "Styles"
-#~ msgstr "Стили"
-
-#~ msgid "Items"
-#~ msgstr "Предметы"
-
-#~ msgid "__LANG_USE_SANS_SERIF__"
-#~ msgstr "NO"
-
-#~ msgid "BEEMOD {} Error!"
-#~ msgstr "Ошибка BEEMOD {}!"
-
-#~ msgid ""
-#~ "\n"
-#~ "Quit BEE2?"
-#~ msgstr ""
-#~ "\n"
-#~ "Выйти из BEE2?"
-
-#~ msgid "No Name?"
-#~ msgstr "Нет имени?"
-
-#~ msgid "Gel Type"
-#~ msgstr "Выберите стиль"
-
-#~ msgid "When previewing in SP, spawn just before the entry door."
-#~ msgstr "При одиночном предпросмотре, вы спавнитесь на входе."
-
-#~ msgid "Start Position"
-#~ msgstr "Начальная позиция"
-
-#~ msgid ""
-#~ "Delay \n"
-#~ "(0=infinite)"
-#~ msgstr ""
-#~ "Задержка \n"
-#~ "(0=бесконечно)"
-
-#~ msgid "Save Palette..."
-#~ msgstr "Сохранить палитру..."
-
-#~ msgid "Delete Palette"
-#~ msgstr "Удалить палитру"
-
-#~ msgid "Hide Palette"
-#~ msgstr "Сохранить палитру"
-
-#~ msgid "Clear Palette"
-#~ msgstr "Очистить палитру"
-
-#~ msgid "Prevent Portal Bump (fizzler)"
-#~ msgstr "Защита от порталов (поле антиэкспроприации)"
-
-#~ msgid ""
-#~ "Add portal bumpers to make it more"
-#~ " difficult to portal across fizzler "
-#~ "edges. This can prevent placing portals"
-#~ " in tight spaces near fizzlers, or"
-#~ " fizzle portals on activation."
-#~ msgstr ""
-#~ "Добавляет хитбоксы, убирая возможность ставить"
-#~ " порталы через поле антиэкспроприации. Это"
-#~ " предотвращает размещение порталов в узких"
-#~ " пространствах между полями антиэкспроприации "
-#~ "или во время их активации."
-
-#~ msgid "Selected:"
-#~ msgstr "Выбран."
-
-#~ msgid "BEE2 - Export Failed!"
-#~ msgstr "BEE2 - Экспорт не удался!"
-
-#~ msgid "BEE2 - Aperture Tag Files Missing"
-#~ msgstr "BEE2 - Не найдены файлы Aperture Tag"
-
-#~ msgid ""
-#~ "Ap-Tag Coop gun instance not found!\n"
-#~ "Coop guns will not work - verify cache to fix."
-#~ msgstr ""
-#~ "Кооперативный краскопульт ApTag не найден! "
-#~ "Кооперативные краскопульты не будут работать"
-#~ " - подтвердите кэш чтобы исправить."
+#~ msgid "P-Body"
+#~ msgstr "П-Боди"
 
 #~ msgid ""
 #~ "Allow placing and deleting the mandatory"
@@ -3095,14 +3116,80 @@ msgstr "Выбрать предложенное"
 #~ "Room. Use with caution, this can "
 #~ "have weird results!"
 #~ msgstr ""
-#~ "Разрешить создание и удаление входа/выхода "
-#~ "и большого зала наблюдения. Осторожно, "
-#~ "удаления этих предметов может привести к"
-#~ " странным результатам!"
+#~ "Позволяет размещать и удалять обязательные "
+#~ "двери входа/выхода и большую комнату "
+#~ "наблюдения. Используйте с осторожностью, это"
+#~ " может привести к странным результатам!"
 
-#~ msgid "ATLAS"
-#~ msgstr "АТЛАС"
+#~ msgid ""
+#~ "Style includes old definition for "
+#~ "{item}. Override the item package object"
+#~ " instead."
+#~ msgstr ""
+#~ "Стиль включает старое определение для "
+#~ "{item}. Вместо этого переопределите объект "
+#~ "пакета item."
 
-#~ msgid "P-Body"
-#~ msgstr "Пи-Боди"
+#~ msgid ""
+#~ "Unknown object type \"{obj_type}\" with "
+#~ "ID \"{obj_id}\" in package \"{pak_id}\"!"
+#~ msgstr ""
+#~ "Неизвестный тип объекта \"{obj_type}\" с "
+#~ "идентификатором \"{obj_id}\" в пакете "
+#~ "\"{pak_id}\"!"
+
+#~ msgid ""
+#~ "TemplateBrush \"{id}\" in package \"{pak_id}\""
+#~ " no longer needs to be defined "
+#~ "in info.txt. Use a bee2_template_conf "
+#~ "entity instead."
+#~ msgstr ""
+#~ "Шаблонная кисть \"{id}\" в пакете "
+#~ "\"{pak_id}\" больше не нужно определять "
+#~ "в info.txt. Вместо этого используйте "
+#~ "сущность bee2_template_conf."
+
+#~ msgid "No ID defined for \"{obj_type}\" object type in \"{pak_id}\" package!"
+#~ msgstr ""
+#~ "Для типа объекта \"{obj_type}\" в пакете"
+#~ " \"{pak_id}\" не определен идентификатор!"
+
+#~ msgid ""
+#~ "The ID \"{obj_id}\" was used twice "
+#~ "for a {obj_type} in the packages "
+#~ "\"{pak1}\" and \"{pak2}\"!"
+#~ msgstr ""
+#~ "Идентификатор \"{obj_id}\" был использован "
+#~ "дважды для {obj_type} в пакетах "
+#~ "\"{pak1}\" и \"{pak2}\"!"
+
+#~ msgid ""
+#~ "Duplicate corridor option ID \"{option}\" "
+#~ "in corridor group for style \"{group}\"!"
+#~ msgstr ""
+#~ "Дублируется идентификатор опции коридора "
+#~ "\"{option}\" в группе коридоров для "
+#~ "стиля \"{group}\"!"
+
+#~ msgid "No \"Quotes\" key in config for quote pack {id}!"
+#~ msgstr "В конфигурации нет ключа \"Quotes\" для пакета цитат {id}!"
+
+#~ msgid "Multiple \"Quotes\" keys found in config for quote pack {id}!"
+#~ msgstr ""
+#~ "В конфигурации для пакета цитат {id} "
+#~ "найдено несколько ключей \"Quotes\"!"
+
+#~ msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
+#~ msgstr ""
+#~ "Недопустимый вид ответа \"{name}\" в "
+#~ "конфигурации для пакета цитат {id}!"
+
+#~ msgid "Flat"
+#~ msgstr "Плоский"
+
+#~ msgid "Upward"
+#~ msgstr "Вверх"
+
+#~ msgid "Downward"
+#~ msgstr "Вниз"
 
