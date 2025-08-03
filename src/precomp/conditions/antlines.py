@@ -6,7 +6,7 @@ from enum import Enum
 
 import attrs
 import srctools.logger
-from srctools import FrozenVec, VMF, Keyvalues, Output, Vec, Entity, Matrix
+from srctools import FrozenVec, VMF, Keyvalues, Output, Vec, Entity, Matrix, FrozenMatrix
 
 from precomp import instanceLocs, connections, conditions, antlines
 import user_errors
@@ -41,23 +41,23 @@ NAME_MODEL: Callable[[str], str] = '{}-mdl'.format
 
 # The configuration for each timer delay value. This starts at delay=3.
 # Vecs are corners, and define the offset in the model. The y-off/matrix tuple is a checkmark.
-TIMER_VALUES = [
-    Vec(8.0, 56.0, -64.0),
-    Vec(8.0, 40.0, -64.0),
-    Vec(8.0, 24.0, -64.0),
-    Vec(8.0, 8.0, -64.0),
-    Vec(-8.0, 56.0, -64.0),
-    Vec(-8.0, 40.0, -64.0),
-    Vec(-8.0, 24.0, -64.0),
-    Vec(-8.0, 8.0, -64.0),
-    (16.0, Matrix.from_yaw(180)),
-    (16.0, Matrix.from_yaw(270)),
-    (16.0, Matrix.from_yaw(0)),
-    (16.0, Matrix.from_yaw(90)),
-    (48.0, Matrix.from_yaw(180)),
-    (48.0, Matrix.from_yaw(270)),
-    (48.0, Matrix.from_yaw(0)),
-    (48.0, Matrix.from_yaw(90)),
+TIMER_VALUES: list[FrozenVec | tuple[float, FrozenMatrix]] = [
+    FrozenVec(8.0, 56.0, -64.0),
+    FrozenVec(8.0, 40.0, -64.0),
+    FrozenVec(8.0, 24.0, -64.0),
+    FrozenVec(8.0, 8.0, -64.0),
+    FrozenVec(-8.0, 56.0, -64.0),
+    FrozenVec(-8.0, 40.0, -64.0),
+    FrozenVec(-8.0, 24.0, -64.0),
+    FrozenVec(-8.0, 8.0, -64.0),
+    (16.0, FrozenMatrix.from_yaw(180)),
+    (16.0, FrozenMatrix.from_yaw(270)),
+    (16.0, FrozenMatrix.from_yaw(0)),
+    (16.0, FrozenMatrix.from_yaw(90)),
+    (48.0, FrozenMatrix.from_yaw(180)),
+    (48.0, FrozenMatrix.from_yaw(270)),
+    (48.0, FrozenMatrix.from_yaw(0)),
+    (48.0, FrozenMatrix.from_yaw(90)),
 ]
 
 
@@ -293,13 +293,13 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             except IndexError:
                 raise user_errors.UserError(
                     user_errors.TOK_ANTLINE_INVALID_TIMER.format(value=timer_delay),
-                    points=[(point @ orient + pos) for point in TIMER_VALUES if isinstance(point, Vec)],
+                    points=[(point @ orient + pos) for point in TIMER_VALUES if isinstance(point, FrozenVec)],
                 ) from None
             match timer_val:
                 case Vec() as ant_pos:
                     # Antline Corner
-                    pos = ant_pos @ orient + pos
-                case (float() as check_off, Matrix() as check_orient):
+                    pos = (ant_pos @ orient + pos).thaw()
+                case (float() as check_off, FrozenMatrix() as check_orient):
                     # Checkmark. Reposition, we only need a Y-offset.
                     # The connections module will set the filename later.
                     inst['origin'] = orient.left(check_off) + pos
