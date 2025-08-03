@@ -308,7 +308,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         await packset.ready(packages.Style).wait()
         for item_id, (mode, direction) in ID_TO_CORR.items():
             try:
-                item = packset.obj_by_id(packages.Item, item_id, optional=True)
+                item = packset.obj_by_id(packages.Item, item_id, warn=False)
             except KeyError:
                 continue
             count = CORRIDOR_COUNTS[mode, direction]
@@ -319,7 +319,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     except KeyError:
                         continue
                     try:
-                        corridor_group = packset.obj_by_id(cls, style_id, optional=True)
+                        corridor_group = packset.obj_by_id(cls, style_id, warn=False)
                     except KeyError:
                         # Synthesise a new group to match.
                         corridor_group = cls(id=style_id, corridors={})
@@ -391,7 +391,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         for corridor_group in packset.all_obj(cls):
             for inherit in corridor_group.inherit:
                 try:
-                    parent_group = packset.obj_by_id(cls, inherit, optional=True)
+                    parent_group = packset.obj_by_id(cls, inherit, warn=False)
                 except KeyError:
                     ctx.warn_auth(corridor_group.pak_id, TransToken.untranslated(
                         'Corridor Group "{id}" is trying to inherit from nonexistent group "{inherit}"!'

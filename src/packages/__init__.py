@@ -857,11 +857,15 @@ class PackagesSet:
         cls: type[PakT],
         obj_id: str,
         *,
-        optional: bool = False,
+        warn: bool = True,
     ) -> PakT:
         """Return the object with a given ID.
 
-        If not found, by default a warning is printed refrerencing the parent.
+        :param cls: The object type to look up.
+        :param obj_id: The ID to look up.
+        :param warn: If enabled (default), a warning is printed once per PackageSet about any
+            missing objects.
+        :raises KeyError: If an item is missing.
         """
         if cls not in self._parsed:
             raise ValueError(f'{cls.__name__} has not been parsed yet!')
@@ -870,7 +874,7 @@ class PackagesSet:
             return obj_dict[obj_id.casefold()]
         except KeyError:
             if (
-                not optional
+                warn
                 and self._unknown_obj_warnings is not None
                 and (key := (cls, obj_id)) not in self._unknown_obj_warnings
             ):

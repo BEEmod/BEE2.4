@@ -206,7 +206,7 @@ def make_legend(
     for style in exp.selected_style.bases:
         trio.from_thread.check_cancelled()
         try:
-            legend_obj = exp.packset.obj_by_id(SignageLegend, style.id, optional=True)
+            legend_obj = exp.packset.obj_by_id(SignageLegend, style.id, warn=False)
         except KeyError:
             pass
         else:

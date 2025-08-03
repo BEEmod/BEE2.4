@@ -33,7 +33,7 @@ async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
         config = exp_data.packset.obj_by_id(
             ConfigGroup,
             'BEE2_CUBE_COLORISER',
-            optional=True,
+            warn=False,
         )
     except KeyError:
         LOGGER.info('Cube colouriser not installed, skipping legend generation.')

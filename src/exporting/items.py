@@ -202,7 +202,7 @@ async def step_write_items(exp_data: ExportData) -> None:
 
         # Add auxiliary configs as well.
         try:
-            aux_conf = exp_data.packset.obj_by_id(ItemConfig, item.id, optional=True)
+            aux_conf = exp_data.packset.obj_by_id(ItemConfig, item.id, warn=False)
         except KeyError:
             pass
         else:

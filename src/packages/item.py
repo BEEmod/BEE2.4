@@ -764,7 +764,7 @@ class Item(PakObject, needs_foreground=True):
             match from_item:
                 case PakRef():
                     try:
-                        packset.obj_by_id(cls, from_item.id, optional=True)
+                        packset.obj_by_id(cls, from_item.id, warn=False)
                     except KeyError:
                         LOGGER.info('Migration: {}:<all> -> {}', from_item, to_item)
                     else:
@@ -775,7 +775,7 @@ class Item(PakObject, needs_foreground=True):
                         del migrations[from_item]
                 case SubItemRef():
                     try:
-                        existing = packset.obj_by_id(cls, from_item.item.id, optional=True)
+                        existing = packset.obj_by_id(cls, from_item.item.id, warn=False)
                     except KeyError:
                         LOGGER.info('Migration: {} -> {}', from_item, to_item)
                         continue
