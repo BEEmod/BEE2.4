@@ -296,7 +296,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     points=[(point @ orient + pos) for point in TIMER_VALUES if isinstance(point, FrozenVec)],
                 ) from None
             match timer_val:
-                case Vec() as ant_pos:
+                case FrozenVec() as ant_pos:
                     # Antline Corner
                     pos = (ant_pos @ orient + pos).thaw()
                 case (float() as check_off, FrozenMatrix() as check_orient):
@@ -394,8 +394,9 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 conn.to_item = logic_item
         else:
             logic_item = conn.from_item
-            conn.from_item.ind_panels.add(inst)
+            logic_item.ind_panels.add(inst)
             conn.remove()
+            LOGGER.debug('Transferring antline panel {} -> item {}', inst, logic_item)
         for conn in list(item.outputs):
             conn.from_item = logic_item
 
