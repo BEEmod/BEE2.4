@@ -773,7 +773,7 @@ def _obj_dict() -> dict[type[PakObject], dict[str, Any]]:
     }
 
 
-@attrs.define
+@attrs.define(eq=False)
 class PackagesSet:
     """Holds all the data parsed from packages.
 
@@ -789,6 +789,8 @@ class PackagesSet:
 
     # The templates found in the packages. This maps an ID to the file.
     templates: dict[str, utils.PackagePath] = attrs.field(init=False, factory=dict)
+
+    item_migrations: dict[PakRef[Item] | SubItemRef, SubItemRef] = {}
 
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
@@ -1682,7 +1684,7 @@ from .barrier_hole import BarrierHole
 from .corridor import CorridorGroup
 from .editor_sound import EditorSound
 from .elevator import Elevator
-from .item import Item
+from .item import Item, SubItemRef
 from .music import Music
 from .pack_list import PackList
 from .player import PlayerModel

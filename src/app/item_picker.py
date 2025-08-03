@@ -148,13 +148,23 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
 
     def set_items(self, palette: Mapping[Coord, tuple[str, int]]) -> None:
         """Change the selected items."""
+        migrations = Item.migrations(self.packset)
         for slot, coord in self.slots_pal.items():
             try:
                 item_id, subtype = palette[coord]
             except KeyError:
                 slot.contents = None
-            else:
-                slot.contents = SubItemRef(PakRef.parse(Item, item_id), subtype)
+                continue
+            subref = new_item = SubItemRef(PakRef.parse(Item, item_id), subtype)
+            # Try to look this up in the package migrations list, first as subtype,
+            # then any subtype of that item.
+            try:
+                new_item = migrations[subref]
+            except KeyError:
+                new_item = migrations.get(subref.item, subref)
+            if subref is not new_item:
+                LOGGER.info("Migrating {} -> {}", subref, new_item)
+            slot.contents = new_item
 
     def clear_palette(self) -> None:
         """Clear the palette."""

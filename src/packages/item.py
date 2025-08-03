@@ -7,16 +7,17 @@ Unparsed style IDs can be <special>, used usually for unstyled items.
 Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
-from typing import Final, Self, override
+from typing import Final, Self, override, ClassVar, assert_never
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from enum import Enum
 from pathlib import PurePosixPath as FSPath
 import copy
 import re
+from weakref import WeakKeyDictionary
 
 from aioresult import ResultCapture
-from srctools import VMF, FileSystem, Keyvalues, logger
+from srctools import VMF, FileSystem, Keyvalues, logger, conv_int
 from srctools.tokenizer import Token, Tokenizer
 import attrs
 import trio
@@ -481,6 +482,9 @@ class Version:
         """Fetch the variant for this style."""
         return self.styles.get(style.id, self.def_style)
 
+# Maps an old item ID to its new one. If key is a PakRef, it applies to all subtypes.
+type Migrations = dict[SubItemRef | PakRef[Item], SubItemRef]
+
 
 class Item(PakObject, needs_foreground=True):
     """An item in the editor..."""
@@ -497,6 +501,8 @@ class Item(PakObject, needs_foreground=True):
     def_ver: Version
     # Subtypes which have palette icons, and therefore should be shown in the UI.
     visual_subtypes: Sequence[int]
+
+    _migrations: ClassVar[WeakKeyDictionary[PackagesSet, Migrations]] = WeakKeyDictionary()
 
     # The type required to export items.
     type ExportInfo = Mapping[str, Mapping[int, tuple[paletteLoader.HorizInd, paletteLoader.VertInd]]]
@@ -532,6 +538,15 @@ class Item(PakObject, needs_foreground=True):
         self.folders = folders
         self.version_id_order = ()
         self.visual_subtypes = ()
+
+    @classmethod
+    def migrations(cls, packset: PackagesSet) -> Migrations:
+        """Fetch the migrations dict for this package, creating if necessary."""
+        try:
+            return cls._migrations[packset]
+        except KeyError:
+            cls._migrations[packset] = res = {}
+            return res
 
     @classmethod
     @override
@@ -661,6 +676,18 @@ class Item(PakObject, needs_foreground=True):
                 f'visible subtypes in its styles: {", ".join(map(str, subtype_counts))}'
             )
 
+        migrations = cls.migrations(data.packset)
+        item_ref = PakRef(Item, utils.obj_id(data.id))
+        for kv in data.info.find_children('migrations'):
+            old_item = SubItemRef.parse(kv.real_name) if ':' in kv.name else PakRef.parse(Item, kv.real_name)
+            new_item = SubItemRef(item_ref, conv_int(kv.value))
+            existing = migrations.setdefault(old_item, new_item)
+            if existing != new_item:
+                raise ValueError(
+                    f'Item migration from {old_item} is '
+                    f'configured to produce both {existing} and {new_item}!'
+                )
+
         return cls(
             data.id,
             versions=versions,
@@ -731,6 +758,38 @@ class Item(PakObject, needs_foreground=True):
         async with trio.open_nursery() as nursery:
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, ctx, styles, item_to_style)
+        # Migrations cannot be from an item that actually exists. If so, warn and remove.
+        migrations = cls.migrations(packset)
+        for from_item, to_item in list(migrations.items()):
+            match from_item:
+                case PakRef():
+                    try:
+                        packset.obj_by_id(cls, from_item.id, optional=True)
+                    except KeyError:
+                        LOGGER.info('Migration: {}:<all> -> {}', from_item, to_item)
+                    else:
+                        LOGGER.warning(
+                            'Cannot migrate from all {} -> {}, the former item exists. Discarding.',
+                            from_item, to_item
+                        )
+                        del migrations[from_item]
+                case SubItemRef():
+                    try:
+                        existing = packset.obj_by_id(cls, from_item.item.id, optional=True)
+                    except KeyError:
+                        LOGGER.info('Migration: {} -> {}', from_item, to_item)
+                        continue
+                    # We allow a migration from a nonexistent subtype.
+                    if 0 <= from_item.subtype < len(existing.visual_subtypes):
+                        LOGGER.warning(
+                            'Cannot migrate from {} -> {}, the former item+subtype exists. Discarding.',
+                            from_item, to_item
+                        )
+                        del migrations[from_item]
+                    else:
+                        LOGGER.info('Migration: {} (invalid subtype) -> {}', from_item, to_item)
+                case never:
+                    assert_never(never)
 
     def selected_version(self) -> Version:
         """Fetch the selected version for this item."""
@@ -904,6 +963,25 @@ class SubItemRef:
     """Represents an item with a specific subtype."""
     item: PakRef[Item] = attrs.field(converter=_conv_pakref_item)
     subtype: int = 0
+
+    @classmethod
+    def parse(cls, value: str) -> SubItemRef:
+        """Parse a string into a ref.
+
+        :raises ValueError: If the value is invalid.
+        """
+        try:
+            [raw_id, raw_sub] = value.split(':')
+        except ValueError:
+            raise ValueError(f'Invalid number of colons for ID:subtype "{value}"!') from None
+        item = PakRef.parse(Item, raw_id)
+        try:
+            subtype = int(raw_sub)
+            if subtype < 0:
+                raise ValueError
+        except (TypeError, OverflowError, ValueError):
+            raise ValueError(f'Invalid subtype "{raw_sub}" for item "{raw_id}", must be a non-negative integer.')
+        return cls(item, subtype)
 
     def __str__(self) -> str:
         """Convert this to a compact ID."""
