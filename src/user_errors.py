@@ -320,17 +320,10 @@ TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
     'Two Superposition Entanglers cannot be connected to a single dropper!'
 )
 
-TOK_ANTLINE_CORNER_INVALID_TIMER = TransToken.ui(
-    'This antline corner has a timer value of "<var>{value}</var>", which is not allowed. '
-    'Valid values are from <var>&inf;-10</var>. Previously values looped past this, but these are now '
-    'reserved for future functionality. This time would have been equivalent to '
-    '"<var>{corrected}</var>".'
-)
-TOK_ANTLINE_CHECKMARK_MIGRATION = TransToken.ui(
-    'This antline corner item is configured to be a checkmark, but has corners as both '
-    'inputs and outputs. This is likely a corner item, using the previous behaviour where corner '
-    'positions looped with higher timer values. The new timer value is "<var>{corrected}</var>". '
-    'If this was intended to be a checkmark, remove its output, connect to the input antline instead.'
+TOK_ANTLINE_INVALID_TIMER = TransToken.ui(
+    'This antline has a timer value of "<var>{value}</var>", which is not allowed. '
+    'Valid values are from <var>&inf;-10</var> to produce corners, '
+    'and <var>11-18</var> for checkmarks.'
 )
 
 TOK_BARRIER_ITEMNAME = TransToken.ui('Glass / Grating item')

@@ -40,7 +40,7 @@ NAME_MODEL: Callable[[str], str] = '{}-mdl'.format
 
 
 # The configuration for each timer delay value. This starts at delay=3.
-# Vecs are corners, and define the offset in the model. The vec/matrix tuple is a checkmark.
+# Vecs are corners, and define the offset in the model. The y-off/matrix tuple is a checkmark.
 TIMER_VALUES = [
     Vec(8.0, 56.0, -64.0),
     Vec(8.0, 40.0, -64.0),
@@ -50,14 +50,14 @@ TIMER_VALUES = [
     Vec(-8.0, 40.0, -64.0),
     Vec(-8.0, 24.0, -64.0),
     Vec(-8.0, 8.0, -64.0),
-    (Matrix.from_yaw(180), Vec(0, 16.0, -64.0)),
-    (Matrix.from_yaw(270), Vec(0, 16.0, -64.0)),
-    (Matrix.from_yaw(0), Vec(0, 16.0, -64.0)),
-    (Matrix.from_yaw(90), Vec(0, 16.0, -64.0)),
-    (Matrix.from_yaw(180), Vec(0, 48.0, -64.0)),
-    (Matrix.from_yaw(270), Vec(0, 48.0, -64.0)),
-    (Matrix.from_yaw(0), Vec(0, 48.0, -64.0)),
-    (Matrix.from_yaw(90), Vec(0, 48.0, -64.0)),
+    (16.0, Matrix.from_yaw(180)),
+    (16.0, Matrix.from_yaw(270)),
+    (16.0, Matrix.from_yaw(0)),
+    (16.0, Matrix.from_yaw(90)),
+    (48.0, Matrix.from_yaw(180)),
+    (48.0, Matrix.from_yaw(270)),
+    (48.0, Matrix.from_yaw(0)),
+    (48.0, Matrix.from_yaw(90)),
 ]
 
 
@@ -262,6 +262,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         name = inst['targetname']
         if filename in conf_inst_laser:
             node_type = NodeType.LASER
+            legacy = False
         elif filename in conf_inst_ant_legacy:
             node_type = NodeType.CORNER
             legacy = True
@@ -284,38 +285,25 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             # being selectable issue.
             timer_delay = item.inst.fixup.int('$timer_delay')
             timer_ind = max(0, timer_delay - 3)
+            if legacy:
+                # Only the corners are available, the rest loop.
+                timer_ind %= 8
             try:
                 timer_val = TIMER_VALUES[timer_ind]
             except IndexError:
                 raise user_errors.UserError(
-                    user_errors.TOK_ANTLINE_CORNER_INVALID_TIMER.format(
-                        value=timer_delay,
-                        corrected=timer_ind % 8 + 3,
-                    ),
+                    user_errors.TOK_ANTLINE_INVALID_TIMER.format(value=timer_delay),
                     points=[(point @ orient + pos) for point in TIMER_VALUES if isinstance(point, Vec)],
                 ) from None
             match timer_val:
                 case Vec() as ant_pos:
                     # Antline Corner
                     pos = ant_pos @ orient + pos
-                case [Matrix() as check_orient, Vec() as check_pos]:
-                    if any(conn.to_item.config.id == 'item_bee2_antline_corner' for conn in item.outputs):
-                        # Previously, we allowed all timer values, cycling between corners after the
-                        # first 8. That means checkmarks are ambiguous. To try and catch that case,
-                        # disallow checkmarks with outputs to antlines.
-                        raise user_errors.UserError(
-                            user_errors.TOK_ANTLINE_CHECKMARK_MIGRATION.format(
-                                value=timer_delay,
-                                corrected=timer_ind % 8 + 3,
-                            ),
-                            points=[check_pos],
-                        )
-                    # For checkmarks, create a new logic item, connect the instance up as the
-                    # panel.
-                    inst['origin'] = check_pos @ orient + pos
+                case (float() as check_off, Matrix() as check_orient):
+                    # Checkmark. Reposition, we only need a Y-offset.
+                    # The connections module will set the filename later.
+                    inst['origin'] = orient.left(check_off) + pos
                     inst['angles'] = (check_orient @ orient).to_angle()
-                    inst['file'] = checkmark_file
-                    conditions.ALL_INST.add(checkmark_file)
                     checkmarks[item] = inst
                     continue
                 case never:
@@ -393,15 +381,23 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 group.links.add(frozenset({neigh_node, node}))
 
     # Setup each checkmark. If they have exactly 1 input, we move them into the caller so they
-    # inherit timer values. Otherwise, they become an OR gate with a dummy item.
-    for item, inst in checkmarks:
+    # inherit timer values. Otherwise, they become an OR gate with a dummy item. Either way,
+    # all the inputs and outputs need to be moved off the old item.
+    for item, inst in checkmarks.items():
         try:
             [conn] = item.inputs
         except ValueError:
             logic_item = make_dummy_conn_item(item, Vec.from_str(inst['origin']), CONFIG_ANTLINE)
+            inst['targetname'] += '_panel'
             logic_item.ind_panels.add(inst)
+            for conn in list(item.inputs):
+                conn.to_item = logic_item
         else:
+            logic_item = conn.from_item
             conn.from_item.ind_panels.add(inst)
+            conn.remove()
+        for conn in list(item.outputs):
+            conn.from_item = logic_item
 
     # Now every node is in a group. Generate the actual entities.
     for group in groups:

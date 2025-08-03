@@ -1367,6 +1367,10 @@ def add_item_indicators(
     has_sign = len(item.ind_panels) > 0
     has_ant = len(item.antlines) > 0
     timer_delay = item.timer
+    LOGGER.debug(
+        'Add antline outputs for "{}", signs={}, overlays={}, timer={}',
+        ant_name, len(item.ind_panels), len(item.antlines), timer_delay,
+    )
 
     for ant in item.antlines:
         ant.name = ant_name
