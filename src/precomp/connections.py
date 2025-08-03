@@ -760,11 +760,24 @@ def do_item_optimisation(vmf: VMF) -> None:
         inp_count = len(item.inputs)
         if inp_count == 0:
             # Totally useless, remove.
-            # We just leave the panel entities, and tie all the antlines
-            # to the same toggle.
+            # We tie all the antlines to the same toggle, then configure the panels to function.
             needs_global_toggle = True
             for ant in item.antlines:
                 ant.name = '_static_ind'
+                ant.export(vmf, item.ind_style, get_ant_tile)
+            if item.timer is not None:
+                panel_inst = item.ind_style.timer_inst
+                switching = item.ind_style.timer_switching
+            else:
+                panel_inst = item.ind_style.check_inst
+                switching = item.ind_style.check_switching
+            conditions.ALL_INST.add(panel_inst)
+            for ind in item.ind_panels:
+                if switching is PanelSwitchingStyle.EXTERNAL:
+                    ind[consts.FixupVars.TOGGLE_OVERLAY] = '_static_ind'
+                else:
+                    ind[consts.FixupVars.TOGGLE_OVERLAY] = '-'
+                ind['file'] = panel_inst
 
             del ITEMS[item.name]
             item.inst.remove()
