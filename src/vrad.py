@@ -36,7 +36,7 @@ TEX_INVISIBLE_PATCHED = 'bee2/invisible_noportal'
 def swap_material(bsp: BSP, src: str, dest: str) -> None:
     """Swap material in the BSP, skipping if not present."""
     for info in bsp.texinfo:
-        if info.mat == src:
+        if info.mat.casefold() == src:
             LOGGER.info('Swapping to {} for {}', dest, info)
             # These are tools mats, details don't matter.
             info.set(bsp, dest, Vec(0.5, 0.5, 0.5), 1, 1)
