@@ -507,7 +507,6 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         except KeyError:
             return
         self.key_navigate(key)
-        raise NotImplementedError
 
     @override
     async def _ui_task(self) -> None:
