@@ -275,7 +275,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 name = TransToken.parse(data.pak_id, wid['Label'])
             except LookupError:
                 name = TransToken.untranslated(wid_id)
-            tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
+            tooltip = TransToken.parse(data.pak_id, '\n'.join(
+                wid.find_key('Tooltip', '').as_array()  # Allow the multiline description style
+            ))
             default_prop = wid.find_key('Default', '')
 
             prev_conf = config.APP.get_cur_conf(
