@@ -2,7 +2,7 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Final
+from typing import Final, override
 from collections.abc import Iterator
 
 from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
@@ -38,6 +38,7 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
             self.vert_video = vert_video
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> 'Elevator':
         """Read elevator videos from the package."""
         info = data.info
@@ -60,6 +61,7 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
     def __repr__(self) -> str:
         return f'<Elevator {self.id}>'
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens present in the elevator."""
         return self.selitem_data.iter_trans_tokens('elevators/' + self.id)

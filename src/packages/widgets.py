@@ -135,6 +135,7 @@ class SingleWidget(Widget):
     # Used for some configs ported from stylevars.
     stylevar_id: str
 
+    @override
     def create_conf(self) -> WidgetConfig:
         return WidgetConfig(self.holder.value)
 
@@ -177,6 +178,7 @@ class MultiWidget(Widget):
     use_inf: bool  # For timer, is infinite valid?
     holders: dict[TimerNum, AsyncValue[str]]
 
+    @override
     def create_conf(self) -> WidgetConfig:
         return WidgetConfig({
             num: holder.value

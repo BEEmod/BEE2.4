@@ -545,7 +545,7 @@ class Item(PakObject, needs_foreground=True):
         try:
             return cls._migrations[packset]
         except KeyError:
-            cls._migrations[packset] = res = {}
+            res = cls._migrations[packset] = {}
             return res
 
     @classmethod

@@ -4,6 +4,8 @@ This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
 
+from typing import override
+
 from srctools import FileSystem
 import srctools.logger
 import trio
@@ -26,6 +28,7 @@ class StyleVPK(PakObject):
         self.dir = directory
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> StyleVPK:
         """Read the VPK file from the package."""
         vpk_name = data.info['filename']

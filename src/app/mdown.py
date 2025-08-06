@@ -3,7 +3,7 @@
 Tkinter and WX most efficiently work with different result formats, so this flexibly handles either.
 """
 from __future__ import annotations
-from typing import ClassVar
+from typing import ClassVar, override
 
 from abc import abstractmethod
 from collections.abc import Iterator
@@ -65,6 +65,7 @@ class JoinedData(MarkdownData):
         self.source = TransToken.BLANK
         self.package = None
 
+    @override
     def iter_tokens(self, desc: str) -> Iterator[TransTokenSource]:
         """Iterate tokens contained in this data."""
         for child in self.children:

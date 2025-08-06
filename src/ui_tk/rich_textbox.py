@@ -1,6 +1,6 @@
 """Parse Markdown and display it in Tkinter widgets."""
 from __future__ import annotations
-from typing import Never
+from typing import Never, override
 
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
@@ -339,6 +339,7 @@ def _convert(text: str, package: utils.ObjectID | None) -> list[Block]:
 
 class DataConverter(mdown.BaseRenderer[list[Block]]):
     """Converter specific to TK."""
+    @override
     def _convert(self, text: str, package: utils.ObjectID | None) -> list[Block]:
         tok = state.set(RenderState(package))
         with _RENDERER:
@@ -347,6 +348,7 @@ class DataConverter(mdown.BaseRenderer[list[Block]]):
             finally:
                 state.reset(tok)
 
+    @override
     def _join(self, children: list[list[Block]]) -> list[Block]:
         return list(itertools.chain.from_iterable(children))
 
@@ -456,6 +458,7 @@ class RichText(tkinter.Text):
 
         self['state'] = "disabled"
 
+    @override
     def insert(self, *args: Never, **kwargs: Never) -> None:  # type: ignore[override]
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')

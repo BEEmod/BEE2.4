@@ -1,6 +1,6 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from typing import Final, Self
+from typing import Final, Self, override
 
 from collections.abc import Sequence
 
@@ -109,6 +109,7 @@ class SignageLegend(PakObject):
         self.antline_conf = antline_conf
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> SignageLegend:
         """Parse a signage legend."""
         await trio.lowlevel.checkpoint()
@@ -155,6 +156,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         self.icon: ImgHandle | None = None
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Signage:
         await trio.lowlevel.checkpoint()
         styles: dict[PakRef[Style], SignStyle] = {}
@@ -214,6 +216,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             data.info.bool('hidden'),
         )
 
+    @override
     def add_over(self, override: Signage) -> None:
         """Append additional styles to the signage."""
         for sty_id, opts in override.styles.items():

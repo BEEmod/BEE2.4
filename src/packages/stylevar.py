@@ -1,6 +1,6 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
-from typing import Final
+from typing import Final, override
 
 from collections.abc import Iterator, Mapping
 
@@ -42,6 +42,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         return self.styles is None
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> StyleVar:
         """Parse StyleVars from configs."""
         name = TransToken.parse(data.pak_id, data.info['name', ''])
@@ -66,6 +67,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             default=data.info.bool('enabled'),
         )
 
+    @override
     def add_over(self, override: StyleVar) -> None:
         """Override a stylevar to add more compatible styles."""
         # Setting it to be unstyled overrides any other values!
@@ -96,6 +98,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             f'styles={self.styles}>'
         )
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens used by this stylevar."""
         yield self.name, self.id + '.name'

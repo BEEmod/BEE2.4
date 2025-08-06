@@ -3,7 +3,7 @@
 These are separated from the item, because they vary not by style but based on the type of
 barrier they're placed onto.
 """
-from typing import Self
+from typing import Self, override
 
 from packages import PakObject, ParseData, get_config
 from app import lazy_conf
@@ -25,6 +25,7 @@ class BarrierHole(PakObject, allow_mult=True):
         self.variant_conf = variant_conf
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Self:
         """Parse barrier holes from the package."""
         variant_conf = await get_config(
@@ -40,6 +41,7 @@ class BarrierHole(PakObject, allow_mult=True):
             variant_conf=variant_conf,
         )
 
+    @override
     def add_over(self, override: Self) -> None:
         """Merge together two hole definitions."""
         self.variant_conf = lazy_conf.concat(self.variant_conf, override.variant_conf)

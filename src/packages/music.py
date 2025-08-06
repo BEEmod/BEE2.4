@@ -1,6 +1,6 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import Final
+from typing import Final, override
 
 from collections.abc import Awaitable, Callable, Mapping, Iterable, Iterator
 
@@ -55,6 +55,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Music:
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
@@ -166,6 +167,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
             volume=volume,
         )
 
+    @override
     def add_over(self, override: Music) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.config = lazy_conf.concat(self.config, override.config)
@@ -174,6 +176,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
     def __repr__(self) -> str:
         return f'<Music {self.id}>'
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens used by this music."""
         yield from self.selitem_data.iter_trans_tokens('music/' + self.id)
@@ -206,6 +209,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
         return utils.ID_NONE
 
     @classmethod
+    @override
     async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """Check children of each music item actually exist.
 

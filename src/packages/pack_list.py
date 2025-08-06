@@ -1,3 +1,4 @@
+from typing import override
 import srctools.logger
 
 from packages import PakObject, ParseData
@@ -13,6 +14,7 @@ class PackList(PakObject, allow_mult=True):
         self.files = files
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> 'PackList':
         """Read pack lists from packages."""
         filesystem = data.fsys
@@ -52,6 +54,7 @@ class PackList(PakObject, allow_mult=True):
 
         return cls(data.id, files)
 
+    @override
     def add_over(self, override: 'PackList') -> None:
         """Override items just append to the list of files."""
         # Don't copy over if it's already present

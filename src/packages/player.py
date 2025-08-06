@@ -1,5 +1,5 @@
 """Objects defining which player models are available."""
-from typing import Self
+from typing import Self, override
 from collections.abc import Iterator, Mapping
 
 import trio.lowlevel
@@ -36,6 +36,7 @@ class PlayerModel(PakObject):
             voice_options.setdefault(criteria, False)
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Self:
         await trio.lowlevel.checkpoint()
         model = data.info['model']
@@ -49,5 +50,6 @@ class PlayerModel(PakObject):
         }
         return cls(utils.obj_id(data.id), model, name, pgun_skin, voice_options)
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         yield (self.name, 'disp_name')

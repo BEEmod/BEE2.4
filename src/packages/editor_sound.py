@@ -1,4 +1,6 @@
 """Adds sounds useable in the editor."""
+from typing import override
+
 from srctools import Keyvalues
 
 from packages import PakObject, ParseData
@@ -18,6 +20,7 @@ class EditorSound(PakObject):
         data.name = 'BEE2_Editor.' + self.id
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> 'EditorSound':
         """Parse editor sounds from the package."""
         return cls(

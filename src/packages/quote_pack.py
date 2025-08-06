@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Final
+from typing import Final, override
 
 from collections.abc import Iterator
 
@@ -43,6 +43,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
         self.data = data
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> QuotePack:
         """Parse a voice line definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
@@ -162,6 +163,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
             ),
         )
 
+    @override
     def add_over(self, override: QuotePack) -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
@@ -196,6 +198,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
         return f'<Voice:{self.id}>'
 
     @classmethod
+    @override
     async def post_parse(cls, ctx: PackErrorInfo) -> None:
         """Verify no quote packs have duplicate IDs."""
         used: set[str] = set()
@@ -230,6 +233,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
                         )
                     used.add(line.id)
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this voice pack."""
         yield from self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')

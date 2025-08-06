@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Final
+from typing import Final, override
 
 from collections.abc import Iterator
 
@@ -43,6 +43,7 @@ class Skybox(
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Skybox:
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
@@ -67,12 +68,14 @@ class Skybox(
             draw_first,
         )
 
+    @override
     def add_over(self, override: Skybox) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
         self.config = lazy_conf.concat(self.config, override.config)
         self.fog_opts += override.fog_opts.copy()
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens used by this skybox."""
         return self.selitem_data.iter_trans_tokens('skyboxes/' + self.id)

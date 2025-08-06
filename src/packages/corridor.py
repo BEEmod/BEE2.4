@@ -1,6 +1,6 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
-from typing import Final
+from typing import Final, override
 
 from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping
@@ -189,6 +189,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
     global_options: dict[OptionGroup, list[Option]] = attrs.Factory(dict)
 
     @classmethod
+    @override
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
         """Parse from the file."""
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
@@ -280,6 +281,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             global_options=dict(global_options),
         )
 
+    @override
     def add_over(self: CorridorGroup, override: CorridorGroup) -> None:
         """Merge two corridor group definitions."""
         for key, corr_over in override.corridors.items():
@@ -300,6 +302,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             self.global_options[kind] += additional
 
     @classmethod
+    @override
     async def post_parse(cls, ctx: packages.PackErrorInfo) -> None:
         """After items are parsed, convert legacy definitions in the item into these groups."""
         packset = ctx.packset
@@ -441,6 +444,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             )
                         dup_check.add(folded)
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Iterate over translation tokens in the corridor."""
         for (mode, direction, orient), corridors in self.corridors.items():
