@@ -787,7 +787,7 @@ class FizzlerBrush:
             keys=keys,
             local_keys=local_keys,
             outputs=outputs,
-            thickness=conf.float('thickness', 2.0),
+            thickness=max(1/256, conf.float('thickness', 2.0)),
             stretch_center=conf.bool('stretch_center', True),
             side_color=side_color,
             singular=conf.bool('singular'),
