@@ -216,7 +216,6 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')
-    checkmark_file = instanceLocs.resolve_one('<item_indicator_panel_timer>', error=True)
 
     beam_conf = res.find_key('BeamKeys', or_blank=True)
     glow_conf = res.find_key('GlowKeys', or_blank=True)
@@ -309,10 +308,6 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 case never:
                     assert_never(never)
         nodes[name] = Node(node_type, inst, item, pos, orient)
-
-    if not nodes:
-        # None at all.
-        return conditions.RES_EXHAUSTED
 
     # Now find every connected group, recording inputs, outputs and links.
     todo = set(nodes.values())
