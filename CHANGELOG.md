@@ -1,6 +1,6 @@
 # Changelog
 
-# Version (dev)
+# Version 4.46.0
 
 ### Enhancements
 * #573: Show filename in tooltip for custom screenshots.
