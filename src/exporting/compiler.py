@@ -117,10 +117,12 @@ async def terminate_error_server() -> bool:
         try:
             await trio.to_thread.run_sync(send_termination, port, abandon_on_cancel=True)
         except urllib.error.URLError as exc:
-            LOGGER.info("No response from error server, assuming it's dead: {}", exc_info=exc)
+            LOGGER.info("No response from error server, assuming it's dead.")
+            LOGGER.debug("Server response traceback:", exc_info=exc)
             return False
         except http.client.HTTPException as exc:
-            LOGGER.info("Error from server, assuming it's some other process: {}", exc_info=exc)
+            LOGGER.info("Error from server, assuming another app took the stale port.")
+            LOGGER.debug("Server error traceback:", exc_info=exc)
             return False
         else:
             # Wait for the file to be deleted.
