@@ -227,6 +227,7 @@ async def step_copy_mod_music(exp: ExportData) -> None:
         count = 0
         if fsys_tag is not None and exp.game.steamID != utils.STEAM_IDS['APERTURE TAG']:
             for file in fsys_tag.walk_folder():
+                await trio.lowlevel.checkpoint()
                 nursery.start_soon(copy_music, tag_dest, file)
                 count += 1
 

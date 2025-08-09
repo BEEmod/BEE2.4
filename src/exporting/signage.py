@@ -104,6 +104,7 @@ async def step_signage(exp_data: ExportData) -> None:
     errors = []
 
     for tim_id, sign_id in sel_ids:
+        await trio.lowlevel.checkpoint()
         try:
             sign = exp_data.packset.obj_by_id(Signage, sign_id)
         except KeyError:
@@ -142,7 +143,7 @@ async def step_signage(exp_data: ExportData) -> None:
     if errors:
         raise ExceptionGroup('Signage Export', errors)
 
-    fsys = exp_data.game.get_filesystem()
+    fsys = await trio.to_thread.run_sync(exp_data.game.get_filesystem)
 
     async with trio.open_nursery() as nursery:
         ant_icons = {

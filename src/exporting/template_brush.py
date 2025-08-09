@@ -16,6 +16,7 @@ async def step_write_templates(exp_data: ExportData) -> None:
     template_list = root['temp'] = DMXAttr.array('list', DMXValue.ELEMENT)
 
     for temp_id, path in exp_data.packset.templates.items():
+        await trio.lowlevel.checkpoint()
         if utils.not_special_id(path.package):
             pack_path = exp_data.packset.packages[path.package].path
             temp_el = DMXElement(temp_id, 'DMETemplate')
