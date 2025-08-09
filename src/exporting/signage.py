@@ -84,7 +84,7 @@ def load_conn_icon(fsys: FileSystem, shape: str) -> Image.Image | None:
             vtf = VTF.read(f)
             return vtf.get().to_PIL()
     except Exception as exc:
-        exc.add_note(filename)
+        exc.add_note(f'File: {fsys}:{filename}')
         raise
 
 

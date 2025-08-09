@@ -29,7 +29,7 @@ from . import (
     PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel,
     set_fixed_size,
 )
-from .mdown_win import MARKDOWN, RichWindow
+from .mdown_win import RichWindow
 from .wid_transtoken import set_text, set_tooltip, set_win_title
 from .widgets import EnumButton
 

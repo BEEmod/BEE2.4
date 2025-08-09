@@ -482,6 +482,7 @@ class Version:
         """Fetch the variant for this style."""
         return self.styles.get(style.id, self.def_style)
 
+
 # Maps an old item ID to its new one. If key is a PakRef, it applies to all subtypes.
 type Migrations = dict[SubItemRef | PakRef[Item], SubItemRef]
 
@@ -980,7 +981,9 @@ class SubItemRef:
             if subtype < 0:
                 raise ValueError
         except (TypeError, OverflowError, ValueError):
-            raise ValueError(f'Invalid subtype "{raw_sub}" for item "{raw_id}", must be a non-negative integer.')
+            raise ValueError(
+                f'Invalid subtype "{raw_sub}" for item "{raw_id}", must be a non-negative integer.'
+            ) from None
         return cls(item, subtype)
 
     def __str__(self) -> str:

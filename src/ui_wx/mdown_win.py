@@ -77,6 +77,7 @@ class RichWindow(HtmlWindow):
             case wx.html.HTML_URL_PAGE:
                 LOGGER.debug('Opening new page URL {}', url)
                 # Don't allow swapping pages, etc.
+                # TODO: Open links externally?
                 return wx.html.HTML_BLOCK, ''
             case wx.html.HTML_URL_OTHER:
                 LOGGER.debug('Opening "other" URL {}', url)

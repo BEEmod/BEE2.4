@@ -1,7 +1,8 @@
 """Image integrations for WxWidgets."""
 from __future__ import annotations
 
-from typing import Final, override, Callable
+from typing import Final, override
+from collections.abc import Callable
 from weakref import ReferenceType as WeakRef, WeakKeyDictionary
 import secrets
 import os

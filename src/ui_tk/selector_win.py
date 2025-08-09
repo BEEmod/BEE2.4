@@ -494,7 +494,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         return self.display
 
     def _evt_open_context(self, _: object = None) -> None:
-        """Dislay the context window at the text widget."""
+        """Display the context window at the text widget."""
         if not self._readonly and not self._loading and self.display is not None:
             self.context_menu.post(
                 self.display.winfo_rootx(),
