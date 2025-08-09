@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2025-08-02 14:36+1000\n"
+"POT-Creation-Date: 2025-08-10 09:22+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -385,11 +385,9 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"This antline corner has a timer value of \"<var>{value}</var>\", which is"
-" not allowed. Valid values are from <var>&inf;-10</var>. Previously "
-"values looped past this, but these are now reserved for future "
-"functionality. This time would have been equivalent to "
-"\"<var>{corrected}</var>\"."
+"This antline has a timer value of \"<var>{value}</var>\", which is not "
+"allowed. Valid values are from <var>&inf;-10</var> to produce corners, "
+"and <var>11-18</var> for checkmarks."
 msgstr ""
 
 #. This uses HTML syntax.
