@@ -19,13 +19,13 @@ async def step_music_conf(exp_data: ExportData) -> None:
     errors: list[AppError] = []
 
     base_id = selected[MusicChannel.BASE]
-    if base_id == utils.ID_EMPTY:
+    if base_id == utils.ID_NONE:
         base_music = None
     else:
         try:
             base_music = exp_data.packset.obj_by_id(Music, base_id)
         except KeyError:
-            # Ignore the error here, the for loop below will stop exporting.
+            # Ignore the error here, the exception in the for loop below will stop exporting.
             base_music = None
         else:
             vbsp_config += await base_music.config()
