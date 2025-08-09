@@ -76,11 +76,13 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Entity | Non
             instance will be copied over.
     - `move_outputs`: If true, outputs will be moved to this instance.
     - `offset`: The offset (relative to the base) that the instance
-        will be placed. Can be set to `<piston_top>` and
+        will be placed at. Can be set to `<piston_top>` and
         `<piston_bottom>` to offset based on the configuration.
         `<piston_start>` will set it to the starting position, and
         `<piston_end>` will set it to the ending position of the Piston
         Platform's handles.
+    - `offsetSrc`: Can be set to 'overlay' or 'base'. Determines the context in which `offset`
+       is calculated. If 'overlay', the offset uses the orientation modified by `rotation`/`angles`.
     - `rotation`: Rotate the instance by this amount.
     - `angles`: If set, overrides `rotation` and the instance angles entirely.
     - `fixup`/`localfixup`: Keyvalues in this block will be copied to the
@@ -135,7 +137,13 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Entity | Non
         inst.outputs = []
 
     if 'offset' in res:
-        overlay_inst['origin'] = conditions.resolve_offset(inst, res['offset'])
+        match res['offsetSrc', 'base'].casefold():
+            case 'overlay':
+                overlay_inst['origin'] = conditions.resolve_offset(overlay_inst, res['offset'])
+            case 'base':
+                overlay_inst['origin'] = conditions.resolve_offset(inst, res['offset'])
+            case invalid:
+                raise ValueError(f'Invalid offset source: "{invalid}!')
 
     return overlay_inst
 
