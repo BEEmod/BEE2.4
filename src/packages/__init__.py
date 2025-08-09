@@ -790,7 +790,7 @@ class PackagesSet:
     # The templates found in the packages. This maps an ID to the file.
     templates: dict[str, utils.PackagePath] = attrs.field(init=False, factory=dict)
 
-    item_migrations: dict[PakRef[Item] | SubItemRef, SubItemRef] = {}
+    item_migrations: dict[PakRef[Item] | SubItemRef, SubItemRef] = attrs.field(init=False, factory=dict)
 
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
