@@ -145,6 +145,7 @@ class ColorPicker(PlanarTemplateEntity):
     sides: list[str]
     grid_snap: bool  # Snap to grid on non-normal axes
     after: AfterPickMode  # What to do after the color is picked.
+    allow_invert: bool  # Whether invertVar etc apply to it.
     # Instead of just changing the colour, copy the entire face from the
     # tiledef.
     use_pattern: bool
@@ -678,6 +679,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             normal=Matrix.from_angstr(ent['angles']).forward(),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
+            allow_invert=srctools.conv_bool(ent['allow_invert']),
             after=remove_after,
             use_pattern=srctools.conv_bool(ent['use_pattern']),
             force_tex_white=ent['tex_white'],
@@ -1186,6 +1188,8 @@ def retexture_template(
             # Not a tile with color (void, etc). Treat as missing a color.
             picker_results.setdefault(color_picker.name, None)
             continue
+        if color_picker.allow_invert and force_colour is AppliedColour.INVERT:
+            tile_color = ~tile_color
 
         if color_picker.name and picker_results.get(color_picker.name, None) is None:
             picker_results[color_picker.name] = tile_color

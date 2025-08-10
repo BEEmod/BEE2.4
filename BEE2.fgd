@@ -45,6 +45,7 @@
 	
 	use_pattern(boolean): "Use Tile Pattern": 0 : "Force this surface to use the texture of the tile that would be here. " +
 		"Should be used ONLY on brushes pointing straight up, and that are split on the 32x32 lines to replace the normal surface entirely."
+	allow_invert(boolean) : "Allow Inversion" : 0 : "If, set, 'invertVar' will invert the colour this reads."
 
 	tex_white(material) : "White Material" : : "If set, the sides will be switched to this specific material if the surface is WHITE."
 	tex_black(material) : "Black Material" : : "If set, the sides will be switched to this specific material if the surface is BLACK."
