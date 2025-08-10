@@ -1,5 +1,11 @@
 # Changelog
 
+# Version 4.46.1
+* Fix FGD export producing invalid syntax.
+* Fix mandatory items always being unlocked.
+
+------------------------------------------
+
 # Version 4.46.0
 
 ### Enhancements
