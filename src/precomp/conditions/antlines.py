@@ -456,7 +456,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     if glow_conf:
                         state_out.append(Output(
                             'OnTrigger', NAME_SPR(base_name, '*'),
-                            'Color', state.beam_colour,
+                            'Color', state.glow_colour,
                         ))
                 for item in inp_items:
                     relay = item.get_ind_state_relay(state.name)
