@@ -7,7 +7,7 @@ Each item has a description, author, and icon.
 from __future__ import annotations
 from typing import Final, Literal, assert_never
 
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Container, Iterable, Iterator
 from contextlib import aclosing
@@ -31,6 +31,7 @@ from packages import AttrDef as AttrDef, AttrMap, AttrTypes, SelitemData
 from transtoken import TransToken
 import async_util
 import config
+import consts
 import packages
 import utils
 
@@ -79,6 +80,7 @@ TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 TRANS_LOADING = TransToken.ui('Loading...')
+IMG_ZOOM = img.Handle.builtin('BEE2/expand', 16, 16)
 
 
 async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], save_id: str) -> None:
@@ -115,6 +117,7 @@ class Options:
       otherwise they're a string.
     - desc is descriptive text to display on the window, and in the widget
       tooltip.
+    - preview_win, if provided, allows displaying large icons in fullscreen.
     - readonly_desc will be displayed on the widget tooltip when readonly.
     - readonly_override, if set will override the textbox when readonly.
     - modal: If True, the window will block others while open.
@@ -132,12 +135,13 @@ class Options:
     desc: TransToken = TransToken.BLANK
     readonly_desc: TransToken = TransToken.BLANK
     readonly_override: TransToken | None = None
+    preview_win: PreviewWinBase | None = None
     attributes: Iterable[AttrDef] = ()
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
 
 # noinspection PyProtectedMember
-class GroupHeaderBase:
+class GroupHeaderBase(ABC):
     """Base logic for the widget used for group headers."""
     def __init__(self, win: SelectorWinBase) -> None:
         self.parent = win
@@ -174,11 +178,54 @@ class GroupHeaderBase:
         raise NotImplementedError
 
 
-class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
-    """The selection window for skyboxes, music, goo and voice packs.
+class PreviewWinBase[WinT](ABC):
+    """Displays the current item's icon in full resolution."""
+    open_trig: async_util.EdgeTrigger[WinT, bool, img.Handle, TransToken]
+
+    def __init__(self) -> None:
+        self.open_trig = async_util.EdgeTrigger()
+        self.close_evt = trio.Event()
+
+    async def task(self) -> None:
+        """Handle opening and closing the window."""
+        while True:
+            parent, modal, img, name = await self.open_trig.wait()
+            self.close_evt = trio.Event()
+            async with trio_util.move_on_when(self.close_evt.wait):
+                meta = img.metadata()
+                self._ui_open(
+                    meta.width, meta.height, img,
+                    parent, TRANS_PREVIEW_TITLE.format(item=name),
+                    modal,
+                )
+                await trio.sleep_forever()
+            self._ui_close()
+
+    def evt_close(self, _: object = None, /) -> None:
+        """The close button was pressed."""
+        self.close_evt.set()
+
+    @abstractmethod
+    def _ui_open(
+        self,
+        width: int, height: int,
+        image: img.Handle, parent: WinT, title: TransToken, modal: bool,
+    /) -> None:
+        """Open the window with the given size, and display the specified handle."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_close(self) -> None:
+        """Close the window."""
+        raise NotImplementedError
+
+
+class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow, ABC):
+    """The selection window for styles, skyboxes, music and voice packs.
 
     Typevars:
     - ButtonT: Type for the button widget.
+    - WinT: The window class.
     - GroupHeaderT: Subclass for group headers.
 
     Attributes:
@@ -186,6 +233,8 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     - selected: The item currently selected in the window, not the actually chosen one.
     - suggested: The Item which is suggested by the style.
     """
+    win: WinT  # The main window.
+
     # Callback functions used to retrieve the data for the window.
     func_get_attr: GetterFunc[AttrMap]
     func_get_data: GetterFunc[SelitemData]
@@ -239,6 +288,10 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     _item_buttons: list[ButtonT]
     # And a lookup from ID -> button
     _id_to_button: dict[utils.SpecialID, ButtonT]
+    # If set, we are allowed to preview.
+    preview_win: PreviewWinBase[WinT] | None
+    # If set, this icon is large enough to allow preview windows.
+    _preview_icon: tuple[img.Handle, TransToken] | None
 
     # The ID used to persist our window state across sessions.
     save_id: str
@@ -259,16 +312,13 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self._loading = True
         self._visible = False
         self.modal = opt.modal
+        self.preview_win = opt.preview_win
+        self._preview_icon = None
 
-        # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested = []
-        # While the user hovers over the "suggested" button, cycle through random items. But we
-        # want to apply that specific item when clicked. This stores the selected item.
         self._suggested_rollover = None
-        # And this is used to control whether to start/stop hovering.
         self.suggested_rollover_active = trio_util.AsyncBool()
 
-        # Should we have the 'reset to default' button?
         self.has_def = opt.has_def
         self.description = opt.desc
         self.readonly_description = opt.readonly_desc
@@ -292,19 +342,14 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self._item_buttons = []
         self._id_to_button = {}
         self._menu_index = {}
-
-        # A map from folded name -> display name
         self.group_names = {}
         self.group_visible = {}
         self.grouped_items = {}
         self.group_widgets = {}
-        # A list of casefolded group names in the display order.
         self.group_order = []
 
-        # The ID used to persist our window state across sessions.
         self.save_id = opt.save_id.casefold()
         self.store_last_selected = opt.store_last_selected
-        # Indicate that flow_items() should restore state.
         self.first_open = True
 
         # For music items, add a '>' button to play sound samples
@@ -598,14 +643,25 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             async for is_playing in agen:
                 self._ui_props_set_samp_button_icon(BTN_STOP if is_playing else BTN_PLAY)
 
-    def _evt_play_sample(self, event: object = None) -> None:
-        """When the large image is clicked, play sounds if available."""
-        assert self.sampler is not None
-        assert self.func_get_sample is not None
-        if self.sampler.is_playing.value:
-            self.sampler.stop()
+    def _evt_icon_clicked(self, event: object = None) -> None:
+        """Handle the large icon being clicked.
+
+        If a preview image is available, show that, otherwise try samples.
+        """
+        if self.preview_win is not None and self._preview_icon is not None:
+            icon, name = self._preview_icon
+            self.preview_win.open_trig.trigger(self.win, self.modal, icon, name)
         else:
-            self.sampler.play(self.func_get_sample(self._packset, self.selected))
+            self._evt_play_sample()
+
+    def _evt_play_sample(self, event: object = None) -> None:
+        """Play or pause sample music."""
+        if self.sampler is not None:
+            assert self.func_get_sample is not None
+            if self.sampler.is_playing.value:
+                self.sampler.stop()
+            else:
+                self.sampler.play(self.func_get_sample(self._packset, self.selected))
 
     def open_win(self) -> None:
         """Display the window."""
@@ -705,7 +761,30 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
                 n=len(data.auth),
             ))
 
-        self._ui_props_set_icon(data.large_icon)
+        has_sample = False
+        if self.sampler is not None:
+            assert self.func_get_sample is not None
+            is_playing = self.sampler.is_playing.value
+
+            samp_file = self.func_get_sample(self._packset, item_id)
+            if samp_file:
+                self._ui_props_set_samp_button_enabled(True)
+                has_sample = True
+                if is_playing:
+                    # Restart with the current file's sample.
+                    self.sampler.play(samp_file)
+            else:
+                self.sampler.stop()  # Stop any existing sample.
+                self._ui_props_set_samp_button_enabled(False)
+
+        icon_meta = data.large_icon.metadata()
+        icon_w, icon_h = consts.SEL_ICON_SIZE_LRG
+        if self.preview_win is not None and (icon_meta.width > icon_w or icon_meta.height > icon_h):
+            self._preview_icon = data.large_icon.resize(0, 0), data.name
+            self._ui_props_set_icon(data.large_icon, 'zoom')
+        else:
+            self._preview_icon = None
+            self._ui_props_set_icon(data.large_icon, 'sample' if has_sample else None)
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
@@ -732,20 +811,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             self._ui_button_scroll_to(button)
 
         self.selected = item_id
-
-        if self.sampler is not None:
-            assert self.func_get_sample is not None
-            is_playing = self.sampler.is_playing.value
-
-            samp_file = self.func_get_sample(self._packset, item_id)
-            if samp_file:
-                self._ui_props_set_samp_button_enabled(True)
-                if is_playing:
-                    # Restart with the current file's sample.
-                    self.sampler.play(samp_file)
-            else:
-                self.sampler.stop()  # Stop any existing sample.
-                self._ui_props_set_samp_button_enabled(False)
 
         if self.has_def:
             self._ui_enable_reset(self.can_suggest())
@@ -1030,8 +1095,8 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_props_set_icon(self, image: img.Handle, /) -> None:
-        """Set the large icon's image, and whether to show a zoom-in cursor."""
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
+        """Set the large icon's image, and the click mode - zoom, play sample or none."""
         raise NotImplementedError
 
     @abstractmethod

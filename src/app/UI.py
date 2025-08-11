@@ -46,7 +46,10 @@ from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
 from trio_util import AsyncValue
 from ui_tk.item_picker import ItemPicker, ItemsBG
-from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr, Options as SelectorOptions
+from ui_tk.selector_win import (
+    SelectorWin, AttrDef as SelAttr, Options as SelectorOptions,
+    PreviewWin as SelectorPreview,
+)
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG, TkDialogs
@@ -106,7 +109,7 @@ class _WindowsDict(TypedDict):
 windows: _WindowsDict = cast(_WindowsDict, {})
 
 
-async def create_selectors(core_nursery: trio.Nursery) -> None:
+async def create_selectors(core_nursery: trio.Nursery, preview: SelectorPreview) -> None:
     """Create the main selector windows."""
     global skybox_win, voice_win, style_win, elev_win
     await trio.lowlevel.checkpoint()
@@ -122,6 +125,7 @@ async def create_selectors(core_nursery: trio.Nursery) -> None:
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
         ),
+        preview_win=preview,
         default_id=packages.CLEAN_STYLE,
         attributes=[
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
@@ -143,6 +147,7 @@ async def create_selectors(core_nursery: trio.Nursery) -> None:
         ),
         default_id=utils.obj_id('BEE2_GLADOS_CLEAN'),
         func_get_attr=packages.QuotePack.get_selector_attrs,
+        preview_win=preview,
         attributes=[
             SelAttr.list_and('CHAR', TransToken.ui('Characters'), ['??']),
             SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
@@ -164,6 +169,7 @@ async def create_selectors(core_nursery: trio.Nursery) -> None:
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
         ),
         func_get_attr=packages.Style.get_selector_attrs,
+        preview_win=preview,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
         # things are open...
@@ -191,6 +197,7 @@ async def create_selectors(core_nursery: trio.Nursery) -> None:
         readonly_override=TransToken.ui('<Not Present>'),
         has_def=True,
         func_get_attr=packages.Elevator.get_selector_attrs,
+        preview_win=preview,
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
@@ -379,6 +386,7 @@ async def init_option(
     export: Callable[[], object],
     export_ready: trio_util.AsyncValue[bool],
     corridor: TkSelector,
+    preview_win: SelectorPreview,
     task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise the export options pane."""
@@ -401,7 +409,7 @@ async def init_option(
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     await core_nursery.start(
-        music_conf.make_widgets, core_nursery, music_frame, pane,
+        music_conf.make_widgets, core_nursery, music_frame, pane, preview_win,
     )
     suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]
 
@@ -553,8 +561,10 @@ async def init_windows(
 
     """
     global sign_ui, context_win, item_picker
+    selector_preview = SelectorPreview(TK_ROOT)
+    core_nursery.start_soon(selector_preview.task)
 
-    await run_as_task(create_selectors, core_nursery)
+    await run_as_task(create_selectors, core_nursery, selector_preview)
 
     # This is updated at the end.
     cur_style = AsyncValue(PakRef(packages.Style, utils.obj_id(style_win.chosen.value)))
@@ -692,7 +702,12 @@ async def init_windows(
         tool_frame=toolbar_frame,
     )
     corridor = TkSelector(tk_img, cur_style)
-    await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
+    await core_nursery.start(
+        init_option,
+        core_nursery, windows['opt'], tk_img,
+        export, export_trig.ready,
+        corridor, selector_preview,
+    )
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()

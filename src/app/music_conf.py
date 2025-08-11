@@ -13,7 +13,7 @@ from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music, SelitemData, AttrDef
 from transtoken import TransToken
-from ui_tk.selector_win import SelectorWin, Options as SelectorOptions
+from ui_tk.selector_win import SelectorWin, Options as SelectorOptions, PreviewWin
 from ui_tk.wid_transtoken import set_text
 from ui_tk.subpane import SubPane
 from ui_tk import TK_ROOT
@@ -130,6 +130,7 @@ async def filesys_update_task(filesys: FileSystemChain) -> None:
 async def make_widgets(
     core_nursery: trio.Nursery,
     frame: ttk.LabelFrame, pane: SubPane,
+    preview: PreviewWin,
     *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Generate the UI components, and return the base window."""
@@ -148,6 +149,7 @@ async def make_widgets(
         func_get_sample=Music.sample_getter_func(MusicChannel.BASE),
         sound_sys=filesystem,
         func_get_attr=Music.get_base_selector_attrs,
+        preview_win=preview,
         attributes=[
             AttrDef.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
             AttrDef.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
@@ -166,6 +168,7 @@ async def make_widgets(
         func_get_sample=Music.sample_getter_func(MusicChannel.TBEAM),
         sound_sys=filesystem,
         func_get_attr=Music.get_funnel_selector_attrs,
+        preview_win=preview,
         attributes=[
             AttrDef.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
@@ -179,6 +182,7 @@ async def make_widgets(
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
         func_get_sample=Music.sample_getter_func(MusicChannel.BOUNCE),
+        preview_win=preview,
         sound_sys=filesystem,
     ))
     await trio.lowlevel.checkpoint()
@@ -190,6 +194,7 @@ async def make_widgets(
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
         func_get_sample=Music.sample_getter_func(MusicChannel.SPEED),
+        preview_win=preview,
         sound_sys=filesystem,
     ))
     await trio.lowlevel.checkpoint()

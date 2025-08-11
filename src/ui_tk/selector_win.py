@@ -1,5 +1,5 @@
 """Tk-specific implementation of the selector window."""
-from typing import Final, assert_never, override
+from typing import Final, assert_never, override, Literal
 
 from tkinter import font as tk_font, ttk
 import tkinter as tk
@@ -12,8 +12,8 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    LOGGER, TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
-    AttrDef, DispFont, GroupHeaderBase, NavKeys, Options, SelectorWinBase,
+    LOGGER, TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE, IMG_ZOOM,
+    AttrDef, DispFont, GroupHeaderBase, NavKeys, Options, SelectorWinBase, PreviewWinBase,
 )
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
@@ -28,8 +28,7 @@ import utils
 
 __all__ = [
     'AttrDef',  # Re-export
-    'SelectorWin',
-    'Options',
+    'SelectorWin', 'PreviewWin', 'Options',
 ]
 
 # Arrows used to indicate the state of the group. First bool is opened, second is hover.
@@ -113,10 +112,53 @@ class GroupHeader(GroupHeaderBase):
         self.arrow['text'] = GROUP_ARROWS[opened, hover]
 
 
-class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
+class PreviewWin(PreviewWinBase[tk.Toplevel]):
+    """Tk implementation of the selector preview window."""
+    def __init__(self, parent: tk.Tk | tk.Toplevel) -> None:
+        super().__init__()
+
+        self.prev_modal: tk.Toplevel | None = None
+        self.win = tk.Toplevel(parent, name='selector_preview')
+        self.win.withdraw()
+        self.win.resizable(False, False)
+
+        # Don't destroy the window when closed.
+        self.win.protocol("WM_DELETE_WINDOW", self.evt_close)
+        self.win.bind("<Escape>", self.evt_close)
+
+        self.display = ttk.Label(self.win)
+        self.display.grid(row=0, column=1, sticky='nsew')
+
+    def _ui_open(
+        self,
+        width: int, height: int,
+        image: img.Handle, parent: tk.Toplevel, title: TransToken,
+        modal: bool,
+    ) -> None:
+        self.win.transient(parent)
+        set_win_title(self.win, title)
+        TK_IMG.apply(self.display, image)
+
+        self.win.deiconify()
+        self.win.lift()
+        tk_tools.center_win(self.win)
+        if modal:
+            parent.grab_release()
+            self.prev_modal = parent
+            self.win.grab_set()
+        else:
+            self.prev_modal = None
+
+    def _ui_close(self) -> None:
+        if self.prev_modal is not None:
+            self.win.grab_release()
+            self.prev_modal.grab_set()
+        self.win.withdraw()
+
+
+class SelectorWin(SelectorWinBase[ttk.Button, tk.Toplevel, GroupHeader]):
     """Tk implementation of the selector window."""
     parent: tk.Tk | tk.Toplevel
-    win: tk.Toplevel
     pane_win: tk.PanedWindow
     desc_label: ttk.Label
     wid_canvas: tk.Canvas
@@ -241,10 +283,11 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
-        self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
+        self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon', cursor=tk_tools.Cursors.REGULAR)
         self.prop_icon.grid(row=0, column=0)
-        if self.sampler is not None:
-            tk_tools.bind_leftclick(self.prop_icon, self._evt_play_sample)
+        tk_tools.bind_leftclick(self.prop_icon, self._evt_icon_clicked)
+        self.prop_icon_expand = ttk.Label(self.prop_icon, name='prop_icon_expand', anchor='se')
+        TK_IMG.apply(self.prop_icon_expand, IMG_ZOOM)
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -698,11 +741,20 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.prop_desc.set_text(desc)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle) -> None:
-        """Set the large icon's image, and whether to show a zoom-in cursor."""
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
         TK_IMG.apply(self.prop_icon, image)
         # Change aspect ratio to match the large icon.
         self.prop_icon_frm.configure(width=image.width, height=image.height)
+        match mode:
+            case 'zoom':
+                self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
+                self.prop_icon_expand.place(x=image.width, y=image.height, anchor='se')
+            case 'sample':
+                self.prop_icon['cursor'] = tk_tools.Cursors.LINK
+                self.prop_icon_expand.place_forget()
+            case None:
+                self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
+                self.prop_icon_expand.place_forget()
 
     @override
     def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
