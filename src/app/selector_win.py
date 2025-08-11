@@ -650,7 +650,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
         """
         if self.preview_win is not None and self._preview_icon is not None:
             icon, name = self._preview_icon
-            self.preview_win.open_trig.trigger(self.win, self.modal, icon, name)
+            self.preview_win.open_trig.maybe_trigger(self.win, self.modal, icon, name)
         else:
             self._evt_play_sample()
 
@@ -784,7 +784,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
             icon = img.Handle.composite([
                 data.large_icon,
                 IMG_ZOOM.transform(width=data.large_icon.width, height=data.large_icon.height, in_corner=True),
-            ], data.large_icon.width, data.large_icon.height)
+            ], icon_w, icon_h)
             self._ui_props_set_icon(icon, 'zoom')
         else:
             self._preview_icon = None

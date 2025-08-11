@@ -13,7 +13,7 @@ import config
 
 from ui_wx import MAIN_WINDOW
 from ui_wx.img import WX_IMG
-from ui_wx.selector_win import SelectorWin, Options as SelOptions
+from ui_wx.selector_win import SelectorWin, Options as SelOptions, PreviewWin
 
 
 async def test(core_nursery: trio.Nursery) -> None:
@@ -29,6 +29,9 @@ async def test(core_nursery: trio.Nursery) -> None:
     core_nursery.start_soon(sound.sound_task)
     print('Done.')
 
+    preview_win = PreviewWin()
+    core_nursery.start_soon(preview_win.task)
+
     sizer = wx.BoxSizer(wx.VERTICAL)
 
     filesystem = FileSystemChain()
@@ -39,20 +42,21 @@ async def test(core_nursery: trio.Nursery) -> None:
         func_get_ids=packages.Music.music_for_channel(MusicChannel.BASE),
         func_get_data=packages.Music.selector_data_getter(packages.SelitemData.build(
             small_icon=packages.NONE_ICON,
+            # Allow testing the preview window.
+            large_icon=img.Handle.file(utils.PackagePath(utils.obj_id('BEE2_CLEAN_STYLE'), 'prev/clean.png'), 256, 192),
             short_name=TransToken.BLANK,
             long_name=packages.TRANS_NONE_NAME,
-            desc=TransToken.ui(
-                'Add no music to the map at all. Testing Element-specific music may still be added.'
-            ),
+            desc=TransToken.untranslated('None item description'),
         )),
         save_id='music_base',
-        title=TransToken.ui('Select Background Music - Base'),
-        desc=TransToken.ui(
+        title=TransToken.untranslated('Select Background Music - Base'),
+        desc=TransToken.untranslated(
             'This controls the background music used for a map. Expand the dropdown to set tracks '
             'for specific test elements.'
         ),
         default_id=utils.obj_id('VALVE_PETI'),
         func_get_sample=packages.Music.sample_getter_func(MusicChannel.BASE),
+        preview_win=preview_win,
         sound_sys=filesystem,
         func_get_attr=packages.Music.get_base_selector_attrs,
         attributes=[

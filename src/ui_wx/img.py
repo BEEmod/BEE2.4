@@ -87,7 +87,6 @@ class Bundle(wx.BitmapBundleImpl):
                 bitmap.CopyFromBuffer(sized.tobytes(), wx.BitmapBufferFormat_RGB)
             case _:
                 raise ValueError(f'Unknown PIL mode: {sized.mode}!')
-        LOGGER.debug('GetBitmap() {} = {} valid={}', size_tup, bitmap, bitmap.IsOk())
         return bitmap
 
 

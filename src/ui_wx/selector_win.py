@@ -1,6 +1,5 @@
 """Wx-specific implementation of the selector window."""
-from typing import Final, assert_never, override
-
+from typing import Final, assert_never, override, Literal
 
 from contextlib import aclosing
 from collections.abc import Callable, Mapping
@@ -13,21 +12,20 @@ from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
     DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
-    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_WINDOW_TITLE,
+    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_WINDOW_TITLE, PreviewWinBase,
 )
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import CURRENT_LANG, TransToken
-from . import PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, RADIO_MENU_BITMAP, wid_transtoken
+from . import PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, RADIO_MENU_BITMAP, wid_transtoken, MAIN_WINDOW
 from .mdown_win import RichWindow
 from .img import WX_IMG, ImageSlot
 import utils
 
 
 __all__ = [
-    'AttrDef',  # Re-export
-    'SelectorWin',
-    'Options',
+    'AttrDef', 'Options',  # Re-export
+    'SelectorWin', 'PreviewWin',
 ]
 
 # Icon widget sizes.
@@ -220,15 +218,56 @@ class GroupHeader(GroupHeaderBase):
         dc.DrawLine(title_rect.Right + 4, y, arrow_left - 4, y)
 
 
-class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
+class PreviewWin(PreviewWinBase[wx.Frame]):
+    """Wx implementation of the selector preview window."""
+    def __init__(self) -> None:
+        super().__init__()
+        self.win = wx.Frame(
+            MAIN_WINDOW,
+            style=wx.CAPTION | wx.CLIP_CHILDREN | wx.CLOSE_BOX
+            | wx.FRAME_FLOAT_ON_PARENT | wx.SYSTEM_MENU,
+        )
+        self.win.Bind(wx.EVT_CLOSE, self.evt_close)
+        self.win.Bind(wx.EVT_KEY_DOWN, self._evt_key)
+        self.win.Hide()
+
+        self.icon = wx.GenericStaticBitmap(self.win, style=wx.BORDER_RAISED)
+        sizer = wx.BoxSizer()
+        sizer.Add(self.icon, wx.SizerFlags(1).Expand())
+        self.win.SetSizer(sizer)
+
+    def _evt_key(self, event: wx.KeyEvent) -> None:
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.evt_close()
+
+    def _ui_open(
+        self,
+        width: int, height: int,
+        image: img.Handle, parent: wx.Frame,
+        title: TransToken, modal: bool,
+    /) -> None:
+        wid_transtoken.set_win_title(self.win, title)
+        WX_IMG.apply(self.icon, image)
+        size = self.win.FromDIP(wx.Size(width, height))
+        self.win.SetMinClientSize(size)
+        self.win.SetMaxClientSize(size)
+        self.win.Layout()
+        self.win.Fit()
+        self.win.Show()
+        self.win.CentreOnScreen()
+
+    def _ui_close(self) -> None:
+        self.win.Hide()
+
+
+class SelectorWin(SelectorWinBase[ItemSlot, wx.Frame, GroupHeader]):
     """Wx implementation of the selector window."""
     parent: wx.TopLevelWindow
-    win: wx.Frame
     split_win: wx.SplitterWindow
     wid_itemlist: wx.ScrolledWindow
 
     # Border around the selected item icon.
-    wid_props_icon: wx.StaticBitmap
+    wid_props_icon: wx.GenericStaticBitmap
     wid_props_name: wx.StaticText
     wid_props_author: wx.StaticText
     wid_props_desc: RichWindow
@@ -323,7 +362,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.sizer_info = sizer_info = wx.BoxSizer(wx.VERTICAL)
         self.wid_panel_info.SetSizer(sizer_info)
 
-        self.wid_props_icon = wx.StaticBitmap(self.wid_panel_info, style=wx.BORDER_RAISED)
+        self.wid_props_icon = wx.GenericStaticBitmap(self.wid_panel_info, style=wx.BORDER_RAISED)
         sizer_info.Add(self.wid_props_icon, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 3)
 
         self.wid_props_name = wx.StaticText(self.wid_panel_info, wx.ID_ANY, "")
@@ -489,8 +528,8 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             self.wid_itemlist.Refresh()
 
     def evt_click_icon(self, event: wx.MouseEvent) -> None:
-        """Clicking the icon plays the sampler, but we need to allow this to continue."""
-        self._evt_play_sample()
+        """Clicking the icon performs events, but we need to allow this to continue."""
+        self._evt_icon_clicked()
         event.Skip()
 
     def evt_window_resized(self, event: object) -> None:
@@ -648,9 +687,16 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.wid_props_desc.set_markdown(desc)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle, /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
         WX_IMG.apply(self.wid_props_icon, image)
         self.sizer_info.Layout()
+        match mode:
+            case 'zoom':
+                self.wid_props_icon.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
+            case 'sample':
+                self.wid_props_icon.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+            case 'sample':
+                self.wid_props_icon.SetCursor(wx.NullCursor)
 
     @override
     def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:

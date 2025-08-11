@@ -75,16 +75,13 @@ class EdgeTrigger[*Args]:
         self._result = args
         self._lot.unpark()
 
-    def maybe_trigger(self: EdgeTrigger[()]) -> None:
-        """Wake up a task blocked on wait(), but do nothing if not currently blocked.
-
-        This is only available if no arguments are specified, since then all calls are identical.
-        """
+    def maybe_trigger(self, *args: *Args) -> None:
+        """Wake up a task blocked on wait(), but do nothing if not currently blocked."""
         if self.ready.value:
-            self._result = ()
+            self._result = args
             self._lot.unpark()
         else:
-            LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
+            LOGGER.debug('Ignoring EdgeTrigger.maybe_trigger{!r}', args)
 
 
 class HasCurrentValue[T](Protocol):
