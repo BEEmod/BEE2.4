@@ -31,7 +31,7 @@
 @PointClass
 	base(Angles)
 	iconsprite("BEE2/editor/bee2_icon.vmt")
-	studioprop("models/editor/angle_helper.mdl")
+	studioprop("models/BEE2/editor/colour_picker.mdl")
 	sidelist(faces)
 	= bee2_template_colorpicker:
 	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
