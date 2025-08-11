@@ -16,7 +16,7 @@ cursors = [
     "sb_up_arrow", "sb_v_double_arrow", "shuttle", "sizing", "spider",
     "spraycan", "star", "target", "tcross", "top_left_arrow",
     "top_left_corner", "top_right_corner", "top_side", "top_tee", "trek",
-    "ul_angle", "umbrella", "ur_angle", "watch", "xterm",
+    "ul_angle", "umbrella", "ur_angle", "watch", "xterm", "size_nw_se", "size_sw_ne", "size_ne_sw",
 
     "copyarrow", "aliasarrow", "contextualmenuarrow", "text", "cross-hair",
     "closedhand", "openhand", "pointinghand", "resizeleft", "resizeright",
