@@ -781,7 +781,11 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
         icon_w, icon_h = consts.SEL_ICON_SIZE_LRG
         if self.preview_win is not None and (icon_meta.width > icon_w or icon_meta.height > icon_h):
             self._preview_icon = data.large_icon.resize(0, 0), data.name
-            self._ui_props_set_icon(data.large_icon, 'zoom')
+            icon = img.Handle.composite([
+                data.large_icon,
+                IMG_ZOOM.transform(width=data.large_icon.width, height=data.large_icon.height, in_corner=True),
+            ], data.large_icon.width, data.large_icon.height)
+            self._ui_props_set_icon(icon, 'zoom')
         else:
             self._preview_icon = None
             self._ui_props_set_icon(data.large_icon, 'sample' if has_sample else None)

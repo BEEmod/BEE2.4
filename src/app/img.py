@@ -568,10 +568,11 @@ class Handle(User):
         self,
         ratio: tuple[int, int] | None = None,
         transpose: Image.Transpose | None = None,
+        in_corner: bool = False,
         width: int = 0, height: int = 0,
     ) -> ImgTransform:
         """Wrap a handle to change the ratio, or do flips."""
-        return ImgTransform._deduplicate(width, height, self, ratio, transpose)
+        return ImgTransform._deduplicate(width, height, self, ratio, transpose, in_corner)
 
     def with_alpha_stripped(self) -> ImgStripAlpha:
         """Wrap a handle to strip alpha."""
@@ -1096,6 +1097,8 @@ class ImgTransform(Handle):
     # The target aspect ratio to produce
     ratio: tuple[int, int] | None
     transpose: Image.Transpose | None
+    # If set, put the (small) image in the lower-right corner instead.
+    in_corner: bool
 
     @override
     def _children(self) -> Iterator[Handle]:
@@ -1105,12 +1108,12 @@ class ImgTransform(Handle):
     @override
     def _to_key(
         cls,
-        args: tuple[Handle, tuple[int, int] | None, Image.Transpose | None],
+        args: tuple[Handle, tuple[int, int] | None, Image.Transpose | None, bool],
         /,
-    ) -> tuple[int, tuple[int, int] | None, Image.Transpose | None]:
+    ) -> tuple[int, tuple[int, int] | None, Image.Transpose | None, bool]:
         """Handles aren't hashable, so we need to use identity."""
-        [child, bounds, transpose] = args
-        return (id(child), bounds, transpose)
+        [child, bounds, transpose, in_corner] = args
+        return (id(child), bounds, transpose, in_corner)
 
     @override
     def _get_metadata(self) -> Metadata:
@@ -1162,6 +1165,11 @@ class ImgTransform(Handle):
         image = self.source._load_pil()
         if self.ratio is not None:
             image = self._crop(Fraction(*self.ratio), image)
+
+        if self.in_corner:
+            icon = image
+            image = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+            image.alpha_composite(icon, (self.width - icon.width, self.height - icon.height))
 
         if self.transpose is not None:
             image = image.transpose(self.transpose)

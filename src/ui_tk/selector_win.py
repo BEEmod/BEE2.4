@@ -12,7 +12,7 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    LOGGER, TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE, IMG_ZOOM,
+    LOGGER, TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
     AttrDef, DispFont, GroupHeaderBase, NavKeys, Options, SelectorWinBase, PreviewWinBase,
 )
 from consts import SEL_ICON_SIZE
@@ -286,8 +286,6 @@ class SelectorWin(SelectorWinBase[ttk.Button, tk.Toplevel, GroupHeader]):
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon', cursor=tk_tools.Cursors.REGULAR)
         self.prop_icon.grid(row=0, column=0)
         tk_tools.bind_leftclick(self.prop_icon, self._evt_icon_clicked)
-        self.prop_icon_expand = ttk.Label(self.prop_icon, name='prop_icon_expand', anchor='se')
-        TK_IMG.apply(self.prop_icon_expand, IMG_ZOOM)
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -748,13 +746,10 @@ class SelectorWin(SelectorWinBase[ttk.Button, tk.Toplevel, GroupHeader]):
         match mode:
             case 'zoom':
                 self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
-                self.prop_icon_expand.place(x=image.width, y=image.height, anchor='se')
             case 'sample':
                 self.prop_icon['cursor'] = tk_tools.Cursors.LINK
-                self.prop_icon_expand.place_forget()
             case None:
                 self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
-                self.prop_icon_expand.place_forget()
 
     @override
     def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
