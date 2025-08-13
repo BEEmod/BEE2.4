@@ -1008,7 +1008,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
     )
 
     if item.config.timer_sound_pos:
-        relay_loc = item.config.timer_sound_pos.copy()
+        relay_loc = Vec(item.config.timer_sound_pos)
         relay_loc.localise(
             Vec.from_str(item.inst['origin']),
             Angle.from_str(item.inst['angles']),
@@ -1016,6 +1016,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         relay['origin'] = relay_loc
     else:
         relay['origin'] = item.inst['origin']
+    LOGGER.debug('Placing timer relay "{}" @ {}, pos={!r}, inst={}', rl_name, relay['origin'], item.config.timer_sound_pos, item.inst)
 
     for cmd in item.config.timer_done_cmd:
         relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))

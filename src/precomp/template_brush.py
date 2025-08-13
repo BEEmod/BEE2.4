@@ -1085,6 +1085,7 @@ def retexture_template(
     - If sense_offset is set, color pickers and tilesetters will be treated
       as if they were locally offset this far in the template.
     """
+    debug_ent: Entity | None
 
     template = template_data.template
 
@@ -1157,7 +1158,7 @@ def retexture_template(
                     picker_pos[axis] = picker_pos[axis] // 128 * 128 + 64
 
         if template_data.debug_marker is not None:
-            template_data.debug_marker(
+            debug_ent = template_data.debug_marker(
                 'bee2_template_colorpicker',
                 targetname=color_picker.name,
                 origin=picker_pos,
@@ -1168,6 +1169,8 @@ def retexture_template(
                     if (side := picker_patterned[old_id]) is not None
                 ]),
             )
+        else:
+            debug_ent = None
 
         try:
             tiledef, u, v = tiling.find_tile(picker_pos, picker_norm)
@@ -1176,9 +1179,13 @@ def retexture_template(
             if color_picker.name:
                 picker_results.setdefault(color_picker.name, None)
                 picker_type_results.setdefault(color_picker.name, None)
+            if debug_ent is not None:
+                debug_ent.comments = 'Missing!'
             continue
 
         tile_type = tiledef[u, v]
+        if debug_ent is not None:
+            debug_ent.comments = str(tile_type)
 
         picker_type_results[color_picker.name] = tile_type
 

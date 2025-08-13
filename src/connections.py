@@ -9,7 +9,7 @@ from collections.abc import Collection, Iterable
 from enum import Enum
 import sys
 
-from srctools import Keyvalues, Output, Vec, conv_bool
+from srctools import Keyvalues, Output, Vec, conv_bool, FrozenVec
 import attrs
 
 import utils
@@ -272,7 +272,7 @@ class Config:
         output_unlock: tuple[str | None, str] | None = None,
         inf_lock_only: bool = False,
 
-        timer_sound_pos: Vec | None = None,
+        timer_sound_pos: FrozenVec | None = None,
         timer_done_cmd: Iterable[Output] = (),
         force_timer_sound: bool = False,
         timer_outputs: Iterable[TimerCommand] = (),
@@ -367,7 +367,7 @@ class Config:
 
         timer_done_cmd = get_outputs(conf, desc, 'timer_done_cmd')
         if 'timer_sound_pos' in conf:
-            timer_sound_pos = conf.vec('timer_sound_pos')
+            timer_sound_pos = conf.vec('timer_sound_pos').freeze()
             force_timer_sound = conf.bool('force_timer_sound')
         else:
             timer_sound_pos = None
