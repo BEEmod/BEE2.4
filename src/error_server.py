@@ -152,7 +152,10 @@ async def route_open_archive() -> quart.ResponseReturnValue:
 
 
 async def generate_archive() -> None:
-    """Generate a zip containing data useful for solving a compile error."""
+    """Generate a zip containing data useful for solving a compile error.
+
+    Since this is an error state, skip any files that fail.
+    """
     with ZipFile(ARCHIVE_LOC, 'w', compression=ZIP_DEFLATED) as archive:
         vmf_name: trio.Path | None = None
         styled_name: trio.Path | None = None
@@ -178,10 +181,18 @@ async def generate_archive() -> None:
             except FileNotFoundError:
                 LOGGER.debug('Missing file: {}', file)
             else:
-                await trio.to_thread.run_sync(archive.writestr, dest, data)
+                await trio.to_thread.run_sync(archive.writestr, dest, data, ZIP_DEFLATED, None)
+        # Pickling is annoying to load, so also dump as the repr.
+        try:
+            cur_error_repr = repr(current_error)
+        except Exception as exc:
+            LOGGER.exception('No repr for error:', exc_info=exc)
+        else:
+            await trio.to_thread.run_sync(archive.writestr,'user_error.txt', cur_error_repr, ZIP_DEFLATED, None)
+
         for log_key, log_data in LOGS.items():
             if data:
-                await trio.to_thread.run_sync(archive.writestr, log_key + '.log', log_data)
+                await trio.to_thread.run_sync(archive.writestr, log_key + '.log', log_data, ZIP_DEFLATED, None)
         LOGGER.info(
             'Generated dump with files:\n{}',
             '\n'.join(f'- {info.filename}' for info in archive.filelist),
