@@ -62,6 +62,8 @@ palettes/*.bee2_palette
 
 # The config files automatically regenerate with the defaults.
 /config/
+package_sync_mutex
+package_sync_server.json
 
 # Reports and logs we produce:
 logs/

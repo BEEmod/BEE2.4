@@ -82,7 +82,6 @@ if __name__ == '__main__':
     app.DEV_MODE.value = conf.dev_mode
 
     localisation.setup(conf.language)
-    from app import backup, CompilerPane
 
     if utils.USE_WX:
         from ui_wx.core import start_main
@@ -93,9 +92,14 @@ if __name__ == '__main__':
 
     if app_name == 'bee2':
         start_main()
+    elif app_name == 'packages_sync':
+        from app import packages_sync
+        packages_sync.main(sys.argv[2:])
     elif app_name == 'backup':
+        from app import backup
         start_main(backup.init_application)
     elif app_name == 'compiler_settings':
+        from app import CompilerPane
         start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
         import importlib

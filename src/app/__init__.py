@@ -24,8 +24,8 @@ LOGGER = get_logger(__name__)
 # The nursery where UI tasks etc are run in.
 _APP_NURSERY: trio.Nursery | None = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.
-# Should be entered by ui_XX.core.
-_APP_QUIT_SCOPE = trio.CancelScope()
+# Should only be used by the toplevel code in each app.
+QUIT_SCOPE = trio.CancelScope()
 # If we want to restart the app, not quit.
 _WANTS_RESTART = False
 
@@ -51,7 +51,7 @@ if utils.WIN:
 
 def quit_app() -> None:
     """Quit the application."""
-    _APP_QUIT_SCOPE.cancel()
+    QUIT_SCOPE.cancel()
 
 
 def restart() -> None:
@@ -61,7 +61,7 @@ def restart() -> None:
     """
     global _WANTS_RESTART
     _WANTS_RESTART = True
-    _APP_QUIT_SCOPE.cancel()
+    QUIT_SCOPE.cancel()
 
 
 # noinspection PyBroadException

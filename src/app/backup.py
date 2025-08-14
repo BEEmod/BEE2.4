@@ -842,7 +842,7 @@ async def init(
 async def init_application(nursery: trio.Nursery) -> None:
     """Initialise the standalone application."""
     from ui_tk.img import TK_IMG
-    from app import gameMan, _APP_QUIT_SCOPE
+    from app import gameMan, QUIT_SCOPE
     global window
     window = cast(tk.Toplevel, TK_ROOT)
     set_win_title(TK_ROOT, TransToken.ui(

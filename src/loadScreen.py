@@ -164,7 +164,7 @@ class LoadScreen:
         self.id = ipc_types.ScreenID(id(self))
         self.stages: list[ScreenStage] = list(stages)
         self.title = title_text
-        # For the main load screen, this is app._APP_QUIT_SCOPE!
+        # For the main load screen, this is app.QUIT_SCOPE!
         self._scope: trio.CancelScope | None = None
         self.cancelled = False
 

@@ -46,7 +46,7 @@ __all__ = [
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'MANDATORY_PACKAGES', 'CLEAN_STYLE',
     'PakObject', 'SelPakObject', 'PackagesSet', 'LOADED', 'get_loaded_packages', 'PakRef',
-    'find_packages',
+    'find_packages', 'Package',
     # For use by lifecycle only.
     '_load_packages', '_load_objects', '_load_templates',
 

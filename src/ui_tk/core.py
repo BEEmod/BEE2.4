@@ -39,13 +39,13 @@ async def init_app(core_nursery: trio.Nursery) -> None:
     """Initialise the application."""
     # This is cancelled when the quit button is pressed.
     # noinspection PyProtectedMember
-    with app._APP_QUIT_SCOPE:
+    with app.QUIT_SCOPE:
         conf = config.APP.get_cur_conf(GenOptions)
 
         LOGGER.debug('Starting loading screen...')
         await loadScreen.MAIN_UI.set_length(13)
         loadScreen.set_force_ontop(conf.force_load_ontop)
-        loadScreen.show_main_loader(conf.compact_splash, app._APP_QUIT_SCOPE)
+        loadScreen.show_main_loader(conf.compact_splash, app.QUIT_SCOPE)
 
         # OS X starts behind other windows, fix that.
         if utils.MAC:
