@@ -24,6 +24,7 @@ TOK_SENDTOR_BAD_OUTPUT = TransToken.parse(utils.obj_id('HMW_SENDIFICATOR'), 'BAD
 # Indicator relay name which triggers the fail FX.
 FAIL_IND_RL = 'set_indicator_fail_rl'
 
+
 # Doesn't actually require connections, but it needs to be before Sendificator.
 @conditions.make_result('SendificatorLaser', valid_before=conditions.MetaCond.Connections)
 def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:

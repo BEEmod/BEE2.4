@@ -14,17 +14,11 @@ from . import MAIN_WINDOW
 from .core import start_main
 
 
-def quit(evt: wx.Event):
-    app.quit_app()
-
-
 class WxUI(SyncUIBase):
     """Wx implementation of the packages-sync UI."""
     # This is a dev tool, we don't need to translate.
     def __init__(self) -> None:
         super().__init__()
-        self_ref = self
-
         self.frm_pack = wx.Frame(
             MAIN_WINDOW,
             title="Select Package",
@@ -139,7 +133,7 @@ class WxUI(SyncUIBase):
             async for self.button_ok.Enabled in agen:
                 pass
 
-    def ui_set_ask_pack(self, src: Path, dest: PurePath, /) -> None:
+    def ui_set_ask_pack(self, src: trio.Path, dest: PurePath, /) -> None:
         self.lbl_file_src.LabelText = str(src)
         self.lbl_file_dest.LabelText = str(dest)
         self.frm_pack.Show()

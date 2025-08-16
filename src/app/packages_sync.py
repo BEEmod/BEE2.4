@@ -69,7 +69,7 @@ class SyncUIBase(ReflowWindow, abc.ABC):
                     self.packages.sort(key=lambda pack: str(pack.disp_name))
                 self.item_pos_dirty.set()
 
-    async def ask_package(self, src: Path, dest: PurePath, /) -> Package | None:
+    async def ask_package(self, src: trio.Path, dest: PurePath, /) -> Package | None:
         """Ask for the package this file should use."""
         self.ui_set_ask_pack(src, dest)
         return await self.selected_pack.wait()
@@ -195,13 +195,13 @@ async def transfer_game2pack(
             continue
         if str(rel_loc) in package.fsys:
             ask_user = False
-            await transfers.send((file, Path(package.fsys.path, rel_loc)))
+            await transfers.send((file, trio.Path(package.fsys.path, rel_loc)))
 
     if ask_user:
         # This file is totally new, need to ask the user.
         found = await ui.ask_package(file, rel_loc)
         if found is not None:
-            await transfers.send((file, Path(found.fsys.path, rel_loc)))
+            await transfers.send((file, trio.Path(found.fsys.path, rel_loc)))
 
 
 def filter_filename(file_path: trio.Path) -> trio.Path | None:
@@ -221,10 +221,12 @@ async def expand_file_task(
     exp_send: trio.MemorySendChannel[trio.Path],
 ) -> None:
     """Expand folders into files, normalise model extensions."""
+    file_path: trio.Path | None
+    sub_file: trio.Path | None
     async with file_rec, exp_send:
         file: Path
         async for file in file_rec:
-            file_path: trio.Path = trio.Path(file)
+            file_path = trio.Path(file)
             if await file_path.is_dir():
                 for sub_file in await file_path.glob('**/*'):
                     if await sub_file.is_file() and (sub_file := filter_filename(sub_file)) is not None:
@@ -300,7 +302,7 @@ async def main_gui(
                 # Not triggered, re-enable.
                 ui.can_confirm.value = True
 
-    def demo_copy(src, dest):
+    def demo_copy(src: object, dest: object) -> None:
         print(f'Copy {src} -> {dest}')
 
     core_nursery.start_soon(delay_enable)
@@ -392,10 +394,11 @@ def main(args: list[str]) -> int:
         print('Starting server!')
         stack.callback(cleanup)
         if utils.USE_WX or True:
-            from ui_wx.packages_sync import WxUI as InterfaceImpl
+            from ui_wx.packages_sync import WxUI
+            WxUI.run_loop(start_server, args)
         else:
-            from ui_tk.packages_sync import TkUI as InterfaceImpl
-        InterfaceImpl.run_loop(start_server, args)
+            from ui_tk.packages_sync import TkUI  # type: ignore
+            TkUI.run_loop(start_server, args)
     return 0
 
 

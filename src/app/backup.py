@@ -900,7 +900,7 @@ async def init_application(nursery: trio.Nursery) -> None:
 
     window['menu'] = bar
 
-    with _APP_QUIT_SCOPE:
+    with QUIT_SCOPE:
         WINDOW_OPEN.value = True
         window.deiconify()
         window.update()
