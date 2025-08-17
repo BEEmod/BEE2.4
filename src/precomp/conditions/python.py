@@ -106,7 +106,24 @@ class Checker(ast.NodeVisitor):
 
 @conditions.make_result('Python', 'Operation')
 def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
-    """Apply a function to a fixup."""
+    """Apply a function to a fixup.
+    * `ResultVar` the fixup to write the result to
+    * `op` the operation to run
+
+    Fixups can be passed by specifying them as keyvalues with the type as the parameter
+
+    For example:
+    ```keyvalues
+    // Script command which shuts off the portals of a colour when picked up
+    "Operation"
+        {
+        "ResultVar"    "$pickup_func"
+        "$fire_blue"   "str"
+        "$fire_orange" "str"
+        "op"           "'upgrade(' + fire_blue + ', ' + fire_orange + ')'"
+        }
+    ```
+    """
     variables: dict[str, Callable[[str], object]] = {}
     variable_order = []
     code = None

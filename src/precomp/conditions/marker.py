@@ -32,7 +32,7 @@ def res_set_marker(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     Parameters:
     * `global`: If true, the position is an absolute position, ignoring this instance.
     * `name`: A name to store to identify this marker/item.
-    * `pos`: The position or offset to use for the marker.
+    * `pos`: The absolute position or local offset from the instance to use for the marker.
     """
     is_global = LazyValue.parse(res['global', '0']).as_bool(False)
     conf_name = LazyValue.parse(res['name']).casefold()

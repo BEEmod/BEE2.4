@@ -19,14 +19,14 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
     This can be used when an item is configured in an incorrect manner.
 
     Parameters:
-        * `ID`: A `package:id` pair specifying a `TransToken` in `info.txt`, containing the actual
-          base message to display. HTML can be used to mark up things like specific keywords or fixups.
-        * `Marker`: Each of these blocks adds a highlight for a specific location in the map.
-            * `Type`: Either `voxel` (to label the whole voxel), or `point` (for a smaller location).
-            * `Offset`: Specifies the position, relative to this instance.
-        * `Parameters`: This allows substituting fixup values into the message. In this block, each
-          key is a name which should match a `{field}` in the original message. The value is then
-          substituted for that field, if present. These values will always be HTML-escaped.
+    * `ID`: A `package:id` pair specifying a `TransToken` in `info.txt`, containing the actual
+      base message to display. HTML can be used to mark up things like specific keywords or fixups.
+    * `Marker`: Each of these blocks adds a highlight for a specific location in the map.
+        * `Type`: Either `voxel` (to label the whole voxel), or `point` (for a smaller location).
+        * `Offset`: Specifies the position, relative to this instance.
+    * `Parameters`: This allows substituting fixup values into the message. In this block, each
+      key is a name which should match a `{field}` in the original message. The value is then
+      substituted for that field, if present. These values will always be HTML-escaped.
     """
     token_id = res['ID']
     try:
