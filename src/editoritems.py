@@ -1102,7 +1102,7 @@ class Item:
     # Boolean option in editor -> Item attribute.
     _BOOL_ATTRS: ClassVar[Mapping[str, str]] = {
         'cananchoronbarriers': 'anchor_barriers',
-        'cananchorongoo': 'anchor_barriers',
+        'cananchorongoo': 'anchor_goo',
         'occupiesvoxel': 'occupies_voxel',
         'copyable': 'copiable',
         'deletable': 'deletable',
