@@ -1,5 +1,8 @@
 # Changelog
 
+# Version (dev)
+* Sendificator antlines will trigger fail FX if all lasers are disabled.
+
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
 * Fix mandatory items always being unlocked.

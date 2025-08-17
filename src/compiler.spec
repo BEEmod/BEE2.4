@@ -37,8 +37,11 @@ EXCLUDES = [
 
     # These aren't ever used in the compiler.
     'tkinter',
+    'wx',
+    'pyglet',
     'numpy',
     'babel',
+    'PIL',
 
     'win32api',
     'win32com',
@@ -55,6 +58,9 @@ EXCLUDES = [
     'versioningit',
     # Pulls in all of pytest etc, not required.
     'trio.testing',
+    # Scripts not code.
+    'hammeraddons.gen_choreo',
+    'hammeraddons.unify_fgd',
     # Trio -> CFFI -> uses setuptools for C compiler in some modes, but
     # trio doesn't use those.
     'setuptools',

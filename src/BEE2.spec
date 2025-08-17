@@ -198,6 +198,8 @@ EXCLUDES = [
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
+    'wx',  # TODO
+
     # Imported by logging handlers which we don't use...
     'win32evtlog',
     'win32evtlogutil',
@@ -208,6 +210,11 @@ EXCLUDES = [
     # Trio -> CFFI -> uses setuptools for C compiler in some modes, but
     # trio doesn't use those. PyInstaller ends up pulling in pkg_resources though.
     # 'setuptools',
+
+    # Scripts not code.
+    'hammeraddons.gen_choreo',
+    'hammeraddons.unify_fgd',
+    'hammeraddons.compare_datadesc',
 
     'markupsafe',  # Used by TransToken.translate_html(), only relevant for Jinja.
 
