@@ -14,16 +14,17 @@ COND_MOD_NAME = 'Custom Items'
 def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     """Customise the output antlines.
 
-    Options:
+    The contents of the result block can be anything in the global
+    [`Antlines` texturing](vbsp_config-texturing#Antlines) block. See those docs for details.
+    If a section is not defined, the existing style definition is inherited.
 
-    * `wall`: The configuration for antlines on walls. Same as global
-        style options.
-    * `floor`: The configuration for floor/ceiling antlines. If not provided,
-        this is assumed to be the same as `wall`.
-    * `remove_signs`: If true, remove the indicator signs.
-    * `toggle_var`: If set, this item controls the toggle state fully of its
-        antlines. This is a fixup var which will be set to the name of the
-        overlays, for user control.
+    Additional options:
+
+    * `toggle_var`: Deprecated. If set, the specified fixup name is set to the name of the antlines,
+       and no outputs are defined. The instance can place its own texturetoggle and have full control
+       over antlines. This is incompatible with antlasers, and doesn't allow for anything special
+       with checkmarks/timers.
+    * `remove_signs`: If true, delete all indicator signs (checkmarks or timers).
     """
     make_style = antlines.IndicatorStyle.parser(res, 'custAntline block')
 

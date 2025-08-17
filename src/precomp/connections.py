@@ -305,13 +305,17 @@ class Item:
 
     def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
+        self.antlines.clear()
+        self.delete_antline_signs()
+
+    def delete_antline_signs(self) -> None:
+        """Delete the antline checkmarks outputting from this item."""
         for ent in self.ind_panels:
             ent.remove()
         for sign in self.shape_signs:
             for ent in sign.overlays:
                 ent.remove()
 
-        self.antlines.clear()
         self.ind_panels.clear()
         self.shape_signs.clear()
 
