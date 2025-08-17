@@ -943,6 +943,7 @@ operations.
 
 '''
 
+SPECIAL_GROUP = '00special'
 DOC_SPECIAL_GROUP = '''\
 ### Specialized Conditions
 
@@ -995,7 +996,7 @@ async def dump_conditions(filename: trio.Path) -> None:
             for test_key, aliases, func in lookup:
                 group = getattr(func, 'group', 'ERROR')
                 if group is None:
-                    group = '00special'
+                    group = SPECIAL_GROUP
                 lookup_grouped[group].append((test_key, aliases, func))
 
             # Collapse 1-large groups into Ungrouped.
@@ -1011,6 +1012,8 @@ async def dump_conditions(filename: trio.Path) -> None:
             for (group, funcs) in sorted(lookup_grouped.items()):
                 if group == '':
                     await file.write('* Ungrouped Conditions\n')
+                elif group == SPECIAL_GROUP:
+                    await file.write('* Special Conditions\n')
                 else:
                     await file.write(f'* {group}\n')
                 for test_key, aliases, func in funcs:
@@ -1028,7 +1031,7 @@ async def dump_conditions(filename: trio.Path) -> None:
                     # Not before the first one...
                     await file.write('---------\n\n')
 
-                if group == '00special':
+                if group == SPECIAL_GROUP:
                     await file.write(DOC_SPECIAL_GROUP)
                 else:
                     await file.write(f'### {group}\n\n')
