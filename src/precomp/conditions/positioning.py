@@ -102,13 +102,6 @@ def brush_at_loc(
 
     norm: Vec = round(kv.vec('dir', 0, 0, 1) @ orient, 6)
 
-    if kv.bool('gridpos') and norm is not None:
-        for axis in 'xyz':
-            # Don't realign things in the normal's axis -
-            # those are already fine.
-            if norm[axis] == 0:
-                pos[axis] = pos[axis] // 128 * 128 + 64
-
     result_var = kv['setVar', '']
     # RemoveBrush is the pre-tiling name.
     should_remove = kv.bool('RemoveTile', kv.bool('RemoveBrush', False))
@@ -136,7 +129,7 @@ def brush_at_loc(
         pos2.localise(origin, orient)
 
         # Place a second for the bounding box, grouped with the first.
-        debug_adder(
+        second_trace = debug_adder(
             'info_target',
             origin=pos2,
             targetname=inst['targetname'],
@@ -144,6 +137,15 @@ def brush_at_loc(
         )
 
         bbox_min, bbox_max = Vec.bbox(round(pos, 6), round(pos2, 6))
+
+        if kv.bool('gridpos'):
+            # For bboxes, expand to fit the grid.
+            for axis in 'xyz':
+                if abs(norm[axis]) < 1e-6:
+                    bbox_min[axis] = math.floor((bbox_min[axis] - 0.125) / 32) * 32 + 16
+                    bbox_max[axis] = math.ceil((bbox_max[axis] + 0.125) / 32) * 32 - 16
+            first_trace['origin'] = bbox_min
+            second_trace['origin'] = bbox_max
 
         white_count = black_count = 0
 
@@ -174,6 +176,13 @@ def brush_at_loc(
             tile_type = tiling.TileType.BLACK
     else:
         # Single tile.
+        if kv.bool('gridpos'):
+            for axis in 'xyz':
+                # Don't realign things in the normal's axis -
+                # those are already fine.
+                if abs(norm[axis]) < 1e-6:
+                    pos[axis] = pos[axis] // 32 * 32 + 16
+
         pos2 = pos
         try:
             tiledef, u, v = tiling.find_tile(pos, norm)
@@ -204,7 +213,7 @@ def brush_at_loc(
 def check_brush_at_loc(inst: Entity, kv: Keyvalues) -> bool:
     """Checks to see if a tile is present at the given location.
 
-    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
+    - `Pos` or `pos1` is the position of the tile, where `0 0 0` is the floor-position
        of the brush.
     - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
     - `Pos2`: If set, checks all the tiles in a bounding box.
@@ -227,7 +236,8 @@ def check_brush_at_loc(inst: Entity, kv: Keyvalues) -> bool:
     - `SetVar` defines an instvar which will be given a value of `black`,
       `white` or `none` depending on the average colour of tiles.
     - If `gridPos` is true, the position will be snapped, so it aligns with
-      the 128 grid (Useful with fizzler/light strip items).
+      the 32 grid (Useful with fizzler/light strip items).
+      If `pos2` is set, the bounding box is expanded to the next grid size.
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
     - `Debug`: If "Developer Mode" is enabled in BEE options, the location sampled will be marked
       in the VMF. This key will be written into the comment field to assist with identifying the
@@ -333,7 +343,7 @@ del _fill_predicates
 def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     """Read the type of surface at a particular location.
 
-    - `Pos` is the position of the tile, where `0 0 0` is the floor-position
+    - `Pos` or `pos1` is the position of the tile, where `0 0 0` is the floor-position
        of the brush.
     - `Dir` is the normal the face is pointing. `(0 0 1)` is up.
     - `Pos2`: If set, causes the check to average the tiles in a bounding box.
@@ -342,7 +352,8 @@ def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     - `ResultVar` is the variable which is set. This will be set to
       `black`, `white` or `none` depending on the average colour of tiles.
     - If `gridPos` is true, the position will be snapped so it aligns with
-      the 128 grid (Useful with fizzler/light strip items).
+      the 32 grid (Useful with fizzler/light strip items).
+      If pos2 is set, the bounding box is expanded to the next grid size.
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
     - `Debug`: If "Developer Mode" is enabled in BEE options, the location sampled will be marked
       in the VMF. This key will be written into the comment field to assist with identifying the

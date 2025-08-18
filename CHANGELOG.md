@@ -2,6 +2,8 @@
 
 # Version (dev)
 * Sendificator antlines will trigger fail FX if all lasers are disabled.
+* In `ReadSurfType` and `PosIsSolid`, redesigned the behaviour of the
+  `gridPos` option combined with two positions.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
