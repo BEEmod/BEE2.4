@@ -321,10 +321,12 @@ class MaterialConf:
     tile_size: TileSize = attrs.field(kw_only=True, default=TileSize.TILE_4x4)
 
     @classmethod
-    def parse(cls, kv: Keyvalues, tile_size: TileSize = TileSize.TILE_4x4) -> MaterialConf:
-        """Parse a property block."""
+    def parse(
+        cls, kv: Keyvalues, tile_size: TileSize = TileSize.TILE_4x4,
+    ) -> list[MaterialConf]:
+        """Parse a keyvalue, return the config, repeated depending on its weight."""
         if not kv.has_children():
-            return cls(kv.value,  tile_size=tile_size)
+            return [cls(kv.value,  tile_size=tile_size)]
         try:
             material = kv['material']
         except LookupError:
@@ -350,11 +352,15 @@ class MaterialConf:
         if repeat_limit <= 0:
             LOGGER.warning('Material repeat limit should be positive, not {}!', repeat_limit)
             repeat_limit = 1
+        weight = kv.int('weight', 1)
+        if weight < 1:
+            LOGGER.warning('Material weight should be positive, not {}', weight)
+            weight = 1
         try:
             rotation = QuarterRot.parse(kv['rotation'])
         except LookupError:
             rotation = QuarterRot.NONE
-        return cls(
+        return [cls(
             material,
             scale=scale,
             off_x=off_x,
@@ -362,7 +368,7 @@ class MaterialConf:
             rotation=rotation,
             repeat_limit=repeat_limit,
             tile_size=tile_size,
-        )
+        )] * weight
 
     def __bool__(self) -> bool:
         """Blank materials are falsey."""
@@ -800,8 +806,8 @@ def load_config(conf: Keyvalues) -> None:
             tile_size: TileSize
             for tile_size in TileSize:
                 textures[tile_size] = [
-                    MaterialConf.parse(prop, tile_size) for prop in
-                    gen_conf.find_all(str(tile_size))
+                    conf for kv in gen_conf.find_all(str(tile_size))
+                    for conf in MaterialConf.parse(kv, tile_size)
                 ]
 
             if '1x2' in gen_conf and not has_block_mats:
@@ -853,8 +859,8 @@ def load_config(conf: Keyvalues) -> None:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
                 textures[tex_name] = tex = [
-                    MaterialConf.parse(child) for child in
-                    gen_conf.find_all(str(tex_name))
+                    conf for kv in gen_conf.find_all(str(tex_name))
+                    for conf in MaterialConf.parse(kv, tex_name)
                 ]
                 if not tex and tex_default:
                     if isinstance(tex_default, str):

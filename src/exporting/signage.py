@@ -27,12 +27,18 @@ LOGGER = srctools.logger.get_logger(__name__)
 SIGN_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage.vtf'
 SIGN_ANT_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage_antline.vtf'
 
-TRANS_MISSING_SELECTED = TransToken.ui('Selected signage "{id}" does not exist.')
-TRANS_MISSING_CHILD = TransToken.ui('Signage "{id}"\'s {child} "{sub_id}" does not exist.')
+TRANS_MISSING_SELECTED = TransToken.untranslated('Selected signage "{id}" does not exist.')
+TRANS_MISSING_CHILD = TransToken.untranslated('Signage "{id}"\'s {child} "{sub_id}" does not exist.')
 TRANS_INVALID_NUMBERS_WIDTH = TransToken.untranslated(
     'Signage legend number texture width must be divisible by ten!'
 )
-TRANS_NO_OVERLAY = TransToken.untranslated('No Signage style overlay defined.')
+TRANS_NO_OVERLAY = TransToken.untranslated(
+    'No SignageLegend layout defined for current style (or parents)! Using Clean Style.'
+)
+TRANS_NO_OVERLAY_NO_CLEAN = TransToken.untranslated(
+    'No SignageLegend layout defined for current style (or parents), and no Clean Style available. '
+    'Editor models will look incorrect.'
+)
 
 EDITOR_SHAPES = [
     'box',
@@ -153,8 +159,24 @@ async def step_signage(exp_data: ExportData) -> None:
             )
             for ind, shape in enumerate(EDITOR_SHAPES)
         }
-
     exp_data.vbsp_conf.append(conf)
+
+    legend_obj: SignageLegend | None = None
+    for style in exp_data.selected_style.bases:
+        await trio.lowlevel.checkpoint()
+        try:
+            legend_obj = exp_data.packset.obj_by_id(SignageLegend, style.id, warn=False)
+            break
+        except KeyError:
+            pass
+    else:
+        # Grab Clean style.
+        try:
+            legend_obj = exp_data.packset.obj_by_id(SignageLegend, CLEAN_STYLE, warn=False)
+        except KeyError:
+            exp_data.warn_auth(exp_data.selected_style.pak_id, TRANS_NO_OVERLAY_NO_CLEAN)
+        else:
+            exp_data.warn_auth(exp_data.selected_style.pak_id, TRANS_NO_OVERLAY)
     sign_path = Path(exp_data.game.abs_path(SIGN_LOC))
     sign_ant_path = Path(exp_data.game.abs_path(SIGN_ANT_LOC))
 
@@ -162,11 +184,11 @@ async def step_signage(exp_data: ExportData) -> None:
     async with trio.open_nursery() as nursery:
         nursery.start_soon(
             trio.to_thread.run_sync, make_legend,
-            exp_data, sign_path, sel_icons, False,
+            exp_data, sign_path, sel_icons, legend_obj, False,
         )
         nursery.start_soon(
             trio.to_thread.run_sync, make_legend,
-            exp_data, sign_ant_path, ant_icons, True,
+            exp_data, sign_ant_path, ant_icons, legend_obj, True,
         )
 
 
@@ -192,6 +214,7 @@ def make_legend(
     exp: ExportData,
     sign_path: Path,
     icons: Mapping[int, ImgHandle | ResultCapture[Image.Image | None]],
+    legend_obj: SignageLegend | None,
     is_antline: bool,
 ) -> None:
     """Construct the legend texture for the signage."""
@@ -204,37 +227,30 @@ def make_legend(
     num_sheet: Image.Image | None = None
     background: Image.Image | None = None
     num_step = num_x = num_y = 0
-    for style in exp.selected_style.bases:
-        trio.from_thread.check_cancelled()
-        try:
-            legend_obj = exp.packset.obj_by_id(SignageLegend, style.id, warn=False)
-        except KeyError:
-            pass
-        else:
-            legend_info = legend_obj.antline_conf if is_antline else legend_obj.symbol_conf
-            if legend_info.overlay is not None:
-                overlay = legend_info.overlay.get_pil()
-            if legend_info.blank is not None:
-                blank_img = legend_info.blank.get_pil().resize(
-                    (cell_size, cell_size),
-                    Image.Resampling.LANCZOS,
-                )
-            if legend_info.background is not None:
-                # Ensure it's exactly the same size as the legend.
-                background = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
-                background.paste(legend_info.background.get_pil())
-                # To allow this to be reused for both legends, skip copying the unused bits
-                # of the cells area. So here only copy the bits for the model geometry.
-                legend.alpha_composite(background, (0, 623), (0, 623))
-            if legend_info.numbers is not None:
-                num_sheet = legend_info.numbers.get_pil()
-                num_x, num_y = legend_info.num_off
-                num_step, num_rem = divmod(num_sheet.width, 10)
-                if num_rem != 0:
-                    exp.warn_auth(legend_obj.pak_id, TRANS_INVALID_NUMBERS_WIDTH)
-            break
+
+    if legend_obj is not None:
+        legend_info = legend_obj.antline_conf if is_antline else legend_obj.symbol_conf
+        if legend_info.overlay is not None:
+            overlay = legend_info.overlay.get_pil()
+        if legend_info.blank is not None:
+            blank_img = legend_info.blank.get_pil().resize(
+                (cell_size, cell_size),
+                Image.Resampling.LANCZOS,
+            )
+        if legend_info.background is not None:
+            # Ensure it's exactly the same size as the legend.
+            background = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
+            background.paste(legend_info.background.get_pil())
+            # To allow this to be reused for both legends, skip copying the unused bits
+            # of the cells area. So here only copy the bits for the model geometry.
+            legend.alpha_composite(background, (0, 623), (0, 623))
+        if legend_info.numbers is not None:
+            num_sheet = legend_info.numbers.get_pil()
+            num_x, num_y = legend_info.num_off
+            num_step, num_rem = divmod(num_sheet.width, 10)
+            if num_rem != 0:
+                exp.warn_auth(legend_obj.pak_id, TRANS_INVALID_NUMBERS_WIDTH)
     else:
-        exp.warn_auth(exp.selected_style.pak_id, TRANS_NO_OVERLAY)
         overlay = None
 
     for num, x, y in iter_ant_cells() if is_antline else iter_sign_cells():
