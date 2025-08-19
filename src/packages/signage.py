@@ -96,7 +96,7 @@ LEGEND_INFO_BLANK = LegendInfo(
 class SignageLegend(PakObject):
     """Allows specifying image resources used to construct the legend texture.
 
-    'symbol' is for the standard item, 'connection' is for the antline variant.
+    'symbol' is for the standard item, 'antline' is for the antline variant.
     """
     def __init__(
         self,
