@@ -508,8 +508,9 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
             )
             pgun_script['Template01'] = '__pgun_template'
             pgun_script['spawnflags'] = 2
+            
         else:
-            # In coop we have not need to actually spawn portalguns.
+            # In coop we have not need to actually spawn portalguns. 
             pgun_script['classname'] = 'logic_script'
 
             # For Absolute Fizzler or otherwise, this fizzles portals on a
@@ -527,6 +528,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
                 ent_pos - 4, ent_pos + 4,
                 mat=consts.Tools.TRIGGER,
             ).solid)
+
 
         # For removing portalguns from players.
         trig_stripper = vmf.create_ent(
@@ -598,19 +600,19 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
                 '_mark_held_cube()',
             ))
 
-        if info.is_sp:
-            logic_auto.add_out(Output(
-                'OnMapSpawn',
-                '@portalgun',
-                'RunScriptCode',
-                'init({}, {}, {})'.format(
-                    'true' if blue_portal else 'false',
-                    'true' if oran_portal else 'false',
-                    'true' if has_btn_onoff else 'false',
-                ),
-                delay=0.1,
-                only_once=True,
-            ))
+        #Init @portalgun
+        logic_auto.add_out(Output(
+            'OnMapSpawn',
+            '@portalgun',
+            'RunScriptCode',
+            'init({}, {}, {})'.format(
+                'true' if blue_portal else 'false',
+                'true' if oran_portal else 'false',
+                'true' if has_btn_onoff else 'false',
+            ),
+            delay=0.1,
+            only_once=True,
+        ))
 
         # Shuts down various parts when you've reached the exit.
         import precomp.conditions.instances
