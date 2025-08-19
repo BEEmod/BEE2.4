@@ -13,9 +13,8 @@ from app.dragdrop import (
     DragInfo as DragInfo,
 )
 from transtoken import TransToken
-from . import set_fixed_size
-from .img import WX_IMG
-from .wid_transtoken import set_text
+from . import set_fixed_size, PEN_SLOT_BORDER, BRUSH_ALPHA, BRUSH_PETI_BG, PEN_ALPHA
+from .img import WX_IMG, ImageSlot
 
 
 __all__ = ["DragDrop", "DragInfo", "InfoCB", "Slot"]
@@ -23,17 +22,91 @@ __all__ = ["DragDrop", "DragInfo", "InfoCB", "Slot"]
 
 CUR_MOVE = wx.Cursor(wx.CURSOR_SIZING)
 CUR_NO_DROP = wx.Cursor(wx.CURSOR_NO_ENTRY)
+SLOT_TEXT_COLOUR = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT)
+FONT_SLOT_TEXT = wx.Font(wx.FontInfo(10))
+PEN_GEAR_BORDER = wx.Pen(PEN_SLOT_BORDER.GetColour(), 1)
+
+# Zoom highlighted slots, like in puzzlemaker.
+ZOOM_FACTOR = 1.2
+ZOOM_SHIFT = (1 - ZOOM_FACTOR) / 2
 
 
-@attrs.define
 class SlotUI:
-    """Widgets associated with a slot."""
-    # Our main widget.
-    lbl: wx.GenericStaticBitmap
-    # The two widgets shown at the bottom when moused over, and the sizer placing them.
-    sizer: wx.BoxSizer
-    text_lbl: wx.StaticText | None
-    info_btn: wx.BitmapButton | None
+    """The widget for a slot."""
+    def __init__(
+        self,
+        parent: wx.Window,
+        width: float, height: float,
+        gear: ImageSlot | None,
+        text: TransToken,
+    ) -> None:
+        self.widget = wx.Panel(parent)
+        self.contents = ImageSlot(self.widget)
+        self.hovered = False
+        # Is Slot.contents non-None?
+        self.has_item = False
+        self.gear = gear  # Image is owned by our manager.
+        self.text = text  # Or BLANK if not used.
+        # Store the position of the gear as we draw, to match to mouse position.
+        self.gear_pos = wx.Rect(-10, -10, 1, 1)
+
+        set_fixed_size(self.widget, width, height)
+        self.widget.Bind(wx.EVT_PAINT, self._on_paint)
+
+    def _on_paint(self, evt: wx.PaintEvent) -> None:
+        """Draw the slot."""
+        dc = wx.PaintDC(self.widget)
+        gc = wx.GraphicsContext.Create(dc)
+        wid_size = self.widget.GetSize()
+        # Only show the border if we either have an item or have text.
+        if self.hovered and (self.has_item or self.text):
+            gc.SetBrush(BRUSH_ALPHA)
+            gc.SetPen(PEN_SLOT_BORDER)
+            gc.DrawRectangle(1, 1, wid_size.width - 1, wid_size.height - 1)
+            # Like in puzzlemaker, draw oversized to get a zoom effect. The DC clips for us
+            # already.
+            self.contents.draw(
+                gc,
+                round(ZOOM_SHIFT * wid_size.width), round(ZOOM_SHIFT * wid_size.height),
+                round(ZOOM_FACTOR * wid_size.width), round(ZOOM_FACTOR * wid_size.width),
+            )
+            deco_off = self.widget.FromDIP(wx.Size(2, 2))
+            if self.text:
+                # Text in the upper-left, add a background/border also.
+                dc.SetTextForeground(SLOT_TEXT_COLOUR)
+                dc.SetFont(FONT_SLOT_TEXT)
+                dc.SetPen(PEN_ALPHA)
+                dc.SetBrush(BRUSH_PETI_BG)
+                text = str(self.text)
+                text_size = dc.GetTextExtent(text)
+                dc.DrawRectangle(
+                    deco_off.x, deco_off.y,
+                    text_size.width + 2 * deco_off.x, text_size.height + 2 * deco_off.y,
+                )
+                dc.DrawText(text, 2 * deco_off.x, 2 * deco_off.y)
+            if self.has_item and self.gear is not None:
+                # Gear icon in the bottom-right.
+                gear_border = self.widget.FromDIP(wx.Size(14, 14))
+                gear_size = self.widget.FromDIP(wx.Size(10, 10))
+                self.gear_pos = pos = wx.Rect(
+                    wid_size.width - gear_border.width,
+                    wid_size.height - gear_border.height,
+                    gear_border.width, gear_border.height,
+                )
+                gc.SetPen(PEN_GEAR_BORDER)
+                gc.SetBrush(BRUSH_PETI_BG)
+                gc.DrawRectangle(pos.x, pos.y, pos.width - 1, pos.height - 1)
+                self.gear.draw(
+                    gc,
+                    pos.x + deco_off.x, pos.y + deco_off.y,
+                    gear_size.x, gear_size.y,
+                )
+        else:
+            self.contents.draw(gc, 0, 0, wid_size.width, wid_size.height)
+
+    def inside_conf(self, evt: wx.MouseEvent) -> bool:
+        """Check if the specified mouse event occurred inside our gear."""
+        return self.gear_pos.Contains(evt.GetPosition())
 
 
 class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
@@ -44,6 +117,7 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
     # The window and bitmap displayed inside.
     _drag_win: wx.Frame
     _drag_img: wx.GenericStaticBitmap
+    _gear_img: ImageSlot | None
 
     def __init__(
         self,
@@ -66,6 +140,11 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
 
         self._drag_img = wx.GenericStaticBitmap(drag_win)
         self._drag_img.SetScaleMode(self._drag_img.Scale_AspectFit)
+        if self.config_icon:
+            self._gear_img = ImageSlot(drag_win)
+            self._gear_img.set_handle(img.Handle.builtin('icons/gear', 10, 10))
+        else:
+            self._gear_img = None
         set_fixed_size(self._drag_img, self.width * 1.25, self.height * 1.25)
 
         drag_win.Bind(wx.EVT_LEFT_UP, self._evt_stop)
@@ -79,20 +158,25 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
             WX_IMG.apply(self._drag_img, icon)
             self._drag_win.Fit()
         else:
-            WX_IMG.apply(self._slot_ui[slot].lbl, icon)
+            slot_ui = self._slot_ui[slot]
+            slot_ui.contents.set_handle(icon)
+            slot_ui.has_item = slot.contents is not None
+            slot_ui.widget.Refresh()
 
     @override
     def _ui_slot_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
-        label = self._slot_ui[slot].lbl
-        x, y = label.ScreenToClient(round(x), round(y))
-        return label.GetClientRect().Contains(x, y)
+        wid = self._slot_ui[slot].widget
+        if not wid.IsShown():
+            return False
+        x, y = wid.ScreenToClient(round(x), round(y))
+        return wid.GetClientRect().Contains(x, y)
 
     @override
     def _ui_slot_coords(self, slot: Slot[ItemT]) -> tuple[int, int]:
-        label = self._slot_ui[slot].lbl
-        if label.IsShown():
-            rect = label.GetClientRect()
+        wid = self._slot_ui[slot].widget
+        if wid.IsShown():
+            rect = wid.GetClientRect()
             return rect.x, rect.y
         else:
             raise ValueError('Slot not placed!')
@@ -105,6 +189,12 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         title: TransToken,
     ) -> None:
         """Called when a slot is added, to create the UI form."""
+        self._slot_ui[slot] = slot_ui = SlotUI(
+            parent, self.width, self.height,
+            self._gear_img,
+            title,
+        )
+
         wid_icon = wx.GenericStaticBitmap(parent)
         wid_icon.SetScaleMode(wid_icon.Scale_AspectFit)
         set_fixed_size(wid_icon, self.width, self.height)
@@ -115,6 +205,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
             evt.Skip()  # Allow normal behaviour to also occur.
             if evt.ShiftDown():
                 self._on_fastdrag(slot)
+            elif slot_ui.inside_conf(evt):
+                self._on_configure(slot)
             else:
                 pos = wid_icon.ClientToScreen(evt.Position)
                 self._on_start(slot, pos.x, pos.y)
@@ -123,61 +215,28 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
             """Share this function."""
             self._on_configure(slot)
 
-        wid_icon.Bind(wx.EVT_LEFT_DOWN, on_leftclick)
-        wid_icon.Bind(wx.EVT_ENTER_WINDOW, lambda evt: self._on_hover_enter(slot))
-        wid_icon.Bind(wx.EVT_LEAVE_WINDOW, lambda evt: self._on_hover_exit(slot))
-        wid_icon.Bind(wx.EVT_RIGHT_UP, on_configure)
-
-        sizer = wx.BoxSizer(wx.VERTICAL)
-
-        if title:
-            text_lbl = wx.StaticText(wid_icon, style=wx.BORDER_RAISED)
-            set_text(text_lbl, title)
-            sizer.Add(text_lbl, wx.SizerFlags().Left())
-            text_lbl.Hide()
-        else:
-            text_lbl = None
-
-        if self.config_icon:
-            info_btn = wx.BitmapButton(wid_icon)
-            WX_IMG.apply(info_btn, img.Handle.builtin('icons/gear', 10, 10))
-            info_btn.Bind(wx.EVT_BUTTON, on_configure)
-            info_btn.Bind(wx.EVT_RIGHT_DOWN, on_configure)
-            info_btn.Hide()
-
-            sizer.AddStretchSpacer()
-            sizer.Add(info_btn, wx.SizerFlags().Right())
-        else:
-            info_btn = None
-
-        self._slot_ui[slot] = SlotUI(wid_icon, sizer, text_lbl, info_btn)
+        slot_ui.widget.Bind(wx.EVT_LEFT_DOWN, on_leftclick)
+        slot_ui.widget.Bind(wx.EVT_ENTER_WINDOW, lambda evt: self._on_hover_enter(slot))
+        slot_ui.widget.Bind(wx.EVT_LEAVE_WINDOW, lambda evt: self._on_hover_exit(slot))
+        slot_ui.widget.Bind(wx.EVT_RIGHT_UP, on_configure)
 
     @override
     def _ui_slot_showdeco(self, slot: Slot[ItemT]) -> None:
         """Fired when a cursor hovers over a slot."""
         slot_ui = self._slot_ui[slot]
+        slot_ui.hovered = True
+        slot_ui.widget.Refresh()
         # Add border, but only if either icon exists or we contain an item.
-        if slot_ui.text_lbl is not None or slot.contents is not None:
-            slot_ui.lbl.SetWindowStyleFlag(wx.BORDER_RAISED)
-
-        # Show configure icon for items.
-        if slot_ui.info_btn is not None and slot.contents is not None:
-            slot_ui.sizer.Show(slot_ui.info_btn)
-        if slot_ui.text_lbl is not None:
-            slot_ui.sizer.Show(slot_ui.text_lbl)
-        slot_ui.lbl.Refresh()
+        if slot_ui.text is not None or slot.contents is not None:
+            slot_ui.widget.SetWindowStyleFlag(wx.BORDER_RAISED)
 
     @override
     def _ui_slot_hidedeco(self, slot: Slot[ItemT]) -> None:
         """Fired when a cursor leaves a slot."""
         slot_ui = self._slot_ui[slot]
-        slot_ui.lbl.SetWindowStyleFlag(0)
-
-        if slot_ui.info_btn is not None:
-            slot_ui.sizer.Hide(slot_ui.info_btn)
-        if slot_ui.text_lbl is not None:
-            slot_ui.sizer.Hide(slot_ui.text_lbl)
-        slot_ui.lbl.Refresh()
+        slot_ui.hovered = False
+        slot_ui.widget.SetWindowStyleFlag(0)
+        slot_ui.widget.Refresh()
 
     @override
     def _ui_dragwin_show(self, x: float, y: float) -> None:
@@ -226,4 +285,4 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
 
     def slot_widget(self: DragDrop[ItemT], slot: Slot[ItemT]) -> wx.Window:
         """Return the widget implementing this slot, so it can be added to a sizer."""
-        return self._slot_ui[slot].lbl
+        return self._slot_ui[slot].widget

@@ -8,6 +8,7 @@ import logging
 import wx
 
 import utils
+from app import img
 
 
 APP = wx.App()
@@ -100,7 +101,9 @@ def discretise_scrollwheel(func: Callable[[Literal[-1, 1]], None]) -> Callable[[
 
     return handler
 
-
+BRUSH_PETI_BG = wx.Brush(img.PETI_ITEM_BG, wx.BRUSHSTYLE_SOLID)
+BRUSH_ALPHA = wx.Brush(wx.NullColour, wx.BRUSHSTYLE_TRANSPARENT)
+PEN_ALPHA = wx.Pen()
 PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
 PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)
 
