@@ -206,8 +206,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
         TK_IMG.apply(wid_label, self._img_blank)
         tk_tools.bind_leftclick(wid_label, lambda evt: self._on_start(slot, evt.x_root, evt.y_root))
         wid_label.bind(tk_tools.EVENTS['LEFT_SHIFT'], lambda evt: self._on_fastdrag(slot))
-        wid_label.bind('<Enter>', lambda evt: self._on_hover_enter(slot))
-        wid_label.bind('<Leave>', lambda evt: self._on_hover_exit(slot))
+        wid_label.bind('<Enter>', enter := lambda evt: self._on_hover_enter(slot))
+        wid_label.bind('<Leave>', exit := lambda evt: self._on_hover_exit(slot))
         tk_tools.bind_rightclick(wid_label, lambda evt: self._on_configure(slot))
 
         if title:
@@ -219,6 +219,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
                 name="text",
             )
             set_text(text_lbl, title)
+            text_lbl.bind('<Enter>', enter)
+            text_lbl.bind('<Leave>', exit)
         else:
             text_lbl = None
 
@@ -229,6 +231,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
                 name="info",
             )
             TK_IMG.apply(info_btn, img.Handle.builtin('icons/gear', 10, 10))
+            info_btn.bind('<Enter>', enter)
+            info_btn.bind('<Leave>', exit)
 
             @tk_tools.bind_leftclick(info_btn)
             def info_button_click(e: tk.Event[tk.Label]) -> object:
