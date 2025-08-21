@@ -512,6 +512,19 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
         else:
             # In coop we have not need to actually spawn portalguns. 
             pgun_script['classname'] = 'logic_script'
+            # Make sure @portalman knows when players spawn
+            vmf.create_ent(
+                classname='comp_relay',
+                targetname='@on_player_spawn_2',
+                origin=ent_pos,
+                OnTrigger="@portalgunCallScriptFunctionon_oran_spawn0-1"
+            )
+            vmf.create_ent(
+                classname='comp_relay',
+                targetname='@on_player_spawn_3',
+                origin=ent_pos,
+                OnTrigger="@portalgunCallScriptFunctionon_blue_spawn0-1"
+            )
 
             # For Absolute Fizzler or otherwise, this fizzles portals on a
             # player remotely.
