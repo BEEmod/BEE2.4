@@ -327,41 +327,26 @@ class CubeAddon:
         return fixups if found else None
 
 
+@attrs.define(eq=False, kw_only=True)
 class DropperType:
     """A type of dropper that makes cubes."""
-    def __init__(
-        self,
-        drop_id: str,
-        item_id: str,
-        cube_pos: Vec,
-        cube_orient: Angle,
-        out_start_drop: tuple[str | None, str],
-        out_finish_drop: tuple[str | None, str],
-        in_respawn: tuple[str | None, str],
-        filter_name: str,
-        bounce_paint_file: str,
-    ) -> None:
-        self.id = drop_id
-        self.instances = resolve_inst(item_id)
-        self.cube_pos = cube_pos
-        # Orientation of the cube.
-        self.cube_orient = cube_orient
+    id: str
+    instances: list[str]
+    # Where the cube should spawn.
+    cube_pos: Vec
+    cube_orient: Angle
 
-        # Instance output fired when finishing dropping. !activator
-        # should be the cube!
-        self.out_finish_drop = out_finish_drop
-
-        # Instance output fired when dropper starts spawning.
-        self.out_start_drop = out_start_drop
-
-        # Instance input to respawn the cube.
-        self.in_respawn = in_respawn
-
-        # Name of the filter which detects only the cube, used to link up superpos logic.
-        self.filter_name = filter_name
-
-        # The instance to use to bounce-paint the dropped cube.
-        self.bounce_paint_file = bounce_paint_file
+    # Instance output fired when dropper starts spawning.
+    out_start_drop: tuple[str | None, str]
+    # Instance output fired when finishing dropping. !activator
+    # should be the cube!
+    out_finish_drop: tuple[str | None, str]
+    # Instance input to respawn the cube.
+    in_respawn: tuple[str | None, str]
+    # Name of the filter which detects only the cube, used to link up superpos logic.
+    filter_name: str
+    # The instance to use to bounce-paint the dropped cube.
+    bounce_paint_file: str
 
     @classmethod
     def parse(cls, conf: Keyvalues) -> DropperType:
@@ -386,8 +371,8 @@ class DropperType:
             cube_orient = Angle()
 
         return cls(
-            drop_id=conf['id'].upper(),
-            item_id=conf['itemid'],
+            id=conf['id'].upper(),
+            instances=resolve_inst(conf['itemid']),
             cube_pos=conf.vec('cube_pos'),
             cube_orient=cube_orient,
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
