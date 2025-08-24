@@ -476,7 +476,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
             self._ui_menu_add(
                 group,
                 item_id,
-                functools.partial(self.sel_item_id, item_id),
+                functools.partial(self.choose_item, item_id),
                 data.context_lbl,
             )
 
@@ -629,7 +629,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
         selected: LastSelected
         with config.APP.get_ui_channel(LastSelected, self.save_id) as channel:
             async for selected in channel:
-                self.sel_item_id(selected.id)
+                self.choose_item(selected.id)
                 self.save()
 
     async def _sampler_task(self, sampler: sound.SamplePlayer) -> None:
@@ -724,14 +724,6 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
             else:
                 pool = self.suggested
             self.choose_item(random.choice(pool))
-
-    def sel_item_id(self, it_id: str) -> bool:
-        """Select the item with the given ID."""
-        item_id = utils.special_id(it_id)
-        if item_id in self.item_list:
-            self.choose_item(item_id)
-            return True
-        return False
 
     def choose_item(self, item_id: utils.SpecialID) -> None:
         """Set the current item to this one."""
