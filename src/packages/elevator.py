@@ -51,12 +51,14 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
             video = info['video']
             vert_video = None
 
-        return cls(
+        elevator = cls(
             data.id,
             selitem_data,
             video,
             vert_video,
         )
+        elevator._parse_migrations(data)
+        return elevator
 
     def __repr__(self) -> str:
         return f'<Elevator {self.id}>'

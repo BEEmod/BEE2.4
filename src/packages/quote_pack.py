@@ -140,7 +140,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
                 for line_kv in resp_kv:
                     lines.append(Line.parse(data.pak_id, line_kv, False))
 
-        return cls(
+        quote = cls(
             data.id,
             selitem_data,
             config,
@@ -162,6 +162,8 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
                 monitor=monitor,
             ),
         )
+        quote._parse_migrations(data)
+        return quote
 
     @override
     def add_over(self, override: QuotePack) -> None:

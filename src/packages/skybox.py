@@ -59,7 +59,7 @@ class Skybox(
 
         fog_opts = data.info.find_key("Fog", or_blank=True)
 
-        return cls(
+        sky = cls(
             data.id,
             selitem_data,
             config,
@@ -67,6 +67,8 @@ class Skybox(
             mat,
             draw_first,
         )
+        sky._parse_migrations(data)
+        return sky
 
     @override
     def add_over(self, override: Skybox) -> None:

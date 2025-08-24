@@ -118,6 +118,7 @@ async def create_selectors(core_nursery: trio.Nursery, preview: SelectorPreview)
     skybox_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Skybox.selector_id_getter(False),
         func_get_data=packages.Skybox.selector_data_getter(None),
+        obj_type=packages.Skybox,
         save_id='skyboxes',
         title=TransToken.ui('Select Skyboxes'),
         desc=TransToken.ui(
@@ -138,6 +139,7 @@ async def create_selectors(core_nursery: trio.Nursery, preview: SelectorPreview)
     voice_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.QuotePack.selector_id_getter(True),
         func_get_data=packages.QuotePack.selector_data_getter(DATA_NO_VOICE),
+        obj_type=packages.QuotePack,
         save_id='voicelines',
         title=TransToken.ui('Select Additional Voice Lines'),
         desc=TransToken.ui(
@@ -160,6 +162,7 @@ async def create_selectors(core_nursery: trio.Nursery, preview: SelectorPreview)
     style_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Style.selector_id_getter(False),
         func_get_data=packages.Style.selector_data_getter(None),
+        obj_type=packages.Style,
         save_id='styles',
         default_id=packages.CLEAN_STYLE,
         title=TransToken.ui('Select Style'),
@@ -185,6 +188,7 @@ async def create_selectors(core_nursery: trio.Nursery, preview: SelectorPreview)
     elev_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Elevator.selector_id_getter(True),
         func_get_data=packages.Elevator.selector_data_getter(DATA_RAND_ELEV),
+        obj_type=packages.Elevator,
         save_id='elevators',
         title=TransToken.ui('Select Elevator Video'),
         desc=TransToken.ui(

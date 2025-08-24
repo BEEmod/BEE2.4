@@ -115,6 +115,8 @@ async def lifecycle(
                     await packset.ready(pack_cls).wait()
                     LOGGER.debug('{} ready', pack_cls)
 
+            packset.verify_migrations(error_ui)
+
             # Foreground objects loaded, release the packset for the UI.
             packages.LOADED.value = packset
 

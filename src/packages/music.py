@@ -143,7 +143,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
 
         children_prop = data.info.find_block('children', or_blank=True)
 
-        return cls(
+        music = cls(
             data.id,
             selitem_data,
             sounds,
@@ -166,6 +166,8 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
             synch_tbeam=synch_tbeam,
             volume=volume,
         )
+        music._parse_migrations(data)
+        return music
 
     @override
     def add_over(self, override: Music) -> None:

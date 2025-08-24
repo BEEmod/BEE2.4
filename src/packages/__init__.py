@@ -562,6 +562,12 @@ class PakObject:
         """
         raise NotImplementedError
 
+    def _parse_migrations(self, data: ParseData) -> None:
+        """Parse out standard migrations data."""
+        for kv in data.info.find_all('migration'):
+            old_id = PakRef.parse(type(self), kv.value)
+            data.packset.add_migration(data, data.pak_id, old_id, self)
+
     def add_over(self, override: Self) -> None:
         """Called to override values.
         self is the originally defined item, and override is the override item
@@ -589,6 +595,7 @@ class PakObject:
 
 class SelPakObject(PakObject):
     """Defines PakObjects which have SelItemData."""
+    # The key used in style objects to define suggested items for this object type.
     suggest_default: ClassVar[str]
 
     selitem_data: SelitemData
@@ -921,6 +928,7 @@ class PackagesSet:
         try:
             exist = self._migrations[old_ref]
         except KeyError:
+            LOGGER.debug('Migration: {} -> {}', old_ref, new_ref)
             self._migrations[old_ref] = new_ref
         else:
             if new_ref != exist:
@@ -1608,7 +1616,7 @@ class Style(SelPakObject, needs_foreground=True):
                 source=f'Style <{data.id}>',
             )
 
-        return cls(
+        style = cls(
             style_id=data.id,
             selitem_data=selitem_data,
             items=items,
@@ -1620,6 +1628,8 @@ class Style(SelPakObject, needs_foreground=True):
             legacy_corridors=legacy_corridors,
             vpk_name=vpk_name,
         )
+        style._parse_migrations(data)
+        return style
 
     def add_over(self, override: Style) -> None:
         """Add the additional commands to ourselves."""

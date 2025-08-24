@@ -27,7 +27,7 @@ from app import DEV_MODE, ReflowWindow, WidgetCache, img, sound
 from app.mdown import MarkdownData
 from config.last_sel import LastSelected
 from config.windows import SelectorState
-from packages import AttrDef as AttrDef, AttrMap, AttrTypes, SelitemData
+from packages import AttrDef as AttrDef, AttrMap, AttrTypes, SelitemData, PakRef
 from transtoken import TransToken
 import async_util
 import config
@@ -94,11 +94,10 @@ async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], sav
 class Options:
     """Creation options for selector windows.
 
-    - parent: Must be a Toplevel window, either the tk() root or another
-    window if needed.
     - func_get_data: Function to get the data for an ID. Should fetch a cached result, will
       be called for every item.
     - func_get_ids: Called to retrieve the list of item IDs.
+    - obj_type: Type of object we display.
     - save_id: The ID used to save/load the window state.
     - store_last_selected: If set, save/load the selected ID.
     - lst: A list of Item objects, defining the visible items.
@@ -124,6 +123,7 @@ class Options:
     """
     func_get_data: GetterFunc[SelitemData]
     func_get_ids: Callable[[packages.PackagesSet], Awaitable[list[utils.SpecialID]]]
+    obj_type: type[packages.PakObject]
     save_id: str  # Required!
     store_last_selected: bool = True
     has_def: bool = True
@@ -240,6 +240,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
     func_get_data: GetterFunc[SelitemData]
     func_get_sample: GetterFunc[str] | None
     func_get_ids: Callable[[packages.PackagesSet], Awaitable[list[utils.SpecialID]]]
+    obj_type: type[packages.PakObject]
 
     # Packages currently loaded for the window.
     _packset: packages.PackagesSet
@@ -307,6 +308,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
         self.func_get_sample = opt.func_get_sample
         self.func_get_data = opt.func_get_data
         self.func_get_ids = opt.func_get_ids
+        self.obj_type = opt.obj_type
 
         self._readonly = False
         self._loading = True
@@ -727,6 +729,9 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
 
     def choose_item(self, item_id: utils.SpecialID) -> None:
         """Set the current item to this one."""
+        if utils.not_special_id(item_id):
+            item_id = self._packset.get_migration(PakRef(self.obj_type, item_id)).id
+
         if self._visible:
             # Only update UI if it is actually visible.
             self.sel_item(item_id)

@@ -139,6 +139,7 @@ async def make_widgets(
     WINDOWS[MusicChannel.BASE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BASE),
         func_get_data=Music.selector_data_getter(DATA_NONE_BASE),
+        obj_type=Music,
         save_id='music_base',
         title=TransToken.ui('Select Background Music - Base'),
         desc=TransToken.ui(
@@ -162,6 +163,7 @@ async def make_widgets(
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.TBEAM),
         func_get_data=Music.selector_data_getter(DATA_NONE_FUNNEL),
+        obj_type=Music,
         save_id='music_tbeam',
         title=TransToken.ui('Select Excursion Funnel Music'),
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
@@ -178,6 +180,7 @@ async def make_widgets(
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BOUNCE),
         func_get_data=Music.selector_data_getter(DATA_NONE_BOUNCE),
+        obj_type=Music,
         save_id='music_bounce',
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
@@ -190,6 +193,7 @@ async def make_widgets(
     WINDOWS[MusicChannel.SPEED] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.SPEED),
         func_get_data=Music.selector_data_getter(DATA_NONE_SPEED),
+        obj_type=Music,
         save_id='music_speed',
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
