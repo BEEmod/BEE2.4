@@ -1,8 +1,7 @@
 """UI implementation for the packages-sync tool."""
+from collections.abc import Awaitable, Callable
+from pathlib import PurePath
 import contextlib
-from collections.abc import Callable
-from pathlib import Path, PurePath
-from typing import Awaitable
 
 import trio
 import wx
@@ -164,7 +163,7 @@ class WxUI(SyncUIBase):
     async def _ui_reposition_items(self, /) -> None:
         def make_func(pack: Package) -> Callable[[wx.CommandEvent], None]:
             """Create the event handler."""
-            def func(evt: wx.CommandEvent):
+            def func(evt: wx.CommandEvent) -> None:
                 """Handle a button being pressed."""
                 self.selected_pack.trigger(pack)
                 self.frm_pack.Hide()

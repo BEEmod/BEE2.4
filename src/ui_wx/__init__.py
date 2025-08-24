@@ -101,6 +101,7 @@ def discretise_scrollwheel(func: Callable[[Literal[-1, 1]], None]) -> Callable[[
 
     return handler
 
+
 BRUSH_PETI_BG = wx.Brush(img.PETI_ITEM_BG, wx.BRUSHSTYLE_SOLID)
 BRUSH_ALPHA = wx.Brush(wx.NullColour, wx.BRUSHSTYLE_TRANSPARENT)
 PEN_ALPHA = wx.Pen()

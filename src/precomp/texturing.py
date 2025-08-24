@@ -974,12 +974,12 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
     async def check_existing(filename: Path) -> None:
         """First, check existing materials to determine which are already created."""
         try:
-            with filename.open() as f:
+            with filename.open(encoding='utf8') as f:
                 exist_mat = await trio.to_thread.run_sync(Material.parse, f, str(filename))
         except FileNotFoundError:
             # It should exist, we just checked for it? Doesn't matter though.
             return
-        except TokenSyntaxError:
+        except (TokenSyntaxError, UnicodeDecodeError):
             LOGGER.warning('Unable to parse antigel material {}!', filename, exc_info=True)
             # Delete the bad file.
             await trio.to_thread.run_sync(filename.unlink)

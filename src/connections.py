@@ -9,7 +9,7 @@ from collections.abc import Collection, Iterable
 from enum import Enum
 import sys
 
-from srctools import Keyvalues, Output, Vec, conv_bool, FrozenVec
+from srctools import Keyvalues, Output, conv_bool, FrozenVec
 import attrs
 
 import utils

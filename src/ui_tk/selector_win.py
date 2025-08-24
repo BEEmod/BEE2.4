@@ -739,7 +739,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, tk.Toplevel, GroupHeader]):
         self.prop_desc.set_text(desc)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample'] | None, /) -> None:
         TK_IMG.apply(self.prop_icon, image)
         # Change aspect ratio to match the large icon.
         self.prop_icon_frm.configure(width=image.width, height=image.height)

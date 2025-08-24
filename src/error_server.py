@@ -188,7 +188,7 @@ async def generate_archive() -> None:
         except Exception as exc:
             LOGGER.exception('No repr for error:', exc_info=exc)
         else:
-            await trio.to_thread.run_sync(archive.writestr,'user_error.txt', cur_error_repr, ZIP_DEFLATED, None)
+            await trio.to_thread.run_sync(archive.writestr, 'user_error.txt', cur_error_repr, ZIP_DEFLATED, None)
 
         for log_key, log_data in LOGS.items():
             if data:

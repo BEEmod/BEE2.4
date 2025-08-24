@@ -687,7 +687,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, wx.Frame, GroupHeader]):
         self.wid_props_desc.set_markdown(desc)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample'] | None, /) -> None:
         WX_IMG.apply(self.wid_props_icon, image)
         self.sizer_info.Layout()
         match mode:

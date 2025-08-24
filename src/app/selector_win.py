@@ -1099,7 +1099,7 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample', None], /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, mode: Literal['zoom', 'sample'] | None, /) -> None:
         """Set the large icon's image, and the click mode - zoom, play sample or none."""
         raise NotImplementedError
 

@@ -111,7 +111,7 @@ def res_sendificator(vmf: VMF, inst: Entity) -> None:
             sendtor.enable_cmd += (Output('', FAIL_IND_RL, 'Trigger'), )
         case [branch]:
             # Can just trigger the one branch.
-            sendtor.enable_cmd += (Output('', branch,'Test', delay=0.01), )
+            sendtor.enable_cmd += (Output('', branch, 'Test', delay=0.01), )
             branch.add_out(Output('OnFalse', f'{sendtor_name}-{FAIL_IND_RL}', 'Trigger'))
         case _:
             # We need a listener to detect when all lasers are off.
