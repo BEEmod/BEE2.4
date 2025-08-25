@@ -359,7 +359,7 @@ class DropperType:
     # The instance to use to bounce-paint the dropped cube.
     bounce_paint_file: str
     # Template used for the carved clip brush.
-    clip_template: str | tuple[template_brush.Template, frozenset[str]]
+    clip_template: LazyValue[str]
     # The points where the cube brush is placed to carve from.
     clip_points: list[FrozenVec]
 
@@ -398,7 +398,7 @@ class DropperType:
             in_respawn=Output.parse_name(conf['InputRespawn']),
             bounce_paint_file=conf['BluePaintInst', ''],
             filter_name=conf['filtername', 'filter'],
-            clip_template=conf['clip', ''],
+            clip_template=LazyValue.parse(conf['clip', '']),
             clip_points=[
                 FrozenVec.from_str(kv.value)
                 for kv in conf.find_all('clip_point')
@@ -2008,20 +2008,18 @@ def make_cube(
     return has_addon_inst, ent
 
 
-def place_clip(vmf: VMF, dropper: Entity, pair: CubePair, drop_type: DropperType) -> None:
+def place_clip(
+    vmf: VMF,
+    dropper: Entity, pair: CubePair,
+    drop_type: DropperType, drop_clip_id: str,
+) -> None:
     """Generate and place the clip for dropper."""
-    match drop_type.clip_template:
-        case str(temp_name):
-            temp_name, visgroups = template_brush.parse_temp_name(drop_type.clip_template)
-            temp = template_brush.get_template(temp_name)
-        case (temp, visgroups):
-            pass
     origin = Vec.from_str(dropper['origin'])
     orient = Matrix.from_angstr(dropper['angles'])
     clip = template_brush.import_template(
-        vmf, temp, origin, orient,
+        vmf, drop_clip_id,
+        origin, orient,
         add_to_map=False,
-        additional_visgroups=visgroups,
     )
 
     # Grab the cube geometry we need. This is a template, but once we've loaded it,
@@ -2185,8 +2183,8 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
                 pair.dropper, 'box',
             )
 
-            if pair.drop_type.clip_template:
-                place_clip(vmf, pair.dropper, pair, pair.drop_type)
+            if clip_temp := pair.drop_type.clip_template(pair.dropper):
+                place_clip(vmf, pair.dropper, pair, pair.drop_type, clip_temp)
 
             # Implement the outputs.
 
