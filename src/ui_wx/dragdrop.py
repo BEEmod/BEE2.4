@@ -25,8 +25,8 @@ SLOT_TEXT_COLOUR = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNTEXT)
 FONT_SLOT_TEXT = wx.Font(wx.FontInfo(10))
 PEN_GEAR_BORDER = wx.Pen(PEN_SLOT_BORDER.GetColour(), 1)
 
-# Zoom highlighted slots, like in puzzlemaker.
-ZOOM_FACTOR = 1.2
+# Zoom highlighted slots, like in puzzlemaker. This matches the measured scale factor.
+ZOOM_FACTOR = 1.1
 ZOOM_SHIFT = (1 - ZOOM_FACTOR) / 2
 
 
