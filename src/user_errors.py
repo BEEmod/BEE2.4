@@ -388,7 +388,7 @@ TOK_CHAINING_INVALID_KIND = TransToken.ui(
 )
 
 TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(
-    'The template "<var>{id}</var>" has a {type} with two visgroups: "<var>{groups}</var>". Brushes and'
+    'The template "<var>{id}</var>" has a {type} with two visgroups: "<var>{groups}</var>". Brushes and '
     'overlays in templates may currently only use one visgroup each.'
 )
 

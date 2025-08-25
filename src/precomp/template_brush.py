@@ -616,7 +616,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             if len(visgroups) > 1:
                 raise user_errors.UserError(user_errors.TOK_TEMPLATE_MULTI_VISGROUPS.format(
                     id=loc.id,
-                    kind='brush',
+                    type='brush',
                     groups=', '.join(visgroups),
                 ))
             # No visgroup = ''
@@ -643,7 +643,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         if len(visgroups) > 1:
             raise user_errors.UserError(user_errors.TOK_TEMPLATE_MULTI_VISGROUPS.format(
                 id=loc.id,
-                kind='overlay',
+                type='overlay',
                 groups=', '.join(visgroups),
             ))
         # No visgroup = ''
