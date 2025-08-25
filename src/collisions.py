@@ -7,7 +7,7 @@ from enum import Flag
 import functools
 import operator
 
-from srctools import conv_bool, logger
+from srctools import conv_bool, logger, geometry
 from srctools.math import (
     AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, lerp, to_matrix,
 )
@@ -661,18 +661,34 @@ class Volume(BBox):  # type: ignore[override]
                 for face in solid.sides
             ])
 
+    @classmethod
+    def from_geo(
+        cls,
+        geo: geometry.Geometry,
+        contents: CollideType = CollideType.SOLID,
+        tags: Iterable[str] | str = frozenset(),
+        name: str = '',
+    ) -> Self:
+        """Create a volume from a geometry definition."""
+        mins, maxes = FrozenVec.bbox(
+            vert for poly in geo.polys for vert in poly.vertices
+        )
+        return cls(
+            mins, maxes, [
+                Plane(poly.plane.normal.freeze(), poly.plane.dist)
+                for poly in geo.polys
+            ], contents=contents, tags=tags, name=name,
+        )
+
     @override
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
         ent = self._to_kvs(vmf, 'bee2_collision_volume')
-        solid = Solid(vmf)
-        ent.solids.append(solid)
-
-        solid.sides = [
-            # Add 0.0 to convert -0 to +0.
-            Side.from_plane(vmf, plane.point + (0, 0, 0), plane.normal, consts.Tools.CLIP)
+        geo = geometry.Geometry.from_dup_planes([
+            geometry.Plane(plane.normal.thaw(), plane.distance)
             for plane in self.planes
-        ]
+        ])
+        ent.solids.append(geo.rebuild(vmf, consts.Tools.CLIP))
 
         return ent
 
