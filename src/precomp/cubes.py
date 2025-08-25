@@ -377,9 +377,12 @@ class DropperType:
         else:
             cube_orient = Angle()
 
+        item_id = conf['itemid', '']
+        instances = resolve_inst(item_id) if item_id else []
+
         return cls(
             id=conf['id'].upper(),
-            instances=resolve_inst(conf['itemid']),
+            instances=instances,
             cube_pos=conf.vec('cube_pos'),
             cube_orient=cube_orient,
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
@@ -1136,6 +1139,31 @@ def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
     except KeyError:
         raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
             kind='CubeType',
+            id=res.value,
+        )) from None
+
+
+@conditions.make_result(
+    'ChangeDropperType', 'SetDropperType',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
+def res_change_dropper_type(inst: Entity, res: Keyvalues) -> None:
+    """Change the cube-type of a cube item.
+
+    This is only valid on `ITEM_BOX_DROPPER` for now.
+    """
+    try:
+        pair = INST_TO_PAIR[inst]
+    except KeyError:
+        LOGGER.warning('Attempting to set cube type on non cube ("{}")', inst['targetname'])
+        return
+
+    try:
+        pair.drop_type = DROPPER_TYPES[res.value]
+    except KeyError:
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
+            kind='DropperType',
             id=res.value,
         )) from None
 
