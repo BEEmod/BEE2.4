@@ -10,6 +10,7 @@ otherwise.
 """
 import abc
 import os
+import shutil
 import sys
 import logging
 import math
@@ -298,8 +299,10 @@ async def main_gui(
                 # Not triggered, re-enable.
                 ui.can_confirm.value = True
 
-    def demo_copy(src: object, dest: object) -> None:
+    def do_copy(src: trio.Path, dest: trio.Path) -> None:
         print(f'Copy {src} -> {dest}')
+        with open(src, 'rb') as sf, open(dest, 'wb') as df:
+            shutil.copyfileobj(sf, df)
 
     core_nursery.start_soon(delay_enable)
 
@@ -321,7 +324,7 @@ async def main_gui(
                 for suffix in MDL_EXTS:
                     try:
                         await trio.to_thread.run_sync(
-                            demo_copy,
+                            do_copy,
                             src.with_suffix(suffix),
                             dest.with_suffix(suffix),
                         )
@@ -329,7 +332,7 @@ async def main_gui(
                         pass
             else:
                 await trio.to_thread.run_sync(
-                    demo_copy,
+                    do_copy,
                     src, dest,
                 )
 
