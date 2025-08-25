@@ -1,20 +1,24 @@
 """Implement cubes and droppers."""
 from __future__ import annotations
+
 from typing import NamedTuple, Literal, assert_never
 
-from collections.abc import MutableMapping, Sequence
+from collections.abc import MutableMapping
 from collections import defaultdict
 from contextlib import suppress
 from weakref import WeakKeyDictionary
+import itertools
 
 from enum import Enum
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
+from srctools.geometry import Geometry, Polygon
 from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle
 import srctools.logger
 import attrs
 
-from precomp import brushLoc, options, packing, conditions, connections
+import consts
+from precomp import brushLoc, options, packing, conditions, connections, template_brush
 from precomp.collisions import Collisions, CollideType
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst, resolve_filter
@@ -81,6 +85,10 @@ COOP_CUBE_VSCRIPT = 'bee2/coop_block_grate_grab'
 
 # If no carve volume is supplied, use a bbox this large.
 DEFAULT_CUBE_CARVE = 48.0
+DEFAULT_CUBE_CARVE_VERTS = [frozenset({
+    FrozenVec(xyz)
+    for xyz in itertools.product([-DEFAULT_CUBE_CARVE/2, DEFAULT_CUBE_CARVE/2], repeat=3)
+})]
 
 
 class CubeEntType(Enum):
@@ -336,7 +344,7 @@ class DropperType:
     id: str
     instances: list[str]
     # Where the cube should spawn.
-    cube_pos: Vec
+    cube_pos: FrozenVec
     cube_orient: Angle
 
     # Instance output fired when dropper starts spawning.
@@ -351,7 +359,7 @@ class DropperType:
     # The instance to use to bounce-paint the dropped cube.
     bounce_paint_file: str
     # Template used for the carved clip brush.
-    clip_template: str
+    clip_template: str | tuple[template_brush.Template, frozenset[str]]
     # The points where the cube brush is placed to carve from.
     clip_points: list[FrozenVec]
 
@@ -383,7 +391,7 @@ class DropperType:
         return cls(
             id=conf['id'].upper(),
             instances=instances,
-            cube_pos=conf.vec('cube_pos'),
+            cube_pos=conf.vec('cube_pos').freeze(),
             cube_orient=cube_orient,
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
             out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
@@ -400,7 +408,7 @@ class DropperType:
 
 class CubeType:
     """A type of cube that can be spawned from droppers."""
-    clip_carve: Sequence[frozenset[FrozenVec]] | str | None
+    clip_carve: list[frozenset[FrozenVec]] | str | None
 
     def __init__(
         self,
@@ -617,7 +625,7 @@ class CubePair:
         if drop_type is not None:
             self.spawn_offset = drop_type.cube_pos
         else:
-            self.spawn_offset = Vec()
+            self.spawn_offset = FrozenVec()
 
         # Addons to attach to the cubes.
         self.addons: list[tuple[CubeAddon, EntityFixup]] = []
@@ -1104,7 +1112,7 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
 )
 def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     """Update the position cubes will be spawned at for a dropper."""
-    offset = LazyValue.parse(res.value).as_vec()
+    offset: LazyValue[FrozenVec] = LazyValue.parse(res.value).as_vec().map(Vec.freeze)
 
     def apply_offset(inst: Entity) -> None:
         """Change the position."""
@@ -1166,6 +1174,9 @@ def res_change_dropper_type(inst: Entity, res: Keyvalues) -> None:
             kind='DropperType',
             id=res.value,
         )) from None
+    else:
+        if pair.drop_type.cube_pos:
+            pair.spawn_offset = pair.drop_type.cube_pos
 
 
 @conditions.make_result(
@@ -1980,6 +1991,72 @@ def make_cube(
     return has_addon_inst, ent
 
 
+def place_clip(vmf: VMF, dropper: Entity, pair: CubePair, drop_type: DropperType) -> None:
+    """Generate and place the clip for dropper."""
+    match drop_type.clip_template:
+        case str(temp_name):
+            temp_name, visgroups = template_brush.parse_temp_name(drop_type.clip_template)
+            temp = template_brush.get_template(temp_name)
+        case (temp, visgroups):
+            pass
+    origin = Vec.from_str(dropper['origin'])
+    orient = Matrix.from_angstr(dropper['angles'])
+    clip = template_brush.import_template(
+        vmf, temp, origin, orient,
+        add_to_map=False,
+        additional_visgroups=visgroups,
+    )
+
+    # Grab the cube geometry we need. This is a template, but once we've loaded it,
+    # just remember the vertices.
+    verts: list[frozenset[FrozenVec]]
+    match pair.cube_type.clip_carve:
+        case list() as verts:
+            pass  # Already parsed.
+        case str(temp_name):  # Not yet parsed.
+            temp_name, visgroups = template_brush.parse_temp_name(temp_name)
+            verts = vert_list = pair.cube_type.clip_carve = []
+            for brush in template_brush.get_template(temp_name).visgrouped_solids(visgroups):
+                geo = Geometry.from_brush(brush)
+                vert_list.append(frozenset({
+                    vert for poly in geo.polys for vert in poly.vertices
+                }))
+            del vert_list
+        case None:
+            LOGGER.warning(
+                'Cube type "{}" has no clip carve shape, assuming a {}^3 cube',
+                pair.cube_type.id, DEFAULT_CUBE_CARVE,
+            )
+            verts = pair.cube_type.clip_carve = DEFAULT_CUBE_CARVE_VERTS
+        case never:
+            assert_never(never)
+
+    clip_geo_world = [Geometry.from_brush(brush) for brush in clip.world]
+    if clip.detail is not None:
+        clip_geo_detail = [Geometry.from_brush(brush) for brush in clip.detail.solids]
+    else:
+        clip_geo_detail = []
+    for off_pair in itertools.pairwise(drop_type.clip_points):
+        for shape in verts:
+            carve = Geometry.from_points([
+                (vert + off) @ orient + origin
+                for off in off_pair for vert in shape
+            ])
+            clip_geo_world = list(Geometry.raw_carve(clip_geo_world, carve))
+            clip_geo_detail = list(Geometry.raw_carve(clip_geo_detail, carve))
+    Geometry.unshare_faces(clip_geo_world)
+    Geometry.unshare_faces(clip_geo_detail)
+    vmf.add_brushes([
+        geo.rebuild(vmf, consts.Tools.INVISIBLE)
+        for geo in clip_geo_world
+    ])
+    if clip_geo_detail:
+        vmf.create_ent('func_detail').solids = [
+            geo.rebuild(vmf, consts.Tools.INVISIBLE)
+            for geo in clip_geo_detail
+        ]
+
+
 @conditions.MetaCond.GenerateCubes.register
 def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None:
     """Generates cube instances.
@@ -2081,7 +2158,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
         if pair.dropper:
             assert pair.drop_type is not None, pair
             pos = Vec.from_str(pair.dropper['origin'])
-            pos += pair.spawn_offset @ Angle.from_str(pair.dropper['angles'])
+            pos += pair.spawn_offset.thaw() @ Angle.from_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map, prevent_grate_use)
             cubes.append(drop_cube)
 
@@ -2090,6 +2167,9 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
             drop_cube['targetname'] = conditions.local_name(
                 pair.dropper, 'box',
             )
+
+            if pair.drop_type.clip_template:
+                place_clip(vmf, pair.dropper, pair, pair.drop_type)
 
             # Implement the outputs.
 
