@@ -80,6 +80,14 @@ ui_list_getter: Callable[[str, ListStyle, list[str]], str] = lambda lang, kind, 
 class HTMLFormatter(string.Formatter):
     """Custom format variant which escapes fields for HTML."""
     @override
+    def get_value(self, key: int | str, args: Sequence[Any], kwargs: Mapping[str, Any]) -> object:
+        try:
+            return super().get_value(key, args, kwargs)
+        except LookupError:
+            LOGGER.error("Lookup fail: {} in (*{}, **{})", key, args, kwargs)
+            return f'(?MISSING: {key}?)'
+
+    @override
     def format_field(self, value: Any, format_spec: str) -> str:
         """Called to convert a field in the format string."""
         if isinstance(value, TransToken):
