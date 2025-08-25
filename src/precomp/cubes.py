@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import NamedTuple, Literal, assert_never
 
-from collections.abc import MutableMapping
+from collections.abc import MutableMapping, Sequence
 from collections import defaultdict
 from contextlib import suppress
 from weakref import WeakKeyDictionary
@@ -78,6 +78,9 @@ CUBE_ID_CUSTOM_MODEL_HACK = '6'
 # In coop, the viewmodel grabbing behaviour allows you to pull cubes through anything
 # if you can pick them up. So optionally add a VScript to deny USE if grating is in the way.
 COOP_CUBE_VSCRIPT = 'bee2/coop_block_grate_grab'
+
+# If no carve volume is supplied, use a bbox this large.
+DEFAULT_CUBE_CARVE = 48.0
 
 
 class CubeEntType(Enum):
@@ -347,6 +350,10 @@ class DropperType:
     filter_name: str
     # The instance to use to bounce-paint the dropped cube.
     bounce_paint_file: str
+    # Template used for the carved clip brush.
+    clip_template: str
+    # The points where the cube brush is placed to carve from.
+    clip_points: list[FrozenVec]
 
     @classmethod
     def parse(cls, conf: Keyvalues) -> DropperType:
@@ -380,13 +387,21 @@ class DropperType:
             in_respawn=Output.parse_name(conf['InputRespawn']),
             bounce_paint_file=conf['BluePaintInst', ''],
             filter_name=conf['filtername', 'filter'],
+            clip_template=conf['clip', ''],
+            clip_points=[
+                FrozenVec.from_str(kv.value)
+                for kv in conf.find_all('clip_point')
+            ]
         )
 
 
 class CubeType:
     """A type of cube that can be spawned from droppers."""
+    clip_carve: Sequence[frozenset[FrozenVec]] | str | None
+
     def __init__(
         self,
+        *,
         cube_id: str,
         cube_type: CubeEntType,
         has_name: str,
@@ -403,6 +418,7 @@ class CubeType:
         base_tint: Vec,
         overlay_addon: CubeAddon | None,
         overlay_think: str | None,
+        clip_carve: str | None,
     ) -> None:
         self.id = cube_id
         self.instances = resolve_inst(cube_item_id)
@@ -450,6 +466,9 @@ class CubeType:
         self.in_map = False
         # Same for colorized version.
         self.color_in_map = False
+        # Template used to carve clip brushes. Once first loaded,
+        # replaced by a set of points for each brush which is all we need.
+        self.clip_carve = clip_carve
 
     @classmethod
     def parse(cls: type[CubeType], conf: Keyvalues) -> CubeType:
@@ -513,22 +532,23 @@ class CubeType:
             cust_model_superpos_ghost = conf['modelSuperpos', None]
 
         return cls(
-            cube_id,
-            cube_type,
-            conf['hasName'],
-            cube_item_id,
-            cube_type is CubeEntType.comp or conf.bool('isCompanion'),
-            conf.bool('tryRusty'),
-            cust_model,
-            cust_model_color,
-            cust_model_superpos_ghost,
-            model_swap_meth,
-            packlist,
-            packlist_color,
-            conf.float('offset', 20),
-            conf.vec('baseTint', 255, 255, 255),
-            CubeAddon.base_parse(cube_id, conf),
-            conf['thinkFunc', None],
+            cube_id=cube_id,
+            cube_type=cube_type,
+            has_name=conf['hasName'],
+            cube_item_id=cube_item_id,
+            is_companion=cube_type is CubeEntType.comp or conf.bool('isCompanion'),
+            try_rusty=conf.bool('tryRusty'),
+            model=cust_model,
+            model_color=cust_model_color,
+            model_superpos_ghost=cust_model_superpos_ghost,
+            model_swap_meth=model_swap_meth,
+            pack=packlist,
+            pack_color=packlist_color,
+            base_offset=conf.float('offset', 20),
+            base_tint=conf.vec('baseTint', 255, 255, 255),
+            overlay_addon=CubeAddon.base_parse(cube_id, conf),
+            overlay_think=conf['thinkFunc', None],
+            clip_carve=conf['clip_carve', None],
         )
 
     def add_models(self, models: dict[str, str]) -> None:
