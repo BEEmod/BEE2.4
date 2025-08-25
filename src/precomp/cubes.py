@@ -599,6 +599,10 @@ class CubePair:
         self.drop_type = drop_type
         self.dropper = dropper
 
+        # The default cube dropper has inverted respawn/autodrop fixups.
+        # Cache this so if the dropper ID is changed later, this gets preserved.
+        self.is_default_dropper = drop_type is not None and drop_type.id == VALVE_DROPPER_ID
+
         # Fixup values from the cube's instance.
         if cube_fixup is None:
             if cube is not None:
@@ -1277,18 +1281,31 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     will have been removed.
     """
     # cube or dropper -> cubetype or droppertype value.
-    inst_to_cube: dict[str, CubeType] = {
-        fname.casefold(): cube_type
-        for cube_type in CUBE_TYPES.values()
-        for fname in cube_type.instances
-        if fname
-    }
-    inst_to_drop: dict[str, DropperType] = {
-        fname.casefold(): drop_type
-        for drop_type in DROPPER_TYPES.values()
-        for fname in drop_type.instances
-        if fname
-    }
+    inst_to_cube: dict[str, CubeType] = {}
+    inst_to_drop: dict[str, DropperType] = {}
+    for cube_type in CUBE_TYPES.values():
+        for fname in cube_type.instances:
+            if not fname:
+                continue
+            fname = fname.casefold()
+            if fname in inst_to_drop:
+                raise ValueError(
+                    f'Instance "{fname}" assigned to multiple dropper types: '
+                    f'{cube_type.id} & {inst_to_cube[fname].id}'
+                )
+            inst_to_cube[fname] = cube_type
+
+    for drop_type in DROPPER_TYPES.values():
+        for fname in drop_type.instances:
+            if not fname:
+                continue
+            fname = fname.casefold()
+            if fname in inst_to_drop:
+                raise ValueError(
+                    f'Instance "{fname}" assigned to multiple dropper types: '
+                    f'{drop_type.id} & {inst_to_drop[fname].id}'
+                )
+            inst_to_drop[fname] = drop_type
 
     # Origin -> instances
     dropper_pos: dict[FrozenVec, tuple[Entity, DropperType]] = {}
@@ -2270,7 +2287,8 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
 
             # Add output to respawn the cube.
             should_respawn = pair.dropper.fixup.bool('$disable_autorespawn')
-            if pair.drop_type.id == VALVE_DROPPER_ID:
+            LOGGER.error('Dropper: {}, {}, default={}', pair, pair.drop_type, pair.is_default_dropper)
+            if pair.is_default_dropper:
                 # Valve's dropper makes these match the name (inverted to
                 # the checkboxes in the editor), but in custom items they
                 # match the checkboxes.
