@@ -2051,11 +2051,13 @@ def place_clip(
         clip_geo_detail = [Geometry.from_brush(brush) for brush in clip.detail.solids]
     else:
         clip_geo_detail = []
+    cube_orient = drop_type.cube_orient
     for off_pair in itertools.pairwise(drop_type.clip_points):
         for shape in verts:
             carve = Geometry.from_points([
-                (vert + off) @ orient + origin
-                for off in off_pair for vert in shape
+                (vert @ cube_orient + off) @ orient + origin
+                for off in off_pair
+                for vert in shape
             ])
             clip_geo_world = list(Geometry.raw_carve(clip_geo_world, carve))
             clip_geo_detail = list(Geometry.raw_carve(clip_geo_detail, carve))
