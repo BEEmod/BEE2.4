@@ -1,14 +1,17 @@
 """Implements a condition which allows linking items into a sequence."""
 from __future__ import annotations
+from typing import assert_never
 from enum import Enum
 import itertools
 import math
 
-import attrs
-from srctools import Keyvalues, VMF, Entity
+from srctools import Keyvalues, VMF, Entity, FrozenVec, Vec
+from srctools.geometry import Geometry
 import srctools.logger
+import attrs
 
-from precomp import instanceLocs, item_chain, conditions
+from precomp import instanceLocs, item_chain, conditions, template_brush, collisions
+from precomp.lazy_value import LazyValue
 import user_errors
 
 
@@ -39,6 +42,12 @@ class Config:
     allow_mid: bool
     allow_end: bool
     allow_loop: bool
+
+    # A template ID, or the already parsed verts.
+    track_coll: str | list[frozenset[FrozenVec]]
+    # Local position for the collision.
+    track_coll_off: LazyValue[Vec]
+    track_coll_type: LazyValue[collisions.CollideType]
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
@@ -134,6 +143,9 @@ def res_linked_item(res: Keyvalues) -> conditions.ResultCallable:
         allow_mid=res.bool('allowMid', True),
         allow_end=res.bool('allowEnd', True),
         transfer_io=res.bool('transferIO', True),
+        track_coll_off=LazyValue.parse(res['track_coll_off', '']).as_offset(),
+        track_coll=res['track_coll', ''],
+        track_coll_type=LazyValue.parse(res['track_coll_type', 'temporary']).map(collisions.CollideType.parse),
         antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
         scaff_endcap_free_rot=res.bool('endcap_free_rotate'),
@@ -152,14 +164,17 @@ res_linked_item.__doc__ = res_linked_item.__doc__.replace(
 
 
 @conditions.MetaCond.LinkedItems.register
-def link_items(vmf: VMF) -> None:
+def link_items(vmf: VMF, coll: collisions.Collisions) -> None:
     """Take the defined linked items, and actually link them together."""
     for name, group in ITEMS_TO_LINK.items():
         LOGGER.info('Linking {} items...', name)
-        link_item(vmf, group)
+        link_item(vmf, coll, group)
 
 
-def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
+def link_item(
+    vmf: VMF, coll: collisions.Collisions,
+    group: list[item_chain.Node[Config]],
+) -> None:
     """Link together a single group of items."""
     chains = item_chain.chain(group, allow_loop=True)
     for group_counter, node_list in enumerate(chains):
@@ -203,23 +218,51 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
 
         for index, node in enumerate(node_list):
             conf = node.conf
+            LOGGER.info('Track coll: {}', conf.track_coll)
             is_floor = node.orient.up().z > 0.99
 
             if node.next is None and node.prev is None:
                 # No connections in either direction, just skip.
                 continue
 
+            if conf.track_coll and node.next is not None:
+                match conf.track_coll:
+                    case list() as coll_geo:
+                        pass  # Already parsed.
+                    case str(temp_name):  # Not yet parsed.
+                        temp_name, visgroups = template_brush.parse_temp_name(temp_name)
+                        coll_geo = conf.track_coll = []
+                        for brush in template_brush.get_template(temp_name).visgrouped_solids(visgroups):
+                            geo = Geometry.from_brush(brush)
+                            coll_geo.append(frozenset({
+                                vert for poly in geo.polys for vert in poly.vertices
+                            }))
+                off_a = node.conf.track_coll_off(node.item.inst)
+                off_b = node.next.conf.track_coll_off(node.next.item.inst)
+                coll_type = conf.track_coll_type(node.item.inst)
+                for point_cloud in coll_geo:
+                    coll.add(collisions.Volume.from_geo(
+                        geo=Geometry.from_points([
+                            vert + off
+                            for off in [off_a, off_b]
+                            for vert in point_cloud
+                        ]),
+                        contents=coll_type,
+                        name=node.item.name,
+                    ))
+
             # We can't touch antlines if the item has regular outputs.
             if not node.item.outputs:
-                if conf.antline is AntlineHandling.REMOVE:
-                    node.item.delete_antlines()
-                elif conf.antline is AntlineHandling.MOVE:
-                    if index != 0:
-                        node.item.transfer_antlines(node_list[0].item)
-                elif conf.antline is AntlineHandling.KEEP:
-                    pass
-                else:
-                    raise AssertionError(conf.antline)
+                match conf.antline:
+                    case AntlineHandling.REMOVE:
+                        node.item.delete_antlines()
+                    case AntlineHandling.MOVE:
+                        if index != 0:
+                            node.item.transfer_antlines(node_list[0].item)
+                    case AntlineHandling.KEEP:
+                        pass
+                    case never:
+                        assert_never(never)
 
             # Transfer inputs and outputs to the first.
             if index != 0 and conf.transfer_io:
