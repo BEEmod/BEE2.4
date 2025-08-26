@@ -7,8 +7,9 @@ import math
 from pytest_regressions.file_regression import FileRegressionFixture
 from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
+import dirty_equals
 
-from collisions import BBox, CollideType, NonBBoxError, Volume
+from collisions import BBox, CollideType, NonBBoxError, Volume, trace_ray, Hit
 
 
 type Tuple3 = tuple[int, int, int]
@@ -389,3 +390,29 @@ def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
             )
 
     file_regression.check(vmf.export(), extension='.vmf', binary=False)
+
+
+def test_volume_trace() -> None:
+    """Test traces against volumes."""
+    with Path(__file__, '..', 'volume_sample.vmf').resolve().open() as f:
+        vmf = VMF.parse(Keyvalues.parse(f))
+    volumes = [
+        volume
+        for ent in vmf.entities
+        for volume in Volume.from_ent(ent)
+    ]
+
+    res = trace_ray(Vec(-32, 528, -128), Vec(0, 0, 256), volumes)
+    assert res is not None
+    assert res.normal == Vec(0, 0, -1)
+    assert res.impact == Vec(-32, 528, -64)
+    assert res.distance == 64.0
+
+    res = trace_ray(Vec(32, 528, 112), Vec(0, 256, 0), volumes)
+    assert res is None
+
+    res = trace_ray(Vec(16, 528, 96), Vec(0, 256, 0), volumes)
+    assert res is not None
+    assert res.normal.dot(Vec(0, -0.5547, 0.832)) > 0.9
+    assert res.impact == Vec(16, 560, 96)
+    assert res.distance == dirty_equals.IsApprox(32)

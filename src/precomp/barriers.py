@@ -1847,7 +1847,7 @@ def add_glass_floorbeams(
                     plane.plane_to_world(*flip_axes(beam_start, side_pos)),
                     normal_start,
                     hit_left.impact,
-                    -hit_left.normal,
+                    hit_left.normal,
                 ))
 
                 # Trace again, this time backwards to find out where to emerge from.
@@ -1868,7 +1868,7 @@ def add_glass_floorbeams(
                 beam_start = (
                     forward.dot(hit_left.impact) + forward.dot(hit_right.impact)
                 ) / 2.0
-                normal_start = -hit_left.normal
+                normal_start = hit_left.normal
                 # On the next iteration, disallow colliding with the same bboxes. Otherwise,
                 # we'll just immediately hit it again.
                 trace_against = [

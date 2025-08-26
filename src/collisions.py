@@ -7,11 +7,12 @@ from enum import Flag
 import functools
 import operator
 
-from srctools import conv_bool, logger, geometry
+from srctools import conv_bool, logger
+from srctools.geometry import Plane, Polygon, Geometry
 from srctools.math import (
     AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, lerp, to_matrix,
 )
-from srctools.vmf import VMF, Entity, Side, Solid
+from srctools.vmf import VMF, Entity, Side
 import attrs
 
 import consts
@@ -524,13 +525,13 @@ class BBox:
                 if time > delta[axis]:
                     raise ValueError('No hit!')
                 time /= delta[axis]
-                return time, 1.0
+                return time, -1.0
             elif start[axis] > maxes[axis]:
                 time = maxes[axis] - start[axis]
                 if time < delta[axis]:
                     raise ValueError('No hit!')
                 time /= delta[axis]
-                return time, -1.0
+                return time, 1.0
             else:
                 return -1.0, 0.0
 
@@ -608,31 +609,19 @@ class BBox:
         return new_bbox
 
 
-@attrs.frozen
-class Plane:
-    """A plane, used to represent the sides of a volume."""
-    normal: FrozenVec
-    distance: float
-
-    @property
-    def point(self) -> FrozenVec:
-        """Return an arbitary point on this plane."""
-        return self.normal * self.distance
-
-
 @attrs.frozen(init=False)  # __attrs_init__() is incompatible with the superclass.
 class Volume(BBox):  # type: ignore[override]
     """A bounding box with additional clipping planes, allowing it to be an arbitary polyhedron.
 
     The planes do include ones for each bounding box side, if that is a valid face.
     """
-    planes: Sequence[Plane]
+    geo: Geometry
 
     # noinspection PyMissingConstructor
     def __init__(
         self,
         bbox_min: FrozenVec, bbox_max: FrozenVec,
-        planes: Sequence[Plane],
+        geo: Geometry,
         *,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
@@ -644,7 +633,7 @@ class Volume(BBox):  # type: ignore[override]
             contents,
             name,
             frozenset([tags] if isinstance(tags, str) else tags),
-            planes,
+            geo,
         )
 
     @classmethod
@@ -655,16 +644,13 @@ class Volume(BBox):  # type: ignore[override]
         tags = frozenset(ent['tags'].split())
 
         for solid in ent.solids:
-            mins, maxes = solid.get_bbox()
-            yield cls(mins.freeze(), maxes.freeze(), contents=coll, tags=tags, planes=[
-                Plane(norm := face.normal().freeze(), FrozenVec.dot(norm, face.planes[0]))
-                for face in solid.sides
-            ])
+            geo = Geometry.from_brush(solid)
+            yield cls.from_geo(geo, coll, tags)
 
     @classmethod
     def from_geo(
         cls,
-        geo: geometry.Geometry,
+        geo: Geometry,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
         name: str = '',
@@ -674,21 +660,14 @@ class Volume(BBox):  # type: ignore[override]
             vert for poly in geo.polys for vert in poly.vertices
         )
         return cls(
-            mins, maxes, [
-                Plane(poly.plane.normal.freeze(), poly.plane.dist)
-                for poly in geo.polys
-            ], contents=contents, tags=tags, name=name,
+            mins, maxes, geo, contents=contents, tags=tags, name=name,
         )
 
     @override
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
         ent = self._to_kvs(vmf, 'bee2_collision_volume')
-        geo = geometry.Geometry.from_dup_planes([
-            geometry.Plane(plane.normal.thaw(), plane.distance)
-            for plane in self.planes
-        ])
-        ent.solids.append(geo.rebuild(vmf, consts.Tools.CLIP))
+        ent.solids.append(self.geo.copy().rebuild(vmf, consts.Tools.CLIP))
 
         return ent
 
@@ -707,7 +686,7 @@ class Volume(BBox):  # type: ignore[override]
         """Return a new volume with the name, contents or tags changed."""
         return Volume(
             self.mins.freeze(), self.maxes.freeze(),
-            self.planes,
+            self.geo.copy(),
             contents=contents if contents is not None else self.contents,
             name=name if name is not None else self.name,
             tags=tags if tags is not None else self.tags,
@@ -726,10 +705,14 @@ class Volume(BBox):  # type: ignore[override]
         matrix, mins, maxs = self._rotate_bbox(other)
         return Volume(
             mins.freeze(), maxs.freeze(),
-            planes=[
-                Plane(plane.normal @ matrix, plane.distance)
-                for plane in self.planes
-            ],
+            geo=Geometry([
+                Polygon(
+                    None,
+                    [vert @ matrix for vert in poly.vertices],
+                    Plane(poly.plane.normal @ matrix, poly.plane.dist),
+                )
+                for poly in self.geo.polys
+            ]),
             contents=self.contents,
             tags=self.tags,
             name=self.name,
@@ -739,19 +722,19 @@ class Volume(BBox):  # type: ignore[override]
         """Shift the bounding box by a vector."""
         changed = False
 
-        planes = []
-        for plane in self.planes:
-            offset = Vec.dot(plane.normal, other)
-            if abs(offset) > 1e-6:
-                planes.append(Plane(plane.normal, plane.distance + offset))
-                changed = True
-            else:
-                planes.append(plane)
+        polys = []
+        for poly in self.geo.polys:
+            offset = Vec.dot(poly.plane.normal, other)
+            polys.append(Polygon(
+                None,
+                [vert + other for vert in poly.vertices],
+                Plane(poly.plane.normal, poly.plane.dist + offset),
+            ))
 
         return Volume(
             self.mins.freeze() + other,
             self.maxes.freeze() + other,
-            planes=planes if changed else self.planes,
+            geo=Geometry(polys),
             contents=self.contents,
             tags=self.tags,
             name=self.name,
@@ -790,24 +773,24 @@ class Volume(BBox):  # type: ignore[override]
 
         best_hit: Hit | None = None
         inside = True
-        for plane in self.planes:
+        for poly in self.geo.polys:
             # Check if the start point is inside the plane.
-            if Vec.dot(start, plane.normal) < plane.distance:
+            if Vec.dot(start, poly.plane.normal) > poly.plane.dist:
                 inside = False
-            dot = Vec.dot(plane.normal, direction)
+            dot = Vec.dot(poly.plane.normal, direction)
             # If perpendicular or facing in the same direction, the ray can't trace into it.
-            if dot <= 0.0:
+            if dot >= 0.0:
                 continue
-            t = (plane.distance - Vec.dot(start, plane.normal)) / dot
+            t = (poly.plane.dist - Vec.dot(start, poly.plane.normal)) / dot
             if not (0.0 <= t <= max_dist) or (best_hit is not None and t > best_hit.distance):
                 # Not in bounds for the ray, or worse than our best result.
                 continue
             impact = start + t * direction
             # Check this impact is actually possible.
-            for other_plane in self.planes:
-                if other_plane is plane:
+            for other_poly in self.geo.polys:
+                if other_poly is poly:
                     continue
-                if Vec.dot(impact, other_plane.normal) < other_plane.distance:
+                if Vec.dot(impact, other_poly.plane.normal) > other_poly.plane.dist:
                     # We're outside this plane, the impact is wrong.
                     break
             else:  # All other plane tests succeeded.
@@ -815,7 +798,7 @@ class Volume(BBox):  # type: ignore[override]
                     start=start,
                     direction=direction,
                     impact=impact,
-                    normal=plane.normal,
+                    normal=poly.plane.normal.freeze(),
                     distance=t,
                     volume=self,
                 )
@@ -856,19 +839,21 @@ class Volume(BBox):  # type: ignore[override]
         matrix[axis_ind, axis_ind] = (maxs - mins) / (old_maxs - old_mins)
         # For normals.
         inverse = matrix.inverse().transpose()
-        new_planes = []
-        for plane in self.planes:
-            point = plane.point.thaw()
+        new_polys = []
+        for poly in self.geo.polys:
+            point = poly.plane.normal * poly.plane.dist
             point[axis] = lerp(point[axis], old_mins, old_maxs, mins, maxs)
-            norm = (plane.normal @ inverse).norm()
+            norm = (poly.plane.normal @ inverse).norm()
             dist = Vec.dot(norm, point)
-            if norm == plane.normal and abs(dist - plane.distance) < 1e-6:
-                new_planes.append(plane)
-            else:
-                new_planes.append(Plane(norm, dist))
+            verts = []
+            for fvert in poly.vertices:
+                vert = fvert.thaw()
+                vert[axis] = lerp(vert[axis], old_mins, old_maxs, mins, maxs)
+                verts.append(vert.freeze())
+            new_polys.append(Polygon(None, verts, Plane(norm, dist)))
         return Volume(
             bb_mins.freeze(), bb_maxes.freeze(),
-            new_planes,
+            Geometry(new_polys),
             contents=self.contents, name=self.name, tags=self.tags,
         )
 
@@ -877,6 +862,7 @@ def trace_ray(start: Vec | FrozenVec, delta: Vec | FrozenVec, volumes: Iterable[
     """Trace a ray against multiple bboxes/volumes, returning the hit position (if any).
 
     :raises ValueError: If no hit occured.
+    :parameter volumes: The volumes to trace against.
     :parameter start: The starting point for the ray.
     :parameter delta: Both the direction and the maximum length to check.
     """

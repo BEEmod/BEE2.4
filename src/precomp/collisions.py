@@ -118,5 +118,5 @@ class Collisions:
                     contents=coll_type.value,
                 )
                 if isinstance(volume, Volume):
-                    for i, plane in enumerate(volume.planes, 1):
-                        ent[f'plane_{i:02}'] = f'{plane.normal} {format_float(plane.distance)}'
+                    for i, poly in enumerate(volume.geo.polys, 1):
+                        ent[f'plane_{i:02}'] = f'{poly.plane.normal} {format_float(poly.plane.dist)}'
