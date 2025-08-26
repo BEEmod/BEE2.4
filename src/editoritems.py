@@ -877,7 +877,8 @@ class SubType:
 @attrs.define
 class Item:
     """A specific item."""
-    id: utils.ObjectID = utils.obj_id('_')  # The item's unique ID.
+    # The item's unique ID. Can be blank, if the info.txt ID should override.
+    id: utils.ObjectID | utils.BlankID = utils.ID_EMPTY
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
     # Type if present.
@@ -1013,9 +1014,10 @@ class Item:
 
             if tok_value.casefold() == 'item':
                 it = cls.parse_one(tok, pak_id)
-                if it.id in known_ids:
-                    LOGGER.warning('Item {} redeclared!', it.id)
-                known_ids.add(it.id)
+                if it.id != "":
+                    if it.id in known_ids:
+                        LOGGER.warning('Item {} redeclared!', it.id)
+                    known_ids.add(it.id)
                 items.append(it)
             elif tok_value.casefold() == 'renderables':
                 for render_block in tok.block('Renderables'):
@@ -1054,7 +1056,8 @@ class Item:
             if tok_value == 'type':
                 if item_id_set:
                     raise tok.error('Item ID (Type) set multiple times!')
-                item.id = utils.obj_id(tok.expect(Token.STRING), 'Item')
+                # Allow explicitly setting a blank ID, to use the object ID.
+                item.id = utils.obj_id_optional(tok.expect(Token.STRING), 'Item')
                 item_id_set = True
                 # The items here are used internally and must have inputs.
                 if item.id in ANTLINE_ITEMS:
@@ -1093,7 +1096,7 @@ class Item:
 
         # Parse the connection info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
-            item.conn_config = ConnConfig.parse(item.id, connections)
+            item.conn_config = ConnConfig.parse(item.id or utils.obj_id(pak_id), connections)
             item._finalise_connections()
             if 'activate' in connections or 'deactivate' in connections:
                 LOGGER.warning('', exc_info=tok.error('Output activate/deactivate commands need out_ prefix!'))

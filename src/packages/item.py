@@ -46,6 +46,10 @@ TRANS_EXTRA_PALETTES = TransToken.untranslated(
     '"{filename}" has palette set for extra item blocks. Deleting.'
 )
 TRANS_INCOMPLETE_GROUPING = TransToken.untranslated('"{filename}" has incomplete grouping icon definition!')
+TRANS_EDITOR_ID_MISMATCH = TransToken.untranslated(
+    'Item ID "{obj_id}" does not match "{editor_id}" in "{path}"!\n'
+    'Info.txt ID will override, update editoritems!',
+)
 
 
 class InheritKind(Enum):
@@ -1064,12 +1068,13 @@ async def parse_item_folder(
             '"Item" block!'
         ) from None
 
-    if first_item.id.casefold() != data.id.casefold():
-        LOGGER.warning(
-            'Item ID "{}" does not match "{}" in "{}:items/{}/editoritems.txt"! '
-            'Info.txt ID will override, update editoritems!',
-            data.id, first_item.id, data.pak_id, fold,
-        )
+    if first_item.id == "":
+        first_item.id = utils.obj_id(data.id)
+    elif first_item.id != utils.obj_id(data.id):
+        data.warn_auth(TRANS_EDITOR_ID_MISMATCH.format(
+            obj_id=data.id, editor_id=first_item.id,
+            path=f'{data.pak_id}:items/{fold}/editoritems.txt',
+        ))
 
     editor_vmf = editor_vmf_res.result()
     if editor_vmf is not None:
@@ -1088,8 +1093,13 @@ async def parse_item_folder(
     # extra_items is any extra blocks (offset catchers, extent items).
     # These must not have a palette section - it'll override any the user
     # chooses.
-    for extra_item in extra_items:
+    for i, extra_item in enumerate(extra_items, 2):
         extra_item.generate_collisions()
+        if not extra_item.id:
+            raise ValueError(
+                f'"{data.pak_id}:items/{fold}/editoritems.txt has no ID ("Type") set for the '
+                f'#{i} "Item" block!'
+            ) from None
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:
                 data.warn_auth(data.pak_id, TRANS_EXTRA_PALETTES.format(
