@@ -76,7 +76,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
     * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
     * `speed`: Speed of the piston in units per second. Defaults to 150.
-    * `dn_fizz_name`: Defaults to `dn_fizz`. The name of the 'downward' hurt trigger.
+    * `dn_fizz_name`: The name of the 'downward' hurt trigger.
        This is enabled to kill players/objects only if the piston gets jammed when retracting.
        If blank, this is disabled.
     * `template`: Specifies a brush template ID used to generate the `func_movelinear`s. This
@@ -119,6 +119,10 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     snd_loop = res['snd_loop', '']
     snd_stop = res['snd_stop', '']
     speed_var = res['speed', '150']
+
+    # Previously, we just had a boolean, and hardcoded the name
+    if not dn_fizz_name and res.bool('has_dn_fizz'):
+        dn_fizz_name = 'dn_fizz'
 
     def modify_platform(inst: Entity) -> None:
         """Modify each platform."""

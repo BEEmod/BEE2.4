@@ -5,6 +5,7 @@
 * In `ReadSurfType` and `PosIsSolid`, redesigned the behaviour of the
   `gridPos` option combined with two positions.
 * #2142: Fix flickering when hovering over additional labels in drag/drop icons
+* #2147: Fix piston platforms not killing objects when retracting.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
