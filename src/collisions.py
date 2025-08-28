@@ -355,14 +355,14 @@ class BBox:
         """Convert to a Volume object."""
         return Volume(
             self.mins.freeze(), self.maxes.freeze(),
-            [
-                Plane(Vec.x_neg, -self.min_x),
-                Plane(Vec.x_pos, +self.max_x),
-                Plane(Vec.y_neg, -self.min_y),
-                Plane(Vec.y_pos, +self.max_y),
-                Plane(Vec.z_neg, -self.min_z),
-                Plane(Vec.z_pos, +self.max_z),
-            ],
+            Geometry.from_dup_planes([
+                Plane(Vec.x_neg.thaw(), -self.min_x),
+                Plane(Vec.x_pos.thaw(), +self.max_x),
+                Plane(Vec.y_neg.thaw(), -self.min_y),
+                Plane(Vec.y_pos.thaw(), +self.max_y),
+                Plane(Vec.z_neg.thaw(), -self.min_z),
+                Plane(Vec.z_pos.thaw(), +self.max_z),
+            ]),
             name=self.name,
             tags=self.tags,
             contents=self.contents,
