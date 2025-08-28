@@ -11,7 +11,7 @@ from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
 import trio
 
-from config.widgets import WidgetConfig, TIMER_NUM_INF, parse_timer
+from config.widgets import WidgetConfig, TIMER_STR_INF, parse_timer, TIMER_NUMS_INF
 from config import COMPILER
 
 
@@ -352,16 +352,7 @@ def get_itemconf[OptionT: OptionType](
         return default
 
     if timer_delay is not None:
-        if isinstance(option.values, dict):
-            # Multi value and timer supplied, determine if infinite or numeric.
-            try:
-                if 3 <= timer_delay <= 30:
-                    value = option.values[parse_timer(str(timer_delay))]
-                else:
-                    value = option.values[TIMER_NUM_INF]
-            except KeyError:
-                return default
-        else:
+        if isinstance(option.values, str):
             # Singular value, timer supplied, just ignore the timer.
             LOGGER.warning(
                 'ConfigGroup "{}:{}" was fetched with timer value "{}", '
@@ -369,8 +360,19 @@ def get_itemconf[OptionT: OptionType](
                 group_id, wid_id, timer_delay,
             )
             value = option.values
+        else:
+            # Multi value and timer supplied, determine if infinite or numeric.
+            try:
+                if 3 <= timer_delay <= 30:
+                    value = option.values[parse_timer(str(timer_delay))]
+                else:
+                    value = option.values[TIMER_STR_INF]
+            except KeyError:
+                return default
     else:
-        if isinstance(option.values, dict):
+        if isinstance(option.values, str):  # Singular value, no timer configured.
+            value = option.values
+        else:
             # No timer, multi value.
             LOGGER.warning(
                 'ConfigGroup "{}:{}" has different values for each timer delay, '
@@ -378,8 +380,6 @@ def get_itemconf[OptionT: OptionType](
                 group_id, wid_id,
             )
             return default
-        else:  # Singular value, no timer configured.
-            value = option.values
 
     result: str | Vec | bool | float | None
     match default:

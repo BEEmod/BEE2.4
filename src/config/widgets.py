@@ -17,8 +17,8 @@ LOGGER = logger.get_logger(__name__, 'conf.widgets')
 TimerNum = NewType('TimerNum', str)
 TIMER_NUM: list[TimerNum] = [TimerNum(str(n)) for n in range(3, 31)]
 TIMER_STR_INF: TimerNum = TimerNum('inf')
-TIMER_NUM_INF: list[TimerNum] = [TIMER_STR_INF, *TIMER_NUM]
-VALID_NUMS = set(TIMER_NUM_INF)
+TIMER_NUMS_INF: list[TimerNum] = [TIMER_STR_INF, *TIMER_NUM]
+VALID_NUMS = set(TIMER_NUMS_INF)
 
 
 def parse_timer(value: str) -> TimerNum:

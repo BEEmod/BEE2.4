@@ -13,7 +13,7 @@ import trio
 
 from app.mdown import MarkdownData
 from config.widgets import (
-    TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
+    TIMER_NUM as TIMER_NUM, TIMER_NUMS_INF as TIMER_NUMS_INF,
     TimerNum as TimerNum, WidgetConfig,
 )
 from config.stylevar import State as StyleVarState
@@ -319,14 +319,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 if default_prop.has_children():
                     defaults = {
                         num: default_prop[num]
-                        for num in (TIMER_NUM_INF if use_inf else TIMER_NUM)
+                        for num in (TIMER_NUMS_INF if use_inf else TIMER_NUM)
                     }
                 else:
                     # All the same.
-                    defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
+                    defaults = dict.fromkeys(TIMER_NUMS_INF if use_inf else TIMER_NUM, default_prop.value)
 
                 holders: dict[TimerNum, AsyncValue[str]] = {}
-                for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
+                for num in (TIMER_NUMS_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
                         cur_value = LEGACY_CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
