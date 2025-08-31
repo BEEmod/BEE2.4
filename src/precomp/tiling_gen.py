@@ -193,12 +193,20 @@ def bevel_split(
             for v in reversed(range(total_mins_v, total_maxs_v + 1)):
                 top, bottom = [], []
                 for u in range(total_mins_u, total_maxs_u + 1):
-                    a, b = BEVEL_CHAR[bevels[u, v]]
+                    if (u, v) in texture_plane:
+                        a, b = BEVEL_CHAR[bevels[u, v]]
+                    else:
+                        a = b = '  '
                     top.append(a)
                     bottom.append(b)
                 f.write(''.join(top) + '\n')
                 f.write(''.join(bottom) + '\n')
-            f.write(f'\n\nRepr:\n{bevels!r}\n')
+            f.write(f'\n\nBevels:\n')
+            for (u, v), bevel in bevels.items():
+                f.write(f'{u}, {v} = {bevel!r}\n')
+            f.write(f'\n\nPlane:\n')
+            for (u, v), tex in texture_plane.items():
+                f.write(f'{u}, {v} = {tex!r}\n')
 
     while todo_plane:
         u, v, texdef = todo_plane.largest_index()
