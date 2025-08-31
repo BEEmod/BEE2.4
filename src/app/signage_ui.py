@@ -126,6 +126,7 @@ class SignageUIBase[ParentT](ReflowWindow):
             nursery.start_soon(self._hovering_task)
             nursery.start_soon(self.reposition_items_task)
             nursery.start_soon(self._update_picker_items_task)
+            nursery.start_soon(self._save_config_task)
 
             while True:
                 await trigger.wait()
@@ -136,11 +137,6 @@ class SignageUIBase[ParentT](ReflowWindow):
                 await self._close_event.wait()
                 self._close_event = trio.Event()
 
-                # Store off the configured signage.
-                config.APP.store_conf(Layout({
-                    timer: slt.contents.id if slt.contents is not None else ''
-                    for timer, slt in self._slots.items()
-                }))
                 self.ui_win_hide()
                 self.drag_man.unload_icons()
                 self.visible = False
@@ -194,6 +190,16 @@ class SignageUIBase[ParentT](ReflowWindow):
                         slot.contents = PakRef(Signage, value)
                     else:
                         slot.contents = None
+
+    async def _save_config_task(self) -> None:
+        """Store any signage changes."""
+        async for _ in self.drag_man.on_modified.events():
+            LOGGER.debug('Storing signage changes...')
+            config.APP.store_conf(Layout({
+                timer: slt.contents.id if slt.contents is not None else ''
+                for timer, slt in self._slots.items()
+            }))
+            await trio.lowlevel.checkpoint()
 
     async def _hovering_task(self) -> None:
         """Show the signage when hovered, then toggle."""

@@ -7,6 +7,7 @@
 * #2142: Fix flickering when hovering over additional labels in drag/drop icons
 * #2147: Fix piston platforms not killing objects when retracting.
 * Fix the infinite value not working in any item properties options.
+* Ensure signage reconfiguration applies to exports even if window is not closed.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
