@@ -1,11 +1,10 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
-
-from pathlib import Path
 from typing import Literal
 
 from collections import defaultdict
 from collections.abc import Iterator
+from pathlib import Path
 import functools
 import itertools
 
@@ -255,6 +254,9 @@ def _bevel_extend_u(
     """Extend this region in the -u direction.
     This then returns the required bevelling and the tile size.
     """
+    if Bevels.u_min in bevels:
+        # Already beveled, stop now.
+        return max_u, bevels
     # The starting bevel on these sides.
     bevel_min = bevel_plane[max_u, min_v] & Bevels.v_min
     bevel_max = bevel_plane[max_u, max_v] & Bevels.v_max
@@ -262,19 +264,28 @@ def _bevel_extend_u(
     column = range(min_v, max_v + 1)
     min_u = max_u
     while True:
-        # If any on this column are bevelled, stop immediately.
-        if any(bevel_plane[min_u, v] & Bevels.u_min for v in column):
-            return min_u, bevels | Bevels.u_min
-
+        # Try to advance to this position.
         u = min_u - 1
+        # The -u bevel side is special, since we're extending that way.
+        # All tiles need to have the same bevel. If we have none, we can continue,
+        # but if they're all bevelled, stop immediately including that.
+        end_bevel = bevel_plane[u, min_v] & Bevels.u_min
         if (
+            # Stop if either end mismatches that side, any texture mismatches, or the leading edge
+            # is not all the same as mentioned.
             bevel_plane[u, min_v] & Bevels.v_min != bevel_min or
             bevel_plane[u, max_v] & Bevels.v_max != bevel_max or
-            any(texture_plane.get((u, v)) is not tile for v in column)
+            any(
+                texture_plane.get((u, v)) is not tile
+                or bevel_plane[u, v] & Bevels.u_min != end_bevel
+                for v in column
+            )
         ):
             return min_u, bevels
-        # Else: all good, check next column.
+        # Else: all good, we can advance to it.
         min_u = u
+        if end_bevel:  # This is bevelled, stop now.
+            return min_u, bevels | Bevels.u_min
 
 
 def _bevel_extend_v(
@@ -288,25 +299,30 @@ def _bevel_extend_v(
     """Extend this region in the -v direction.
     This then returns the required bevelling and the tile size.
     """
+    if Bevels.v_min in bevels:
+        return max_v, bevels
     bevel_min = bevel_plane[min_u, max_v] & Bevels.u_min
     bevel_max = bevel_plane[max_u, max_v] & Bevels.u_max
     bevels |= bevel_min | bevel_max
     row = range(min_u, max_u + 1)
     min_v = max_v
     while True:
-        # If any on this row are bevelled, stop immediately.
-        if any(bevel_plane[u, min_v] & Bevels.v_min for u in row):
-            return min_v, bevels | Bevels.v_min
-
         v = min_v - 1
+        end_bevel = bevel_plane[min_u, v] & Bevels.v_min
         if (
             bevel_plane[min_u, v] & Bevels.u_min != bevel_min or
             bevel_plane[max_u, v] & Bevels.u_max != bevel_max or
-            any(texture_plane.get((u, v)) is not tile for u in row)
+            any(
+                texture_plane.get((u, v)) is not tile
+                or bevel_plane[u, v] & Bevels.v_min != end_bevel
+                for u in row
+            )
         ):
             return min_v, bevels
-        # Else: all good, check next row.
+        # Else: all good, we can advance to it.
         min_v = v
+        if end_bevel:  # This is bevelled, stop now.
+            return min_v, bevels | Bevels.v_min
 
 
 def generate_brushes(vmf: VMF) -> None:
