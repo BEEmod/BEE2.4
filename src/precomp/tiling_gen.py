@@ -450,8 +450,10 @@ def calculate_plane(
             else:
                 max_width = min(width // size.width, mat_conf.repeat_limit)
                 max_height = min(height // size.height, mat_conf.repeat_limit)
-                width = round(rng.triangular(1, max_width, min(1.5, max_width))) * mat_conf.tile_size.width
-                height = round(rng.triangular(1, max_height, min(1.5, max_height))) * mat_conf.tile_size.height
+                rng_width = rng.triangular(1, max_width, min(1.5, max_width))
+                rng_height = rng.triangular(1, max_height, min(1.5, max_height))
+                width = round(rng_width) * mat_conf.tile_size.width
+                height = round(rng_height) * mat_conf.tile_size.height
             tex_def = make_texdef(
                 mat_conf,
                 subtile.antigel,
@@ -599,6 +601,7 @@ def generate_plane(
     norm_axis = plane_key.normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
     grid_pos: PlaneGrid[TileDef] = PlaneGrid()
+    norm_off = plane_key.normal * plane_key.distance
 
     subtile_pos = PlaneGrid(default=SubTile(TileType.VOID, False))
 
@@ -633,7 +636,7 @@ def generate_plane(
 
     # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, dump_path, grid_pos, orig_tiles):
-        center = plane_key.normal * plane_key.distance + Vec.with_axes(
+        center = norm_off + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
             # = (min + max) * 16
@@ -652,8 +655,7 @@ def generate_plane(
             antigel=tex_def.antigel,
         )
         vmf.add_brush(brush)
-        tile_min = Vec.with_axes(
-            norm_axis, plane_key.distance,
+        tile_min = norm_off + Vec.with_axes(
             u_axis, -32 * tex_def.u_off,
             v_axis, -32 * tex_def.v_off,
         )
@@ -666,8 +668,7 @@ def generate_plane(
                 try:
                     tiledefs.add(grid_pos[u, v])
                 except KeyError:
-                    pos = Vec.with_axes(
-                        norm_axis, plane_key.distance,
+                    pos = norm_off + Vec.with_axes(
                         u_axis, 32. * u + 16.,
                         v_axis, 32. * v + 16.,
                     )
