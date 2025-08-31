@@ -831,7 +831,10 @@ def load_config(conf: Keyvalues) -> None:
                     for rot in QuarterRot:
                         size = start_size.rotated if rot.flips_uv else start_size
                         for mat in mat_list:
-                            textures[size].append(attrs.evolve(mat, rotation=mat.rotation + rot))
+                            textures[size].append(attrs.evolve(
+                                mat,
+                                tile_size=size, rotation=mat.rotation + rot
+                            ))
 
             # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
@@ -1082,6 +1085,7 @@ class Generator(abc.ABC):
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
     global_settings: ClassVar[dict[str, Any]] = {}
+    # For P1 style primarily, defines a 'bottom trim' which restricts tile sizes.
     bottom_trim_pattern: Sequence[TileSize]
 
     def __init__(
