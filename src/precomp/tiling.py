@@ -100,12 +100,15 @@ class Bevels(Flag):
     none = 0
     north = v_max = 0b1000
     south = v_min = 0b0100
-    east  = u_min = 0b0010
-    west  = u_max = 0b0001
+    west  = u_min = 0b0010
+    east  = u_max = 0b0001
 
     u_both = east | west
     v_both = north | south
     all = u_both | v_both
+
+# All possible bevel flags.
+BEVEL_COMBOS = [Bevels(i) for i in range(2**4)]
 
 
 # Given the two bevel options, determine the correct texturing
@@ -119,11 +122,11 @@ _BEVEL_BACK_SCALE_SINGLE = {
 }
 # The above for both axes, pre-calculated for every bevel.
 BEVEL_BACK_SCALE = {
-    (bevel := Bevels(i)): (
+    bevel: (
         _BEVEL_BACK_SCALE_SINGLE[Bevels.u_min in bevel, Bevels.u_max in bevel],
         _BEVEL_BACK_SCALE_SINGLE[Bevels.v_min in bevel, Bevels.v_max in bevel],
     )
-    for i in range(2**4)
+    for bevel in BEVEL_COMBOS
 }
 del _BEVEL_BACK_SCALE_SINGLE
 type Axis = Literal[-1, 0, +1]
@@ -2155,7 +2158,7 @@ def bevel_split(
             for v in v_range
         ]
         bevel_umaxes: list[Bevels] = [
-            Bevels.u_max if tile_pos[max_u, v].should_bevel(1, 0) else Bevels.none
+            Bevels.u_max if tile_pos[max_u, v].should_bevel(+1, 0) else Bevels.none
             for v in v_range
         ]
         bevel_vmins: list[Bevels] = [
@@ -2163,7 +2166,7 @@ def bevel_split(
             for u in u_range
         ]
         bevel_vmaxes: list[Bevels] = [
-            Bevels.v_max if tile_pos[u, max_v].should_bevel(0, 1) else Bevels.none
+            Bevels.v_max if tile_pos[u, max_v].should_bevel(0, +1) else Bevels.none
             for u in u_range
         ]
 
