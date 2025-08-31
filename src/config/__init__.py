@@ -22,7 +22,7 @@ import utils
 from transtoken import TransToken
 
 
-LOGGER = logger.get_logger(__name__)
+LOGGER = logger.get_logger('config', alias='config')
 if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
     LOGGER.setLevel('INFO')
 

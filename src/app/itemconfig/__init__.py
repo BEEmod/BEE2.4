@@ -37,7 +37,7 @@ import config
 import packages
 
 
-LOGGER = logger.get_logger(__name__)
+LOGGER = logger.get_logger('app.itemconfig', alias='app.itemconfig')
 
 
 class SingleCreateTask[WidgetT, ImageT: img.UIImage, ConfT: ConfigProto | None](Protocol):

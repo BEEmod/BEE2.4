@@ -66,7 +66,7 @@ __all__ = [
     'TRANS_OBJ_NOT_FOUND',
 ]
 
-LOGGER = srctools.logger.get_logger(__name__, alias='packages')
+LOGGER = srctools.logger.get_logger('packages', alias='packages')
 OBJ_TYPES: dict[str, type[PakObject]] = {}
 PACK_CONFIG = ConfigFile('packages.cfg')
 
@@ -931,7 +931,7 @@ class PackagesSet:
             LOGGER.debug('Migration: {} -> {}', old_ref, new_ref)
             self._migrations[old_ref] = new_ref
         else:
-            if new_ref != exist:
+            if exist is not None and new_ref != exist:
                 # Divergent migrations. Warn the author, mark as invalid.
                 try:  # Need to check which packages these exist in.
                     new_obj = new_ref.resolve(self)

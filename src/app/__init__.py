@@ -20,7 +20,7 @@ from async_util import run_as_task
 import utils
 
 
-LOGGER = get_logger(__name__)
+LOGGER = get_logger('app', alias='app')
 # The nursery where UI tasks etc are run in.
 _APP_NURSERY: trio.Nursery | None = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.

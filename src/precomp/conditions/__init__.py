@@ -70,7 +70,7 @@ __all__ = [
 ]
 COND_MOD_NAME = 'Main Conditions'
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
+LOGGER = srctools.logger.get_logger('conditions', alias='cond.core')
 
 # The global instance filenames we add.
 GLOBAL_INSTANCES: set[str] = set()

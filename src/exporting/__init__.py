@@ -24,7 +24,7 @@ import loadScreen
 import packages
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = srctools.logger.get_logger('exporting', alias='exporting')
 
 
 if TYPE_CHECKING:
