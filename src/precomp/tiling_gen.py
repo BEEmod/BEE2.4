@@ -1,5 +1,7 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
+
+from pathlib import Path
 from typing import Literal
 
 from collections import defaultdict
@@ -7,9 +9,10 @@ from collections.abc import Iterator
 import functools
 import itertools
 
-from srctools import Angle, Entity, VMF, Vec, logger
+from srctools import Angle, Entity, VMF, Vec, logger, FrozenVec
 import attrs
 
+import utils
 from plane import PlaneGrid, PlaneKey
 from precomp import rand, texturing, brushLoc
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
@@ -18,6 +21,45 @@ import consts
 
 
 LOGGER = logger.get_logger(__name__)
+DEBUG = False
+PLANE_NAMES = {
+    FrozenVec(-1, 0, 0): 'w',
+    FrozenVec(+1, 0, 0): 'e',
+    FrozenVec(0, +1, 0): 'n',
+    FrozenVec(0, -1, 0): 's',
+    FrozenVec(0, 0, +1): 'f',
+    FrozenVec(0, 0, -1): 'c',
+}
+
+
+def make_bevel_char(flag: Bevels) -> tuple[str, str]:
+    """Generate box drawing characters to represent bevel patterns."""
+    if Bevels.north in flag:
+        ul = '╔' if Bevels.west in flag else '╒'
+    else:
+        ul = '╓' if Bevels.west in flag else '┌'
+    if Bevels.north in flag:
+        ur = '╗' if Bevels.east in flag else '╕'
+    else:
+        ur = '╖' if Bevels.east in flag else '┐'
+
+    if Bevels.south in flag:
+        ll = '╚' if Bevels.west in flag else '╘'
+    else:
+        ll = '╙' if Bevels.west in flag else '└'
+
+    if Bevels.south in flag:
+        lr = '╝' if Bevels.east in flag else '╛'
+    else:
+        lr = '╜' if Bevels.east in flag else '┘'
+
+    return (ul + ur, ll + lr)
+
+
+BEVEL_CHAR = {
+    bevel: make_bevel_char(bevel)
+    for bevel in map(Bevels, range(0, 0b1111 + 1))
+}
 
 
 @attrs.frozen
@@ -93,6 +135,7 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 
 def bevel_split(
     texture_plane: PlaneGrid[TexDef],
+    dump_path: Path | None,
     tile_pos: PlaneGrid[TileDef],
     orig_tiles: PlaneGrid[SubTile],
 ) -> Iterator[tuple[int, int, int, int, Bevels, TexDef]]:
@@ -143,6 +186,19 @@ def bevel_split(
                 bevels[u, v] &= ~bevel
 
     todo_plane = texture_plane.copy()
+
+    if dump_path is not None:
+        with open(dump_path, 'w', encoding='utf8') as f:
+            f.write(f'Bounds: {total_mins_u},{total_mins_v} - {total_maxs_u}, {total_maxs_v}\n')
+            for v in reversed(range(total_mins_v, total_maxs_v + 1)):
+                top, bottom = [], []
+                for u in range(total_mins_u, total_maxs_u + 1):
+                    a, b = BEVEL_CHAR[bevels[u, v]]
+                    top.append(a)
+                    bottom.append(b)
+                f.write(''.join(top) + '\n')
+                f.write(''.join(bottom) + '\n')
+            f.write(f'\n\nRepr:\n{bevels!r}\n')
 
     while todo_plane:
         u, v, texdef = todo_plane.largest_index()
@@ -239,6 +295,19 @@ def generate_brushes(vmf: VMF) -> None:
     # The key is (normal, plane distance)
     full_tiles: dict[PlaneKey, list[TileDef]] = defaultdict(list)
 
+    if DEBUG:
+        dump_path: Path | None = utils.install_path('reports/tiling_gen')
+        LOGGER.error('Dump path: {}', dump_path)
+        try:
+            for file in dump_path.iterdir():
+                if file.is_file():
+                    file.unlink(missing_ok=True)
+        except FileNotFoundError:
+            pass  # Already empty.
+        dump_path.mkdir(parents=True, exist_ok=True)
+    else:
+        dump_path = None
+
     # First examine each portal/noportal + orient set, to see what the max clump distance can be.
     search_dists: dict[tuple[Portalable, Orient], int] = {}
     for port in Portalable:
@@ -275,7 +344,7 @@ def generate_brushes(vmf: VMF) -> None:
     LOGGER.info('Generating {} planes:', len(full_tiles))
 
     for plane_key, tiles in full_tiles.items():
-        generate_plane(vmf, search_dists, plane_key, tiles)
+        generate_plane(vmf, dump_path, search_dists, plane_key, tiles)
     LOGGER.info(
         'Caches: subtile={}, texdef={}',
         make_subtile.cache_info(), make_texdef.cache_info(),
@@ -511,6 +580,7 @@ def calculate_bottom_trim(
 
 def generate_plane(
     vmf: VMF,
+    dump_path: Path | None,
     search_dists: dict[tuple[Portalable, Orient], int],
     plane_key: PlaneKey,
     tiles: list[TileDef],
@@ -531,6 +601,10 @@ def generate_plane(
     grid_pos: PlaneGrid[TileDef] = PlaneGrid()
 
     subtile_pos = PlaneGrid(default=SubTile(TileType.VOID, False))
+
+    if dump_path is not None:
+        dump_path /= f'plane_{PLANE_NAMES.get(plane_key.normal, plane_key.normal.join("_"))}_{round(plane_key.distance):+05}.log'
+        LOGGER.info('Dump: {}', dump_path)
 
     for tile in tiles:
         pos = tile.pos_front
@@ -558,7 +632,7 @@ def generate_plane(
     missing_tiles = fetch_debug_visgroup(vmf, 'Missing plane tiles')
 
     # Split tiles into each brush that needs to be placed, then create it.
-    for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
+    for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, dump_path, grid_pos, orig_tiles):
         center = plane_key.normal * plane_key.distance + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
