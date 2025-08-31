@@ -140,7 +140,7 @@ def bevel_split(
     orig_tiles: PlaneGrid[SubTile],
 ) -> Iterator[tuple[int, int, int, int, Bevels, TexDef]]:
     """Split the optimised segments to produce the correct bevelling."""
-    bevels = PlaneGrid(default=Bevels.none)
+    bevels: PlaneGrid[Bevels] = PlaneGrid(default=Bevels.none)
 
     total_mins_u, total_mins_v = texture_plane.mins
     total_maxs_u, total_maxs_v = texture_plane.maxes
@@ -258,12 +258,13 @@ def _bevel_extend_u(
     # The starting bevel on these sides.
     bevel_min = bevel_plane[max_u, min_v] & Bevels.v_min
     bevel_max = bevel_plane[max_u, max_v] & Bevels.v_max
+    bevels |= bevel_min | bevel_max
     column = range(min_v, max_v + 1)
     min_u = max_u
     while True:
         # If any on this column are bevelled, stop immediately.
         if any(bevel_plane[min_u, v] & Bevels.u_min for v in column):
-            return min_u, bevels & Bevels.u_min
+            return min_u, bevels | Bevels.u_min
 
         u = min_u - 1
         if (
@@ -295,7 +296,7 @@ def _bevel_extend_v(
     while True:
         # If any on this row are bevelled, stop immediately.
         if any(bevel_plane[u, min_v] & Bevels.v_min for u in row):
-            return min_v, bevels & Bevels.v_min
+            return min_v, bevels | Bevels.v_min
 
         v = min_v - 1
         if (
