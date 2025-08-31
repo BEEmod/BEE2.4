@@ -223,48 +223,55 @@ def _bevel_extend(
 ) -> tuple[int, int, int, int, Bevels]:
     """Extend a tile as far as it can."""
     # Try both orders to see which produces the biggest tile.
-    min_u1, min_v1, max_u1, max_v1, bevels1 = _bevel_extend_u(
-        texture_plane, bevel_plane, texdef, Bevels.none,
-        u, v, u, v,
+    start_bevel = bevel_plane[u, v]
+    min_u1, bevels1 = _bevel_extend_u(
+        texture_plane, bevel_plane, texdef, u, start_bevel,
+        v, v,
     )
-    min_u1, min_v1, max_u1, max_v1, bevels1 = _bevel_extend_v(
-        texture_plane, bevel_plane, texdef, bevels1,
-        min_u1, min_v1, max_u1, max_v1,
+    min_v1, bevels1 = _bevel_extend_v(
+        texture_plane, bevel_plane, texdef, v, bevels1,
+        min_u1, u,
     )
-    min_u2, min_v2, max_u2, max_v2, bevels2 = _bevel_extend_v(
-        texture_plane, bevel_plane, texdef, Bevels.none,
-        u, v, u, v,
+    min_v2, bevels2 = _bevel_extend_v(
+        texture_plane, bevel_plane, texdef, v, start_bevel,
+        u, u,
     )
-    min_u2, min_v2, max_u2, max_v2, bevels2 = _bevel_extend_u(
-        texture_plane, bevel_plane, texdef, bevels2,
-        min_u2, min_v2, max_u2, max_v2,
+    min_u2, bevels2 = _bevel_extend_u(
+        texture_plane, bevel_plane, texdef, u, bevels2,
+        min_v2, v,
     )
-    if (1 + max_u1 - min_u1) * (1 + max_v1 - min_v1) > (1 + max_u2 - min_u2) * (1 + max_v2 - min_v2):
-        return min_u1, min_v1, max_u1, max_v1, bevels1
+    if (1 + u - min_u1) * (1 + v - min_v1) > (1 + u - min_u2) * (1 + v - min_v2):
+        return min_u1, min_v1, u, v, bevels1
     else:
-        return min_u2, min_v2, max_u2, max_v2, bevels2
+        return min_u2, min_v2, u, v, bevels2
 
 
 def _bevel_extend_u(
     texture_plane: PlaneGrid[TexDef],
     bevel_plane: PlaneGrid[Bevels],
-    tile: TexDef, bevels: Bevels,
-    min_u: int, min_v: int, max_u: int, max_v: int,
-) -> tuple[int, int, int, int, Bevels]:
+    tile: TexDef, max_u: int, bevels: Bevels,
+    min_v: int, max_v: int,
+) -> tuple[int, Bevels]:
     """Extend this region in the -u direction.
     This then returns the required bevelling and the tile size.
     """
-    bevel_min = bevel_plane[min_u, min_v] & Bevels.v_min
+    # The starting bevel on these sides.
+    bevel_min = bevel_plane[max_u, min_v] & Bevels.v_min
     bevel_max = bevel_plane[max_u, max_v] & Bevels.v_max
-    bevels |= bevel_min | bevel_max
+    column = range(min_v, max_v + 1)
+    min_u = max_u
     while True:
+        # If any on this column are bevelled, stop immediately.
+        if any(bevel_plane[min_u, v] & Bevels.u_min for v in column):
+            return min_u, bevels & Bevels.u_min
+
         u = min_u - 1
         if (
             bevel_plane[u, min_v] & Bevels.v_min != bevel_min or
             bevel_plane[u, max_v] & Bevels.v_max != bevel_max or
-            any(texture_plane.get((u, v)) is not tile for v in range(min_v, max_v + 1))
+            any(texture_plane.get((u, v)) is not tile for v in column)
         ):
-            return min_u, min_v, max_u, max_v, bevels
+            return min_u, bevels
         # Else: all good, check next column.
         min_u = u
 
@@ -272,23 +279,31 @@ def _bevel_extend_u(
 def _bevel_extend_v(
     texture_plane: PlaneGrid[TexDef],
     bevel_plane: PlaneGrid[Bevels],
-    tile: TexDef, bevels: Bevels,
-    min_u: int, min_v: int, max_u: int, max_v: int,
-) -> tuple[int, int, int, int, Bevels]:
+    tile: TexDef,
+    max_v: int,
+    bevels: Bevels,
+    min_u: int, max_u: int,
+) -> tuple[int, Bevels]:
     """Extend this region in the -v direction.
     This then returns the required bevelling and the tile size.
     """
-    bevel_min = bevel_plane[min_u, min_v] & Bevels.u_min
+    bevel_min = bevel_plane[min_u, max_v] & Bevels.u_min
     bevel_max = bevel_plane[max_u, max_v] & Bevels.u_max
     bevels |= bevel_min | bevel_max
+    row = range(min_u, max_u + 1)
+    min_v = max_v
     while True:
+        # If any on this row are bevelled, stop immediately.
+        if any(bevel_plane[u, min_v] & Bevels.v_min for u in row):
+            return min_v, bevels & Bevels.v_min
+
         v = min_v - 1
         if (
             bevel_plane[min_u, v] & Bevels.u_min != bevel_min or
             bevel_plane[max_u, v] & Bevels.u_max != bevel_max or
-            any(texture_plane.get((u, v)) is not tile for u in range(min_u, max_u + 1))
+            any(texture_plane.get((u, v)) is not tile for u in row)
         ):
-            return min_u, min_v, max_u, max_v, bevels
+            return min_v, bevels
         # Else: all good, check next row.
         min_v = v
 
