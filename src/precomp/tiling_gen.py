@@ -368,16 +368,15 @@ def fizzler_tile_gen(
         """Calculate bevels for a set of tiles.
         If either end is voxel-aligned, check for whether the tile should bevel.
         """
-        # TODO: This is not correct.
         bevels = Bevels.none
         if mins % 4 == 0:
             tile = def_plane.get(order(voxel_off, mins))
-            if tile is not None and tile.should_bevel(*order(-1, 0)):
-                bevels |= Bevels[f'{axis}_min']
+            if tile is not None and tile.should_bevel(*order(0, -1)):
+                bevels |= Bevels.v_min if axis == 'u' else Bevels.u_min
         if maxs % 4 == 0:
             tile = def_plane.get(order(voxel_off, maxs))
-            if tile is not None and tile.should_bevel(*order(+1, 0)):
-                bevels |= Bevels[f'{axis}_max']
+            if tile is not None and tile.should_bevel(*order(0, +1)):
+                bevels |= Bevels.v_max if axis == 'u' else Bevels.u_max
         return bevels
 
     for voxel_off in range(split_min, split_max + 1, 4):
