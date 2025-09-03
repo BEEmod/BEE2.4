@@ -1068,6 +1068,9 @@ class TileDef:
         # This violates the _sub_tiles type definition.
         self._get_subtiles()[SUBTILE_FIZZ_KEY] = cast(TileType, axis)
 
+    def get_fizz_orient(self) -> Literal['u', 'v'] | None:
+        return self._get_subtiles().get(SUBTILE_FIZZ_KEY, None)  # type: ignore
+
     def uv_offset(self, u: float, v: float, norm: float) -> Vec:
         """Return an u/v offset from our position.
 

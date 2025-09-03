@@ -240,6 +240,10 @@ class TileSize(StrEnum):
     TILE_1x4 = '1x4'  # Horizontal strip
     TILE_4x1 = '4x1'  # Vertical strip
 
+    # Used for centered fizzlers on either side.
+    TILE_4x8 = '4x8'  # Horizontal thin tile.
+    TILE_8x4 = '8x4'  # Vertical thin tile.
+
     TILE_DOUBLE = 'double'  # 256x256 tile textures.
 
     CLUMP_GAP = 'gap'  # For clumping, spaces without a clump.
@@ -265,6 +269,12 @@ class TileSize(StrEnum):
             return 4, 1
         elif self.value == 'double':
             return 8, 8
+        # Not correct (should be half), but these are only used in special situations as a 1-wide
+        # surface.
+        elif self.value == '4x8':
+            return 1, 8
+        elif self.value == '8x4':
+            return 8, 1
         raise AssertionError(self)
 
     @property
@@ -295,6 +305,11 @@ class TileSize(StrEnum):
             return TileSize.TILE_4x1
         if self is TileSize.TILE_4x1:
             return TileSize.TILE_1x4
+
+        if self is TileSize.TILE_4x8:
+            return TileSize.TILE_8x4
+        if self is TileSize.TILE_8x4:
+            return TileSize.TILE_4x8
         return self
 
 
@@ -553,6 +568,8 @@ TILE_INHERIT = [
     (TileSize.TILE_2x1, TileSize.TILE_1x1),
 
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
+    (TileSize.TILE_4x4, TileSize.TILE_4x8),
+    (TileSize.TILE_4x4, TileSize.TILE_8x4),
 ]
 
 DEFAULT_WEIGHTS = {
@@ -564,8 +581,11 @@ DEFAULT_WEIGHTS = {
     TileSize.TILE_4x1: 3,
     TileSize.TILE_1x4: 3,
     TileSize.TILE_4x4: 1,
-    TileSize.GOO_SIDE: 1,
-    TileSize.CLUMP_GAP: 1,
+    # Special, should never be picked normally.
+    TileSize.GOO_SIDE: 0,
+    TileSize.CLUMP_GAP: 0,
+    TileSize.TILE_4x8: 0,
+    TileSize.TILE_8x4: 0,
 }
 
 

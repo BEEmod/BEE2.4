@@ -1,6 +1,8 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
-from typing import Literal
+
+import math
+from typing import Literal, assert_never
 
 from collections import defaultdict
 from collections.abc import Iterator
@@ -137,7 +139,7 @@ def bevel_split(
     dump_path: Path | None,
     tile_pos: PlaneGrid[TileDef],
     orig_tiles: PlaneGrid[SubTile],
-) -> Iterator[tuple[int, int, int, int, Bevels, TexDef]]:
+) -> Iterator[tuple[float, float, float, float, Bevels, TexDef]]:
     """Split the optimised segments to produce the correct bevelling."""
     bevels: PlaneGrid[Bevels] = PlaneGrid(default=Bevels.none)
 
@@ -210,7 +212,7 @@ def bevel_split(
     while todo_plane:
         u, v, texdef = todo_plane.largest_index()
         min_u, min_v, max_u, max_v, bevel = _bevel_extend(u, v, texdef, todo_plane, bevels)
-        yield min_u, min_v, max_u, max_v, bevel, texdef
+        yield min_u, min_v, max_u + 1, max_v + 1, bevel, texdef
         for u, v in itertools.product(range(min_u, max_u + 1), range(min_v, max_v + 1)):
             del todo_plane[u, v]
 
@@ -323,6 +325,14 @@ def _bevel_extend_v(
         min_v = v
         if end_bevel:  # This is bevelled, stop now.
             return min_v, bevels | Bevels.v_min
+
+
+def fizzler_tile_gen(
+    tile_plane: PlaneGrid[SubTile],
+    axis: Literal['u', 'v'],
+) -> Iterator[tuple[float, float, float, float, Bevels, TexDef]]:
+    """Generate the half-tiles for fizzler brushes."""
+    return iter(())
 
 
 def generate_brushes(vmf: VMF) -> None:
@@ -640,27 +650,55 @@ def generate_plane(
     # TODO: Use PlaneKey instead of axis strings
     norm_axis = plane_key.normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-    grid_pos: PlaneGrid[TileDef] = PlaneGrid()
     norm_off = plane_key.normal * plane_key.distance
+    # For each subtile, stores the original tiledef, to associate overlays etc.
+    grid_pos: PlaneGrid[TileDef] = PlaneGrid()
 
+    # We fill this plane first, then empty as we place each tile.
     subtile_pos = PlaneGrid(default=SubTile(TileType.VOID, False))
+    # We also preserve an unmodified copy to consult.
+    # We clear the default to ensure an error is raised if indexed incorrectly.
+    orig_tiles = PlaneGrid(subtile_pos)
 
     if dump_path is not None:
         dump_path /= f'plane_{PLANE_NAMES.get(plane_key.normal, plane_key.normal.join("_"))}_{round(plane_key.distance):+05}.log'
         LOGGER.info('Dump: {}', dump_path)
 
+    # Stores tiles constructing the half-border next to fizzlers. These are 16-wide, with nodraw
+    # in-between.
+    fizzler_split_u = PlaneGrid()
+    fizzler_split_v = PlaneGrid()
+
     for tile in tiles:
         pos = tile.pos_front
         antigel = tile.is_antigel()
-        u_full = int((pos[u_axis] - 64) // 32)
-        v_full = int((pos[v_axis] - 64) // 32)
+        tile_u = int((pos[u_axis] - 64) // 32)
+        tile_v = int((pos[v_axis] - 64) // 32)
+        fizz_split = tile.get_fizz_orient()
         for u, v, tile_type in tile:
-            if tile_type is not TileType.VOID:
-                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, antigel)
-                grid_pos[u_full + u, v_full + v] = tile
+            if tile_type is TileType.VOID:
+                continue
+            key = (tile_u + u, tile_v + v)
+            grid_pos[key] = tile
+            # If the tiledef is fizzler-split, extract the middle row/column pair into the alternate.
+            # In all cases, we add to the original tiles plane, for bevelling calculations.
+            orig_tiles[key] = subtile = make_subtile(tile_type, antigel)
+            match fizz_split:
+                case None:
+                    subtile_pos[key] = subtile
+                case 'u':
+                    if u in (1, 2):
+                        fizzler_split_u[key] = subtile
+                    else:
+                        subtile_pos[key] = subtile
+                case 'v':
+                    if v in (1, 2):
+                        fizzler_split_v[key] = subtile
+                    else:
+                        subtile_pos[key] = subtile
+                case never:
+                    assert_never(never)
 
-    # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
-    orig_tiles = PlaneGrid(subtile_pos)
     texture_plane: PlaneGrid[TexDef] = PlaneGrid()
 
     # Check if the P1 style bottom trim option is set, and if so apply it.
@@ -675,13 +713,17 @@ def generate_plane(
     missing_tiles = fetch_debug_visgroup(vmf, 'Missing plane tiles')
 
     # Split tiles into each brush that needs to be placed, then create it.
-    for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, dump_path, grid_pos, orig_tiles):
+    for min_u, min_v, max_u, max_v, bevels, tex_def in itertools.chain(
+        bevel_split(texture_plane, dump_path, grid_pos, orig_tiles),
+        fizzler_tile_gen(fizzler_split_u, 'u'),
+        fizzler_tile_gen(fizzler_split_v, 'v'),
+    ):
         center = norm_off + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
             # = (min + max) * 16
-            u_axis, (1 + min_u + max_u) * 16,
-            v_axis, (1 + min_v + max_v) * 16,
+            u_axis, (min_u + max_u) * 16,
+            v_axis, (min_v + max_v) * 16,
         )
         brush, front = make_tile(
             vmf,
@@ -690,8 +732,8 @@ def generate_plane(
             tex_def.tex,
             texturing.SPECIAL.get(center, 'behind', antigel=tex_def.antigel),
             bevels=bevels,
-            width=(1 + max_u - min_u) * 32,
-            height=(1 + max_v - min_v) * 32,
+            width=(max_u - min_u) * 32,
+            height=(max_v - min_v) * 32,
             antigel=tex_def.antigel,
         )
         vmf.add_brush(brush)
@@ -703,8 +745,8 @@ def generate_plane(
         front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
 
         tiledefs = set()
-        for u in range(min_u, max_u + 1):
-            for v in range(min_v, max_v + 1):
+        for u in range(math.floor(min_u), math.ceil(max_u)):
+            for v in range(math.floor(min_v), math.ceil(max_v)):
                 try:
                     tiledefs.add(grid_pos[u, v])
                 except KeyError:
