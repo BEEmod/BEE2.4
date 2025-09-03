@@ -328,10 +328,12 @@ def _bevel_extend_v(
 
 
 def fizzler_tile_gen(
+    def_plane: PlaneGrid[TileDef],
     tile_plane: PlaneGrid[SubTile],
     axis: Literal['u', 'v'],
 ) -> Iterator[tuple[float, float, float, float, Bevels, TexDef]]:
     """Generate the half-tiles for fizzler brushes."""
+    # TODO: Should we handle missing tiles - how should nodraw work?
     if not tile_plane:
         return
     mins_u, mins_v = tile_plane.mins
@@ -339,28 +341,38 @@ def fizzler_tile_gen(
     if axis == 'u':
         split_min, split_max = mins_u, maxs_u
         along_min, along_max = mins_v, maxs_v
-        def lookup(split: int, along: int) -> SubTile | None:
-            return tile_plane.get((split, along))
+        def order(split: int, along: int) -> tuple[int, int]:
+            return (split, along)
     else:
         split_min, split_max = mins_v, maxs_v
         along_min, along_max = mins_u, maxs_u
-        def lookup(split: int, along: int) -> SubTile | None:
-            return tile_plane.get((along, split))
+        def order(split: int, along: int) -> tuple[int, int]:
+            return (along, split)
 
     for voxel_off in range(split_min, split_max + 1, 4):
         # First, iterate the whole row/column to create the nodraw. Include an extra position
         # so we don't need to specially handle about a tile present at the last position.
         nodraw_start: int | None = None
         for along in range(along_min - 1, along_max + 2):
-            if lookup(voxel_off, along) is not None or lookup(voxel_off + 1, along) is not None:
+            if tile_plane.get(order(voxel_off, along)) is not None or tile_plane.get(order(voxel_off + 1, along)) is not None:
                 if nodraw_start is None:
                     nodraw_start = along
             elif nodraw_start is not None:
-                # Make nodraw. TODO: Calculate bevels here?
+                # Make nodraw. First, calculate bevels - if an end is voxel aligned, check
+                # for whether the tile should bevel.
+                bevels = Bevels.none
+                if nodraw_start % 4 == 0:
+                    tile = def_plane.get(order(voxel_off, nodraw_start))
+                    if tile is not None and tile.should_bevel(*order(-1, 0)):
+                        bevels |= Bevels[f'{axis}_min']
+                if along_max % 4 == 0:
+                    tile = def_plane.get(order(voxel_off, along - 1))
+                    if tile is not None and tile.should_bevel(*order(+1, 0)):
+                        bevels |= Bevels[f'{axis}_max']
                 if axis == 'u':
-                    yield voxel_off + 0.5, nodraw_start, voxel_off + 1.5, along, Bevels.none, TEXDEF_NODRAW
+                    yield voxel_off + 0.5, nodraw_start, voxel_off + 1.5, along, bevels, TEXDEF_NODRAW
                 else:
-                    yield nodraw_start, voxel_off + 0.5, along, voxel_off + 1.5, Bevels.none, TEXDEF_NODRAW
+                    yield nodraw_start, voxel_off + 0.5, along, voxel_off + 1.5, bevels, TEXDEF_NODRAW
                 nodraw_start = None
             # Else, nodraw span, ignore.
         assert nodraw_start is None, (
@@ -750,8 +762,8 @@ def generate_plane(
     # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in itertools.chain(
         bevel_split(texture_plane, dump_path, grid_pos, orig_tiles),
-        fizzler_tile_gen(fizzler_split_u, 'u'),
-        fizzler_tile_gen(fizzler_split_v, 'v'),
+        fizzler_tile_gen(grid_pos, fizzler_split_u, 'u'),
+        fizzler_tile_gen(grid_pos, fizzler_split_v, 'v'),
     ):
         center = norm_off + Vec.with_axes(
             # Compute avg(32*min, 32*max)
