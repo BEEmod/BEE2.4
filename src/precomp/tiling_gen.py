@@ -332,7 +332,41 @@ def fizzler_tile_gen(
     axis: Literal['u', 'v'],
 ) -> Iterator[tuple[float, float, float, float, Bevels, TexDef]]:
     """Generate the half-tiles for fizzler brushes."""
-    return iter(())
+    if not tile_plane:
+        return
+    mins_u, mins_v = tile_plane.mins
+    maxs_u, maxs_v = tile_plane.maxes
+    if axis == 'u':
+        split_min, split_max = mins_u, maxs_u
+        along_min, along_max = mins_v, maxs_v
+        def lookup(split: int, along: int) -> SubTile | None:
+            return tile_plane.get((split, along))
+    else:
+        split_min, split_max = mins_v, maxs_v
+        along_min, along_max = mins_u, maxs_u
+        def lookup(split: int, along: int) -> SubTile | None:
+            return tile_plane.get((along, split))
+
+    for voxel_off in range(split_min, split_max + 1, 4):
+        # First, iterate the whole row/column to create the nodraw. Include an extra position
+        # so we don't need to specially handle about a tile present at the last position.
+        nodraw_start: int | None = None
+        for along in range(along_min - 1, along_max + 2):
+            if lookup(voxel_off, along) is not None or lookup(voxel_off + 1, along) is not None:
+                if nodraw_start is None:
+                    nodraw_start = along
+            elif nodraw_start is not None:
+                # Make nodraw. TODO: Calculate bevels here?
+                if axis == 'u':
+                    yield voxel_off + 0.5, nodraw_start, voxel_off + 1.5, along, Bevels.none, TEXDEF_NODRAW
+                else:
+                    yield nodraw_start, voxel_off + 0.5, along, voxel_off + 1.5, Bevels.none, TEXDEF_NODRAW
+                nodraw_start = None
+            # Else, nodraw span, ignore.
+        assert nodraw_start is None, (
+            f'Additional position failed? {along_min=}, {along_max=}, '
+            f'{voxel_off=}, {axis=}\n{tile_plane=}'
+        )
 
 
 def generate_brushes(vmf: VMF) -> None:
@@ -668,6 +702,7 @@ def generate_plane(
     # in-between.
     fizzler_split_u = PlaneGrid()
     fizzler_split_v = PlaneGrid()
+    # And then planes storing the tiledefs themselves, for generating the nodraw.
 
     for tile in tiles:
         pos = tile.pos_front
