@@ -364,11 +364,11 @@ def fizzler_tile_gen(
     # Include an extra position at the end so we naturally handle tiles running up to the end.
     along_range = range(along_min, along_max + 2)
 
-    def bevel_calc(side_off: int, mins: int, maxs: int) -> Bevels:
+    def bevel_calc(mins: int, maxs: int) -> Bevels:
         """Calculate bevels for a set of tiles.
         If either end is voxel-aligned, check for whether the tile should bevel.
         """
-        # TODO: Verify this is correct.
+        # TODO: This is not correct.
         bevels = Bevels.none
         if mins % 4 == 0:
             tile = def_plane.get(order(voxel_off, mins))
@@ -381,20 +381,22 @@ def fizzler_tile_gen(
         return bevels
 
     for voxel_off in range(split_min, split_max + 1, 4):
-        # First, iterate the whole row/column to create the nodraw, and tiles.
-        nodraw_start: int | None = None
         tex: TexDef | None
+        # Find the pair of each tiles, or None if missing.
         tiles = [
             (along, tile_plane.get(order(voxel_off, along)), tile_plane.get(order(voxel_off + 1, along)))
             for along in along_range
         ]
+        # Then iterate that, create nodraw if either is present, calculating runs to generate one
+        # brush.
+        nodraw_start: int | None = None
         for along, left, right in tiles:
             if left is not None or right is not None:
                 if nodraw_start is None:
                     nodraw_start = along
             elif nodraw_start is not None:
                 # Make nodraw. First, calculate bevels - if an end is voxel aligned,
-                bevels = bevel_calc(voxel_off, nodraw_start, along - 1)
+                bevels = bevel_calc(nodraw_start, along - 1)
                 if axis == 'u':
                     yield voxel_off + 0.5, nodraw_start, voxel_off + 1.5, along, bevels, TEXDEF_NODRAW
                 else:
@@ -402,10 +404,14 @@ def fizzler_tile_gen(
                 nodraw_start = None
             # Else, nodraw span, ignore.
 
+        # Now do each tile column. First generate the textures for each tile, group runs,
+        # then make each brush.
         for tex, start, end in utils.group_runs(
             make_texdef(
                 generators[left.type.color].get(
-                    Vec(),  # TODO
+                    plane_key.plane_to_world(
+                        *order(32 * voxel_off + 8, 32 * along + 16),
+                    ),
                     tile_size,
                     antigel=left.antigel,
                 ), left.antigel,
@@ -415,7 +421,7 @@ def fizzler_tile_gen(
             if tex is not None:
                 start += along_min
                 end += along_min
-                bevels = bevel_calc(voxel_off, start, end)
+                bevels = bevel_calc(start, end)
                 if axis == 'u':
                     yield voxel_off, start, voxel_off + 0.5, end + 1, bevels, tex
                 else:
@@ -424,7 +430,9 @@ def fizzler_tile_gen(
         for tex, start, end in utils.group_runs(
             make_texdef(
                 generators[right.type.color].get(
-                    Vec(),  # TODO
+                    plane_key.plane_to_world(
+                        *order(32 * voxel_off + 56, 32 * along + 16),
+                    ),
                     tile_size,
                     antigel=right.antigel,
                 ), right.antigel,
@@ -434,7 +442,7 @@ def fizzler_tile_gen(
             if tex is not None:
                 start += along_min
                 end += along_min
-                bevels = bevel_calc(voxel_off, start, end)
+                bevels = bevel_calc(start, end)
                 if axis == 'u':
                     yield voxel_off + 1.5, start, voxel_off + 2, end + 1, bevels, tex
                 else:
