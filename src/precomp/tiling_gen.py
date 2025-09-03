@@ -352,6 +352,8 @@ def fizzler_tile_gen(
         tile_size = TileSize.TILE_4x8
         def order(split: int, along: int) -> tuple[int, int]:
             return (along, split)
+
+    # In case all of the left are somehow missing, adjust.
     split_min = split_min // 4 * 4 + 1
 
     orient = Orient.from_normal(plane_key.normal)
@@ -359,11 +361,14 @@ def fizzler_tile_gen(
         port: texturing.gen(GenCat.NORMAL, orient, port)
         for port in Portalable
     }
+    # Include an extra position at the end so we naturally handle tiles running up to the end.
+    along_range = range(along_min, along_max + 2)
 
     def bevel_calc(side_off: int, mins: int, maxs: int) -> Bevels:
         """Calculate bevels for a set of tiles.
         If either end is voxel-aligned, check for whether the tile should bevel.
         """
+        # TODO: Verify this is correct.
         bevels = Bevels.none
         if mins % 4 == 0:
             tile = def_plane.get(order(voxel_off, mins))
@@ -376,18 +381,14 @@ def fizzler_tile_gen(
         return bevels
 
     for voxel_off in range(split_min, split_max + 1, 4):
-        # First, iterate the whole row/column to create the nodraw, and tiles. Include an extra position
-        # so we don't need to specially handle about a tile present at the last position.
+        # First, iterate the whole row/column to create the nodraw, and tiles.
         nodraw_start: int | None = None
-        # Then for tiles, the left/right runs of textures.
-        tile_start_left = 0
-        tile_run_left: TexDef | None = None
-        tile_start_right: int = 0
-        tile_run_right: TexDef | None = None
         tex: TexDef | None
-        for along in range(along_min - 1, along_max + 2):
-            left = tile_plane.get(order(voxel_off, along))
-            right = tile_plane.get(order(voxel_off + 1, along))
+        tiles = [
+            (along, tile_plane.get(order(voxel_off, along)), tile_plane.get(order(voxel_off + 1, along)))
+            for along in along_range
+        ]
+        for along, left, right in tiles:
             if left is not None or right is not None:
                 if nodraw_start is None:
                     nodraw_start = along
@@ -401,28 +402,46 @@ def fizzler_tile_gen(
                 nodraw_start = None
             # Else, nodraw span, ignore.
 
-            if left is not None and left.type.is_tile:
-                tex = make_texdef(
-                    generators[left.type.color].get(
-                        Vec(),  # TODO
-                        tile_size,
-                        antigel=left.antigel,
-                    ), left.antigel,
-                )
-            else:
-                tex = None
-            if tex != tile_run_left:
-                if tile_run_left is not None:
-                    bevels = bevel_calc(voxel_off, tile_start_left, along - 1)
-                    if axis == 'u':
-                        yield voxel_off, tile_start_left, voxel_off + 0.5, along, bevels, tile_run_left
-                    else:
-                        yield tile_start_left, voxel_off, along, voxel_off + 0.5, bevels, tile_run_left
-                tile_start_left = along
-                tile_run_left = tex
+        for tex, start, end in utils.group_runs(
+            make_texdef(
+                generators[left.type.color].get(
+                    Vec(),  # TODO
+                    tile_size,
+                    antigel=left.antigel,
+                ), left.antigel,
+            ) if left is not None and left.type.is_tile else None
+            for along, left, right in tiles
+        ):
+            if tex is not None:
+                start += along_min
+                end += along_min
+                bevels = bevel_calc(voxel_off, start, end)
+                if axis == 'u':
+                    yield voxel_off, start, voxel_off + 0.5, end + 1, bevels, tex
+                else:
+                    yield start, voxel_off, end + 1, voxel_off + 0.5, bevels, tex
+
+        for tex, start, end in utils.group_runs(
+            make_texdef(
+                generators[right.type.color].get(
+                    Vec(),  # TODO
+                    tile_size,
+                    antigel=right.antigel,
+                ), right.antigel,
+            ) if right is not None and right.type.is_tile else None
+            for along, left, right in tiles
+        ):
+            if tex is not None:
+                start += along_min
+                end += along_min
+                bevels = bevel_calc(voxel_off, start, end)
+                if axis == 'u':
+                    yield voxel_off + 1.5, start, voxel_off + 2, end + 1, bevels, tex
+                else:
+                    yield start, voxel_off + 1.5, end + 1, voxel_off + 2, bevels, tex
 
         # Additional range increment should have finalised the last tile.
-        assert nodraw_start is None and tile_run_left is None and tile_run_right is None, (
+        assert nodraw_start is None, (
             f'Additional position failed? {locals()}'
         )
 
