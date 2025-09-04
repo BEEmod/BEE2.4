@@ -215,6 +215,39 @@ def res_make_catwalk(vmf: VMF, coll: Collisions, res: Keyvalues) -> object:
     LOGGER.info("Starting catwalk generator...")
     marker = instanceLocs.resolve_filter(res['markerInst'])
 
+    # The directions this instance is connected by (NSEW)
+    catwalks: dict[FrozenVec, Link] = defaultdict(Link)
+    markers = {}
+
+    # Find all our markers, so we can look them up by targetname.
+    for inst in vmf.by_class['func_instance']:
+        if inst['file'].casefold() not in marker:
+            continue
+        markers[inst['targetname']] = inst
+
+        # Snap the markers to the grid. If on glass it can become offset...
+        origin = Vec.from_str(inst['origin'])
+        origin = origin // 128 * 128
+        origin += 64
+
+        while brushLoc.POS.lookup_world(origin).is_goo:
+            # The instance is in goo! Switch to floor orientation, and move
+            # up until it's in air.
+            inst['angles'] = '0 0 0'
+            origin.z += 128
+
+        catwalks[origin.freeze()] = Link()
+
+        inst['origin'] = str(origin)
+
+    if not markers:
+        return conditions.RES_EXHAUSTED
+
+    LOGGER.info('Positions: {}', catwalks)
+    LOGGER.info('Markers: {}', markers)
+
+    debug_add = conditions.fetch_debug_visgroup(vmf, 'Catwalks')
+
     instances: dict[Instances | None, str] = {
         inst_name: instanceLocs.resolve_one(res[inst_name.value, ''], error=True)
         for inst_name in Instances
@@ -260,39 +293,6 @@ def res_make_catwalk(vmf: VMF, coll: Collisions, res: Keyvalues) -> object:
                 coll=coll,
             )
             template_brush.retexture_template(temp, origin)
-
-    # The directions this instance is connected by (NSEW)
-    catwalks: dict[FrozenVec, Link] = defaultdict(Link)
-    markers = {}
-
-    # Find all our markers, so we can look them up by targetname.
-    for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in marker:
-            continue
-        markers[inst['targetname']] = inst
-
-        # Snap the markers to the grid. If on glass it can become offset...
-        origin = Vec.from_str(inst['origin'])
-        origin = origin // 128 * 128
-        origin += 64
-
-        while brushLoc.POS.lookup_world(origin).is_goo:
-            # The instance is in goo! Switch to floor orientation, and move
-            # up until it's in air.
-            inst['angles'] = '0 0 0'
-            origin.z += 128
-
-        catwalks[origin.freeze()] = Link()
-
-        inst['origin'] = str(origin)
-
-    if not markers:
-        return conditions.RES_EXHAUSTED
-
-    LOGGER.info('Positions: {}', catwalks)
-    LOGGER.info('Markers: {}', markers)
-
-    debug_add = conditions.fetch_debug_visgroup(vmf, 'Catwalks')
 
     # First loop through all the markers, adding connecting sections
     for marker_name, inst in markers.items():
