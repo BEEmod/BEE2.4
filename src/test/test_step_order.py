@@ -1,7 +1,6 @@
 """Test the StepOrder system."""
 from enum import Enum
 
-from trio.testing import RaisesGroup
 import pytest
 import trio
 
@@ -91,7 +90,7 @@ async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
         await trio.lowlevel.checkpoint()
         pytest.fail("Shouldn't run.")
 
-    with RaisesGroup(CycleError):
+    with pytest.RaisesGroup(CycleError):
         await order.run(None)
 
     assert log == ['step 1', 'step 2']  # These still ran.
