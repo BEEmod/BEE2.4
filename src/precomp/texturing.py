@@ -883,7 +883,7 @@ def load_config(conf: Keyvalues) -> None:
             for tex_name, tex_default in tex_defaults.items():
                 textures[tex_name] = tex = [
                     conf for kv in gen_conf.find_all(str(tex_name))
-                    for conf in MaterialConf.parse(kv, tex_name)
+                    for conf in MaterialConf.parse(kv)
                 ]
                 if not tex and tex_default:
                     if isinstance(tex_default, str):
