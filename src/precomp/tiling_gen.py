@@ -17,10 +17,11 @@ import utils
 from plane import PlaneGrid, PlaneKey
 from precomp import rand, texturing, brushLoc
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize, GenCat
-from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
+from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile, Axis
 import consts
 
 
+__all__ = ['generate_brushes']
 LOGGER = logger.get_logger(__name__)
 DEBUG = False
 PLANE_NAMES = {
@@ -102,18 +103,6 @@ class Tideline:
     min: float
     max: float
 
-
-@attrs.frozen
-class TrimColour:
-    """Used to allow pattern matching."""
-    tile_1x1: TileType
-    tile_4x4: TileType
-
-
-TRIM_COLOURS = [
-    TrimColour(TileType.WHITE, TileType.WHITE_4x4),
-    TrimColour(TileType.BLACK, TileType.BLACK_4x4),
-]
 
 # The TileSize values each type can pick from - first is the match, plus alts.
 tile_chain = [
@@ -344,13 +333,13 @@ def fizzler_tile_gen(
         split_min, split_max = mins_u, maxs_u
         along_min, along_max = mins_v, maxs_v
         tile_size = TileSize.TILE_8x4
-        def order(split: int, along: int) -> tuple[int, int]:
+        def order[T](split: T, along: T) -> tuple[T, T]:
             return (split, along)
     else:
         split_min, split_max = mins_v, maxs_v
         along_min, along_max = mins_u, maxs_u
         tile_size = TileSize.TILE_4x8
-        def order(split: int, along: int) -> tuple[int, int]:
+        def order[T](split: T, along: T) -> tuple[T, T]:
             return (along, split)
 
     # In case all of the left are somehow missing, adjust.
@@ -368,14 +357,18 @@ def fizzler_tile_gen(
         """Calculate bevels for a set of tiles.
         If either end is voxel-aligned, check for whether the tile should bevel.
         """
+        u: Axis
+        v: Axis
         bevels = Bevels.none
         if mins % 4 == 0:
             tile = def_plane.get(order(voxel_off, mins))
-            if tile is not None and tile.should_bevel(*order(0, -1)):
+            u, v = order(0, -1)
+            if tile is not None and tile.should_bevel(u, v):
                 bevels |= Bevels.v_min if axis == 'u' else Bevels.u_min
         if maxs % 4 == 0:
             tile = def_plane.get(order(voxel_off, maxs))
-            if tile is not None and tile.should_bevel(*order(0, +1)):
+            u, v = order(0, +1)
+            if tile is not None and tile.should_bevel(u, v):
                 bevels |= Bevels.v_max if axis == 'u' else Bevels.u_max
         return bevels
 
@@ -463,8 +456,9 @@ def generate_brushes(vmf: VMF) -> None:
     # The key is (normal, plane distance)
     full_tiles: dict[PlaneKey, list[TileDef]] = defaultdict(list)
 
+    dump_path: Path | None
     if DEBUG:
-        dump_path: Path | None = utils.install_path('reports/tiling_gen')
+        dump_path = utils.install_path('reports/tiling_gen')
         LOGGER.error('Dump path: {}', dump_path)
         try:
             for file in dump_path.iterdir():
@@ -765,6 +759,7 @@ def generate_plane(
     - A second pass is made to determine the required bevelling.
     - Finally that raw form is converted to brushes.
     """
+    pos: Vec | FrozenVec
     # TODO: Use PlaneKey instead of axis strings
     norm_axis = plane_key.normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
@@ -784,8 +779,8 @@ def generate_plane(
 
     # Stores tiles constructing the half-border next to fizzlers. These are 16-wide, with nodraw
     # in-between.
-    fizzler_split_u = PlaneGrid()
-    fizzler_split_v = PlaneGrid()
+    fizzler_split_u: PlaneGrid[SubTile] = PlaneGrid()
+    fizzler_split_v: PlaneGrid[SubTile] = PlaneGrid()
     # And then planes storing the tiledefs themselves, for generating the nodraw.
 
     for tile in tiles:
