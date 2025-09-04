@@ -155,7 +155,10 @@ async def load_settings() -> tuple[
         raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
     for item in editor_list:
         if isinstance(item, editoritems.Item):
-            id_to_item[item.id] = item
+            if item.id != '':
+                id_to_item[item.id] = item
+            else:
+                raise ValueError(f'Invalid editor item with no ID: {item!r}')
         else:
             raise ValueError(f'Invalid editor item, got: {item!r}')
 

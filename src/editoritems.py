@@ -877,8 +877,8 @@ class SubType:
 @attrs.define
 class Item:
     """A specific item."""
-    # The item's unique ID. Can be blank, if the info.txt ID should override.
-    id: utils.ObjectID | utils.BlankID = utils.ID_EMPTY
+    # The item's unique ID. Can be blank in file, to explicitly ask the info.txt ID should override.
+    id: utils.ObjectID
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
     # Type if present.
@@ -1034,15 +1034,17 @@ class Item:
         return items, icons
 
     @classmethod
-    def parse_one(cls, tok: Tokenizer, pak_id: utils.ObjectID) -> Item:
+    def parse_one(cls, tok: Tokenizer, pak_id: utils.ObjectID, info_id: utils.ObjectID | None = None) -> Item:
         """Parse an item.
 
         This expects the "Item" token to have been read already.
+        If info_id is provided, this overrides blank IDs.
         """
-        item_id_set = False
         connections = Keyvalues('Connections', [])
         tok.expect(Token.BRACE_OPEN)
-        item = Item()
+        # Initially invalid ID, we check before returning this at the end.
+        item_id_set = False
+        item = Item(utils.obj_id('_'))
 
         for token, tok_value in tok:
             if token is Token.BRACE_CLOSE:
@@ -1057,7 +1059,17 @@ class Item:
                 if item_id_set:
                     raise tok.error('Item ID (Type) set multiple times!')
                 # Allow explicitly setting a blank ID, to use the object ID.
-                item.id = utils.obj_id_optional(tok.expect(Token.STRING), 'Item')
+                item_id = utils.obj_id_optional(tok.expect(Token.STRING), 'Item')
+                if item_id == '':
+                    if info_id is not None:
+                        item.id = info_id
+                    else:
+                        raise tok.error(
+                            'Blank Item ID (Type) provided, but ID cannot be inferred! '
+                            'Only IDs for the first/primary item in Item objects can default.'
+                        )
+                else:
+                    item.id = item_id
                 item_id_set = True
                 # The items here are used internally and must have inputs.
                 if item.id in ANTLINE_ITEMS:

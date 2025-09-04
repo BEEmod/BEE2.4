@@ -1021,6 +1021,8 @@ async def parse_item_folder(
     def parse_items(path: str) -> list[EditorItem]:
         """Parse the editoritems in order in a file."""
         items: list[EditorItem] = []
+        # The first item can opt to use the object ID by setting it to blank.
+        first_id: utils.ObjectID | None = utils.obj_id(data.id)
         try:
             f = data.fsys[path].open_str()
         except FileNotFoundError as err:
@@ -1031,7 +1033,8 @@ async def parse_item_folder(
                 if tok_type is Token.STRING:
                     if tok_value.casefold() != 'item':
                         raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok, data.pak_id))
+                    items.append(EditorItem.parse_one(tok, data.pak_id, first_id))
+                    first_id = None  # Subsequent items cannot be blank.
                 elif tok_type is not Token.NEWLINE:
                     raise tok.error(tok_type)
         return items
@@ -1068,9 +1071,7 @@ async def parse_item_folder(
             '"Item" block!'
         ) from None
 
-    if first_item.id == "":
-        first_item.id = utils.obj_id(data.id)
-    elif first_item.id != utils.obj_id(data.id):
+    if first_item.id != utils.obj_id(data.id):
         data.warn_auth(TRANS_EDITOR_ID_MISMATCH.format(
             obj_id=data.id, editor_id=first_item.id,
             path=f'{data.pak_id}:items/{fold}/editoritems.txt',
@@ -1095,11 +1096,6 @@ async def parse_item_folder(
     # chooses.
     for i, extra_item in enumerate(extra_items, 2):
         extra_item.generate_collisions()
-        if not extra_item.id:
-            raise ValueError(
-                f'"{data.pak_id}:items/{fold}/editoritems.txt has no ID ("Type") set for the '
-                f'#{i} "Item" block!'
-            ) from None
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:
                 data.warn_auth(data.pak_id, TRANS_EXTRA_PALETTES.format(
