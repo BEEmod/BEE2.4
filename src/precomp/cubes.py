@@ -1832,7 +1832,6 @@ def make_cube(
             # then set paint type after exiting. That way it can't bounce off
             # the dropper walls, but will look visually painted.
             elif drop_type.bounce_paint_file.casefold() == '<prepaint>':
-                assert drop_type is not None
                 assert pair.dropper is not None
 
                 # Apply the skin after spawn.
@@ -1859,7 +1858,6 @@ def make_cube(
                     )
                 )
             else:
-                assert drop_type is not None
                 assert pair.dropper is not None
 
                 # Add the bounce painter. This is only on the dropper.
@@ -2159,7 +2157,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo, coll: Collisions) -> None
                 ]
 
         # Generate the outputs to paint the cubes.
-        if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
+        if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not CubePaintType.CLEAR:
             pair.outputs[CubeOutputs.SPAWN].append(Output(
                 'Spawn',
                 'cube_addon_painter',

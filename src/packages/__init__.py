@@ -933,11 +933,10 @@ class PackagesSet:
         else:
             if exist is not None and new_ref != exist:
                 # Divergent migrations. Warn the author, mark as invalid.
-                try:  # Need to check which packages these exist in.
-                    new_obj = new_ref.resolve(self)
-                    exist_obj = exist.resolve(self)
-                except KeyError as exc:  # Added but somehow missing now? Just error out.
-                    raise ValueError(f'Conflicting migration: {old_ref} -> {exist} & {new_ref}') from exc
+                new_obj = new_ref.resolve(self)
+                exist_obj = exist.resolve(self)
+                if new_obj is None or exist_obj is None:  # Added but somehow missing now? Just error out.
+                    raise ValueError(f'Conflicting migration: {old_ref} -> {exist} & {new_ref}')
                 if self.use_dev_warnings(new_obj.pak_id) or self.use_dev_warnings(exist_obj.pak_id):
                     errors.warn(TRANS_MIGRATION_CONFLICT.format(
                         obj_type=type(new).__name__,
@@ -1654,7 +1653,7 @@ class Style(SelPakObject, needs_foreground=True):
 
             base: list[Style] = []
             b_style = style
-            while b_style is not None:
+            while True:
                 # Recursively find all the base styles for this one.
                 if b_style in base:
                     # Already hit this, fatal error. Append the style to the end to more clearly

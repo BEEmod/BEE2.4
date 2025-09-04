@@ -38,6 +38,7 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     delay = res['delay', '0.0']
     parm = res['parm', '']
 
+    out_type: str | None
     if conf_output.startswith('<') and conf_output.endswith('>'):
         out_id_str, out_type = conf_output.strip('<>').split(':', 1)
         out_id = utils.obj_id(out_id_str, 'item')

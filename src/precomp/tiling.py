@@ -40,7 +40,7 @@ import consts
 
 
 __all__ = [
-    'TileSize', 'Portalable', 'TileType', 'Bevels',
+    'TileSize', 'Portalable', 'TileType', 'Bevels', 'Axis',
     'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
     'analyse_map', 'generate_brushes', 'make_tile',
     'TILES',  # TODO make private, encapsulate?
@@ -1401,9 +1401,7 @@ class TileDef:
                 (umin + umax) * 16 - 64,
                 (vmin + vmax) * 16 - 64,
                 offset,
-            )
-            if vec_offset is not None:
-                tile_center += vec_offset
+            ) + vec_offset
 
             if tile_type.is_tile:
                 # These types force a specific grid size.

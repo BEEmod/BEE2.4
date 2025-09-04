@@ -147,9 +147,9 @@ def test_grid_views() -> None:
     assert ((2, -5), 4) not in grid.items()
     assert ((3, 4), 2) not in grid.items()
     # Check illegal values don't error.
-    assert 45 not in grid.items()  # type: ignore[comparison-overlap]
-    assert (1, ) not in grid.items()  # type: ignore[comparison-overlap]
-    assert (1, 2, 3, 4) not in grid.items()  # type: ignore[comparison-overlap]
+    assert 45 not in grid.items()  # type: ignore[operator]
+    assert (1, ) not in grid.items()  # type: ignore[operator]
+    assert (1, 2, 3, 4) not in grid.items()  # type: ignore[operator]
     assert set(grid.items()) == {
         ((0, 4), 1), ((2, -5), None), ((0, 5), 3), ((0, 7), 2), ((5, 3), 2),
     }

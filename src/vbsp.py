@@ -367,7 +367,6 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         return
 
     loc = options.GLOBAL_ENTS_LOC()
-    assert loc is not None
     model_id = BEE2_config.get_val(
         'General', 'player_model_id',
         consts.DEFAULT_PLAYER,
@@ -488,7 +487,6 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
         info.set_attr('spawn_nogun')
 
     ent_pos = options.GLOBAL_PTI_ENTS_LOC()
-    assert ent_pos is not None
 
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
 
@@ -899,8 +897,6 @@ def fit_goo_mist(
 
     needs_mist is a set of all added sides, so we don't double-up on a space.
     """
-    if grid_y is None:
-        grid_y = grid_x
     for pos in sides:
         if pos not in needs_mist:
             continue  # We filled this space already

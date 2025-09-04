@@ -36,9 +36,9 @@ from packages.corridor import parse_specifier, parse_corr_kind
 ])
 def test_specifier_parse(
     text: str,
-    mode: GameMode,
-    direction: Direction,
-    attach: Attachment,
+    mode: GameMode | None,
+    direction: Direction | None,
+    attach: Attachment | None,
 ) -> None:
     """Test parsing any kind of specifier."""
     assert parse_specifier(text) == (mode, direction, attach)

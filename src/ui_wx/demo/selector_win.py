@@ -48,6 +48,7 @@ async def test(core_nursery: trio.Nursery) -> None:
             long_name=packages.TRANS_NONE_NAME,
             desc=TransToken.untranslated('None item description'),
         )),
+        obj_type=packages.Music,
         save_id='music_base',
         title=TransToken.untranslated('Select Background Music - Base'),
         desc=TransToken.untranslated(

@@ -226,7 +226,7 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         slot_ui.hovered = True
         slot_ui.widget.Refresh()
         # Add border, but only if either icon exists or we contain an item.
-        if slot_ui.text is not None or slot.contents is not None:
+        if slot_ui.text or slot.contents is not None:
             slot_ui.widget.SetWindowStyleFlag(wx.BORDER_RAISED)
 
     @override

@@ -618,14 +618,12 @@ async def widget_item_variant(
 
     def update_data(cur_style: packages.PakRef[packages.Style]) -> None:
         """Refresh the data in the list."""
-        assert item is not None
         nonlocal version_lookup
         version_lookup = context_win.set_version_combobox(combobox, item, cur_style)
 
     def change_callback(e: object = None) -> None:
         """Change the item version."""
-        if version_lookup is not None:
-            item_picker.change_version(item_ref, version_lookup[combobox.current()])
+        item_picker.change_version(item_ref, version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,
