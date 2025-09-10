@@ -225,7 +225,7 @@ class LimitCounter:
                 app.background_run(self._flash)
         else:
             if self._flasher is not None:
-                self._flasher.cancel()
+                self._flasher.cancel('counter update')
             self._flasher = None
             self.cur_count = round(100 * value / self.max)
             self.var.set(self.cur_count)
@@ -240,14 +240,13 @@ class LimitCounter:
     async def _flash(self) -> None:
         """Flash the display."""
         if self._flasher is not None:
-            self._flasher.cancel()
+            self._flasher.cancel('restart')
         with trio.CancelScope() as self._flasher:
             while True:
                 self.var.set(100)
                 await trio.sleep(random.uniform(0.5, 0.75))
                 self.var.set(0)
                 await trio.sleep(random.uniform(0.5, 0.75))
-        # noinspection PyUnreachableCode
         self.var.set(self.cur_count)
 
 

@@ -51,7 +51,7 @@ if utils.WIN:
 
 def quit_app() -> None:
     """Quit the application."""
-    QUIT_SCOPE.cancel()
+    QUIT_SCOPE.cancel('app quit')
 
 
 def restart() -> None:
@@ -61,7 +61,7 @@ def restart() -> None:
     """
     global _WANTS_RESTART
     _WANTS_RESTART = True
-    QUIT_SCOPE.cancel()
+    QUIT_SCOPE.cancel('app restart')
 
 
 # noinspection PyBroadException

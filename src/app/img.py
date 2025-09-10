@@ -716,7 +716,7 @@ class Handle(User):
             return
         self._users.add(ref)
         # Abort cleaning up if we were planning to.
-        self._cancel_cleanup.cancel()
+        self._cancel_cleanup.cancel('increfed')
         for child in self._children():
             child._incref(self)
 
@@ -724,7 +724,7 @@ class Handle(User):
         """Schedule this handle to be cleaned up."""
         if self._users:
             return  # We do have users.
-        self._cancel_cleanup.cancel()
+        self._cancel_cleanup.cancel('restart cleanup')
         self._cancel_cleanup = trio.CancelScope()
         if _load_nursery is not None:
             _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)

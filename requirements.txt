@@ -4,7 +4,7 @@ srctools == 2.6.1
 typing_extensions >= 4.12.0
 rtree >= 0.9.7
 # Async
-trio >= 0.27.0
+trio >= 0.31.0
 outcome >= 1.3.0  # Trio dependency
 aioresult >= 1.0.0
 trio-util >= 0.7.0

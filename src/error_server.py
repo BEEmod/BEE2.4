@@ -137,7 +137,7 @@ async def route_static_js(filename: str) -> quart.ResponseReturnValue:
 async def route_shutdown() -> quart.ResponseReturnValue:
     """Called by the application to force us to shut down so this can be updated."""
     LOGGER.info('Recieved shutdown request!')
-    SHUTDOWN_SCOPE.cancel()
+    SHUTDOWN_SCOPE.cancel('shutdown request')
     await trio.lowlevel.checkpoint()
     return 'DONE'
 
@@ -228,7 +228,7 @@ async def check_portal2_running(allow_exit: trio.Event) -> None:
             LOGGER.info('Waiting for Portal 2 to quit...')
             await trio.to_thread.run_sync(proc_portal.wait)
         LOGGER.info('Portal 2 quit!')
-        SHUTDOWN_SCOPE.cancel()
+        SHUTDOWN_SCOPE.cancel('Portal 2 quit')
     except psutil.AccessDenied as exc:
         LOGGER.warning('Failed to detect if Portal 2 is closed:', exc_info=exc)
 
@@ -315,7 +315,7 @@ async def main(argv: list[str]) -> None:
             await trio.sleep_forever()
         LOGGER.info('Shutdown triggered.')
         # Allow nursery to exit.
-        stop_sleeping.cancel()
+        stop_sleeping.cancel('timeout')
 
     async def load_compiler(name: str) -> None:
         """Load a compiler log file."""

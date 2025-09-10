@@ -100,14 +100,14 @@ async def update_task(cur_style: trio_util.AsyncValue[PakRef[Style]]) -> None:
             async with iterval_cancelling(packages.LOADED) as new_packset:
                 await new_packset.ready(Item).wait()
                 packset = new_packset
-                scope.cancel()
+                scope.cancel('packset changed')
 
     async def wait_style() -> None:
         """Reload if the style changes."""
         nonlocal style
         async with aclosing(cur_style.eventual_values()) as agen:
             async for style in agen:
-                scope.cancel()
+                scope.cancel('style changed')
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(wait_packset)
@@ -118,7 +118,6 @@ async def update_task(cur_style: trio_util.AsyncValue[PakRef[Style]]) -> None:
                 await _rebuild_database(packset, style)
                 searchbar_wid.state(('!disabled',))
                 await trio.sleep_forever()
-            LOGGER.info('End scope.')
 
 
 def _build_words(packset: PackagesSet, style: PakRef[Style]) -> FilterTrie:

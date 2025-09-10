@@ -179,7 +179,7 @@ async def iterval_cancelling[T](value: AsyncValue[T]) -> AsyncGenerator[T]:
     async def wait() -> None:
         """Wait for a change, then cancel."""
         await value.wait_transition()
-        nursery.cancel_scope.cancel()
+        nursery.cancel_scope.cancel('changed')
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(wait)

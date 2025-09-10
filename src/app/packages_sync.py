@@ -437,7 +437,7 @@ async def start_server(ui: SyncUIBase, core_nursery: trio.Nursery, files: list[s
         with app.QUIT_SCOPE:
             await main_gui(ui, core_nursery, rec_file)
         # Quit, shut down the server.
-        nursery.cancel_scope.cancel()
+        nursery.cancel_scope.cancel('ui quit')
 
 
 if __name__ == '__main__':

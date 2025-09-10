@@ -314,7 +314,7 @@ async def _listen_to_process() -> None:
                 else:
                     LOGGER.info('Cancelling load screen {!r}, scope={}', screen.title, screen._scope)
                     if screen._scope is not None:
-                        screen._scope.cancel()
+                        screen._scope.cancel('user pressed cancel')
 
 
 

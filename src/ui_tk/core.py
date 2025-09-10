@@ -151,7 +151,7 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
         # Run main app, then once completed cancel this nursery to quit all other tasks.
         # It gets given the nursery to allow spawning new tasks here.
         await init(nursery)
-        nursery.cancel_scope.cancel()
+        nursery.cancel_scope.cancel('app_main() finished')
 
 
 def done_callback(result: Outcome[None]) -> None:

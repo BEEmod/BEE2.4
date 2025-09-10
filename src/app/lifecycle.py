@@ -64,7 +64,7 @@ async def lifecycle(
         await reload_trigger.wait()
         LOGGER.info('Triggered reload!')
         should_reload = True
-        wait_nursery.cancel_scope.cancel()
+        wait_nursery.cancel_scope.cancel('reload request')
 
     async def wait_export() -> None:
         """Enable the export UI, then wait for an export command."""
@@ -74,7 +74,7 @@ async def lifecycle(
         LOGGER.debug('Waiting for export...')
         export_info = await export_trigger.wait()
         LOGGER.info('Triggered export!')
-        wait_nursery.cancel_scope.cancel()
+        wait_nursery.cancel_scope.cancel('export request')
 
     while True:
         # The filecheck task is out here so it can run during UI code,
@@ -136,7 +136,7 @@ async def lifecycle(
                     wait_nursery.start_soon(wait_export)
                     await trio.sleep_forever()
                 if should_reload:
-                    filecheck_nursery.cancel_scope.cancel()
+                    filecheck_nursery.cancel_scope.cancel('packset reload requested')
                     break  # Go the outer loop, which will reload again.
 
 
