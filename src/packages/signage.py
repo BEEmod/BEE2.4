@@ -108,6 +108,9 @@ class SignageLegend(PakObject):
         self.symbol_conf = symbol_conf
         self.antline_conf = antline_conf
 
+    def __repr__(self) -> str:
+        return f'SignageLegend({self.id!r},\nsymbol_conf={self.symbol_conf!r},\nantline_conf={self.antline_conf!r})'
+
     @classmethod
     @override
     async def parse(cls, data: ParseData) -> SignageLegend:
