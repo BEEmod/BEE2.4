@@ -1913,7 +1913,7 @@ class Item:
             f.write('\t\t\t\t}\n')
         f.write('\t\t\t}\n')
 
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[Any, ...]:
         """Simplify pickles.
 
         We produce a tuple to avoid needing to specify the attributes in the file.
@@ -1952,7 +1952,7 @@ class Item:
             self.force_output,
         )
 
-    def __setstate__(self, state: tuple) -> None:
+    def __setstate__(self, state: tuple[Any, ...]) -> None:
         props: list[ItemProp[Any]]
         antline_points: list[list[AntlinePoint]]
         (

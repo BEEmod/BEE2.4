@@ -1,5 +1,5 @@
 """Implements the selected palette and list of items."""
-from typing import Final, Never
+from typing import Final, Never, Any
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
@@ -116,6 +116,8 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             match other_slot.contents:
                 case SubItemRef(item=ref.item):
                     other_slot.contents = None
+                case _:
+                    pass  # Empty, or an unrelated item.
         return True
 
     def find_matching_slot(

@@ -5,7 +5,7 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
-from typing import Final, Literal, assert_never
+from typing import Final, Literal, assert_never, Any
 
 from abc import abstractmethod, ABC
 from collections import defaultdict
@@ -135,7 +135,7 @@ class Options:
     desc: TransToken = TransToken.BLANK
     readonly_desc: TransToken = TransToken.BLANK
     readonly_override: TransToken | None = None
-    preview_win: PreviewWinBase | None = None
+    preview_win: PreviewWinBase[Any] | None = None
     attributes: Iterable[AttrDef] = ()
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
@@ -143,7 +143,7 @@ class Options:
 # noinspection PyProtectedMember
 class GroupHeaderBase(ABC):
     """Base logic for the widget used for group headers."""
-    def __init__(self, win: SelectorWinBase) -> None:
+    def __init__(self, win: SelectorWinBase[Any, Any, Any]) -> None:
         self.parent = win
         # Event functions access the attribute, so this can be changed to reassign.
         self.id = '<unused group>'

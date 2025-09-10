@@ -155,7 +155,7 @@ disallow_incomplete_defs = true
 disallow_untyped_defs = true
 disallow_untyped_decorators = true
 #disallow_untyped_calls = true
-disallow_any_generics = false
+disallow_any_generics = true
 #untyped_calls_exclude = ["tkinter", "tkinter.ttk"]
 
 enable_error_code = [
@@ -172,6 +172,7 @@ enable_error_code = [
 	'unimported-reveal',
 	'unreachable',
 	'unused-awaitable',
+	'exhaustive-match',
 #	'explicit-override',
 ]
 

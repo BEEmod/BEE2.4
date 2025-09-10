@@ -234,7 +234,7 @@ def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
 
     The first value is the in -> out var, and all following are values to map.
     """
-    table: dict[str, LazyValue] = {}
+    table: dict[str, LazyValue[str]] = {}
     res_iter = iter(res)
     first_prop = next(res_iter)
     in_name, out_name = first_prop.name, first_prop.value

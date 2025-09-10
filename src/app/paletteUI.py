@@ -1,5 +1,6 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
+from typing import Any
 
 from tkinter import ttk
 import tkinter as tk
@@ -68,7 +69,8 @@ class PaletteUI:
     ui_menu_palettes_index: int
 
     def __init__(
-        self, f: ttk.Frame, menu: tk.Menu, item_picker: ItemPickerBase,
+        self, f: ttk.Frame, menu: tk.Menu,
+        item_picker: ItemPickerBase[Any],
         *,
         palettes: list[Palette],
         tk_img: TKImages,

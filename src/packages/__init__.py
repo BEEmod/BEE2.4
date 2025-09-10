@@ -797,7 +797,7 @@ class PackagesSet:
     # Value is set to None if conflicting migrations exist - this key is ignored.
     # This is not used for Items, which have subtypes to contend with. That uses a dict weakly keyed
     # on packsets.
-    _migrations: dict[PakRef, PakRef | None] = attrs.field(init=False, factory=dict)
+    _migrations: dict[PakRef[Any], PakRef[Any] | None] = attrs.field(init=False, factory=dict)
 
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)

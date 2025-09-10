@@ -315,8 +315,7 @@ async def _listen_to_process() -> None:
                     LOGGER.info('Cancelling load screen {!r}, scope={}', screen.title, screen._scope)
                     if screen._scope is not None:
                         screen._scope.cancel()
-            case _:
-                assert_never(op)
+
 
 
 _bg_started = False

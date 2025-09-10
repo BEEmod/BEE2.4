@@ -5,7 +5,7 @@ They can then fetch the current state and store new state.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Self, cast, override
+from typing import Any, ClassVar, Self, cast, override
 from collections.abc import Generator, ItemsView, Iterator, KeysView, Mapping
 from pathlib import Path
 import datetime
@@ -46,7 +46,7 @@ class UnknownVersion(Exception):
 
 
 @attrs.define(eq=False)
-class ConfInfo[DataT: 'Data']:
+class ConfInfo[DataT: Data]:
     """Holds information about a type of configuration data."""
     name: str
     version: int
@@ -55,7 +55,7 @@ class ConfInfo[DataT: 'Data']:
 
 
 # List of mismatched sections produced when parsing.
-type VersionMismatchList = list[tuple[ConfInfo | str, int]]
+type VersionMismatchList = list[tuple[ConfInfo[Any] | str, int]]
 TRANS_MISMATCH_TITLE = TransToken.ui('Version Mismatch')
 TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
     'The palette "{name}" has unknown config versions for the following sections:'
@@ -126,7 +126,7 @@ def backup_conf(path: Path, suffix: str) -> None:
 
 class Data(abc.ABC):
     """Data which can be saved to the config. These should be immutable."""
-    __info: ClassVar[ConfInfo]
+    __info: ClassVar[ConfInfo[Any]]
     __slots__ = ()  # No members itself.
 
     @override

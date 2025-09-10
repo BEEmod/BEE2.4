@@ -107,6 +107,7 @@ class Bevels(Flag):
     v_both = north | south
     all = u_both | v_both
 
+
 # All possible bevel flags.
 BEVEL_COMBOS = [Bevels(i) for i in range(2**4)]
 

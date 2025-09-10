@@ -12,7 +12,7 @@ import itertools
 from enum import Enum
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
-from srctools.geometry import Geometry, Polygon
+from srctools.geometry import Geometry
 from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle
 import srctools.logger
 import attrs

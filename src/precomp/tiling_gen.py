@@ -191,10 +191,10 @@ def bevel_split(
                     bottom.append(b)
                 f.write(''.join(top) + '\n')
                 f.write(''.join(bottom) + '\n')
-            f.write(f'\n\nBevels:\n')
+            f.write('\n\nBevels:\n')
             for (u, v), bevel in bevels.items():
                 f.write(f'{u}, {v} = {bevel!r}\n')
-            f.write(f'\n\nPlane:\n')
+            f.write('\n\nPlane:\n')
             for (u, v), tex in texture_plane.items():
                 f.write(f'{u}, {v} = {tex!r}\n')
 
@@ -333,12 +333,14 @@ def fizzler_tile_gen(
         split_min, split_max = mins_u, maxs_u
         along_min, along_max = mins_v, maxs_v
         tile_size = TileSize.TILE_8x4
+
         def order[T](split: T, along: T) -> tuple[T, T]:
             return (split, along)
     else:
         split_min, split_max = mins_v, maxs_v
         along_min, along_max = mins_u, maxs_u
         tile_size = TileSize.TILE_4x8
+
         def order[T](split: T, along: T) -> tuple[T, T]:
             return (along, split)
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 from contextlib import aclosing
 from enum import Enum
 import webbrowser
+from typing import Any
 
 from srctools.logger import get_logger
 from trio_util import AsyncValue
@@ -180,7 +181,7 @@ class ContextWinBase:
     selected_pal_pos: Coord | None  # Palette position, if from there. Allows changing version.
 
     dialog: Dialogs
-    picker: ItemPickerBase
+    picker: ItemPickerBase[Any]
     current_style: AsyncValue[packages.PakRef[packages.Style]]
     # If set, the item properties window is open and suppressing us.
     props_open: bool
@@ -193,7 +194,7 @@ class ContextWinBase:
 
     def __init__(
         self,
-        item_picker: ItemPickerBase,
+        item_picker: ItemPickerBase[Any],
         dialog: Dialogs,
         current_style: AsyncValue[packages.PakRef[packages.Style]],
     ) -> None:

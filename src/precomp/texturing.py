@@ -405,7 +405,7 @@ class MaterialConf:
 
         uaxis.scale *= self.scale
         vaxis.scale *= self.scale
-        match self.rotation:
+        match self.rotation:  # type: ignore[exhaustive-match]  # Mypy bug
             case QuarterRot.NONE:
                 pass
             case QuarterRot.ROT_90:

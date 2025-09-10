@@ -650,7 +650,7 @@ def res_import_template(
                     force_colour = texturing.Portalable.black
                 else:
                     LOGGER.warning(
-                        '"{}": Instance "{}" ' "isn't one with inherent color!",
+                        '"{}": Instance "{}" ' "isn't one with inherent colour!",
                         temp_id,
                         inst['file'],
                     )
@@ -658,7 +658,10 @@ def res_import_template(
                 force_colour = texturing.Portalable.white
             case 'black':
                 force_colour = texturing.Portalable.black
-            # else: no color var
+            case '':
+                pass  # no color var
+            case invalid:
+                LOGGER.warning('"{}": Invalid colour type "{}"!', temp_id, invalid)
 
         if invert_var(inst):
             force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]

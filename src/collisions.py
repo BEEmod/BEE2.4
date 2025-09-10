@@ -720,8 +720,6 @@ class Volume(BBox):  # type: ignore[override]
 
     def _shift(self, other: FrozenVec) -> Volume:
         """Shift the bounding box by a vector."""
-        changed = False
-
         polys = []
         for poly in self.geo.polys:
             offset = Vec.dot(poly.plane.normal, other)

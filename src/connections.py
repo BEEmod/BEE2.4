@@ -4,7 +4,7 @@ This controls how I/O is generated for each item.
 """
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Any
 from collections.abc import Collection, Iterable
 from enum import Enum
 import sys
@@ -477,7 +477,7 @@ class Config:
             timer_sound_pos, timer_done_cmd, force_timer_sound, timer_outputs,
         )
 
-    def __getstate__(self) -> tuple:
+    def __getstate__(self) -> tuple[Any, ...]:
 
         return (
             self.id,
@@ -505,7 +505,7 @@ class Config:
             _intern_out(self.output_unlock),
         )
 
-    def __setstate__(self, state: tuple) -> None:
+    def __setstate__(self, state: tuple[Any, ...]) -> None:
         (
             self.id,
             self.input_type,
