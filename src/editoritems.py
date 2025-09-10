@@ -1112,6 +1112,17 @@ class Item:
             item._finalise_connections()
             if 'activate' in connections or 'deactivate' in connections:
                 LOGGER.warning('', exc_info=tok.error('Output activate/deactivate commands need out_ prefix!'))
+
+            if item.cls is ItemClass.TRACK_PLATFORM and item.targetname != 'raillift':
+                # Track platforms have some special logic for their antline connections, which causes
+                # inputs to stop working if the ent isn't named exactly this. Don't warn if the item
+                # doesn't have connections though.
+                LOGGER.warning(
+                    'Track platform "{}" has targetname="{}", '
+                    'but this must be set to "raillift" for connections to function. Changing.',
+                    item.id, item.targetname,
+                )
+                item.targetname = 'raillift'
         return item
 
     # Boolean option in editor -> Item attribute.
