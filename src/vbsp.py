@@ -134,12 +134,18 @@ async def load_settings() -> tuple[
     vconf = res_vconf.result()
     tex_block = Keyvalues('Textures', list(vconf.find_children('textures')))
 
-    texturing.load_config(tex_block)
-
     # Load in our main configs...
     options.load(vconf.find_all('Options'))
     config.COMPILER.merge_conf(res_dmx_conf.result())
     utils.DEV_MODE = options.DEV_MODE()
+
+    texturing.NEW_TILE_GEN = srctools.conv_bool(
+        options.get_itemconf('VALVE_MANDATORY:PlanarTileGenerator', '1'),
+        True,
+    )
+    LOGGER.info('New tile generator: {}', texturing.NEW_TILE_GEN)
+
+    texturing.load_config(tex_block)
 
     # Configuration properties for styles.
     for stylevar_block in vconf.find_all('stylevars'):

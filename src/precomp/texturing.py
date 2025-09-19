@@ -721,6 +721,16 @@ def apply(
 def load_config(conf: Keyvalues) -> None:
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
+
+    if not NEW_TILE_GEN and 'legacy' in conf:
+        # Allow an alternate configuration for the old tiling generator.
+        # But share configuration for non-tile stuff.
+        old_conf = conf
+        conf = conf.find_block('legacy')
+        for name in ['special', 'overlays', 'antlines']:
+            if name not in conf and name in old_conf:
+                conf.append(old_conf.find_block(name))
+
     global_options = {
         prop.name or '': prop.value
         for prop in
@@ -753,7 +763,7 @@ def load_config(conf: Keyvalues) -> None:
     has_block_mats = False
 
     for prop in conf:
-        if prop.name in ('options', 'antlines'):
+        if prop.name in ('options', 'antlines', 'legacy'):
             continue
         if '.' in prop.name:
             try:
@@ -893,9 +903,8 @@ def load_config(conf: Keyvalues) -> None:
                         tex.append(tex_default)
 
         # Next, do a check to see if any texture names were specified that
-        # we don't recognise.
-        extra_keys = {prop.name for prop in gen_conf}
-        extra_keys.discard('options')  # Not a texture name, but valid.
+        # we don't recognise. Options/weights aren't valid obviously.
+        extra_keys = {prop.name for prop in gen_conf} - {'options', 'weights'}
 
         if isinstance(gen_key, GenCat):
             extra_keys.difference_update(map(str.casefold, tex_defaults.keys()))

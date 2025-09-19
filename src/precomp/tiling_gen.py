@@ -776,7 +776,10 @@ def generate_plane(
     orig_tiles = PlaneGrid(subtile_pos)
 
     if dump_path is not None:
-        dump_path /= f'plane_{PLANE_NAMES.get(plane_key.normal, plane_key.normal.join("_"))}_{round(plane_key.distance):+05}.log'
+        dump_path /= (
+            f'plane_{PLANE_NAMES.get(plane_key.normal, plane_key.normal.join("_"))}'
+            f'_{round(plane_key.distance):+05}.log'
+        )
         LOGGER.info('Dump: {}', dump_path)
 
     # Stores tiles constructing the half-border next to fizzlers. These are 16-wide, with nodraw
