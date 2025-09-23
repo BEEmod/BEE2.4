@@ -48,6 +48,7 @@ ALL_DIRS: Final[Sequence[Direction]] = list(Direction)
 TRANS_DUPLICATE_OPTION = TransToken.untranslated(
     'Duplicate corridor option ID "{option}" in corridor group for style "{group}"!'
 )
+TRANS_MISSING_VARIANT = TransToken.untranslated('No corridors defined for {style}:{variant}!')
 
 
 @attrs.frozen(kw_only=True)
@@ -443,6 +444,16 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 f'{orient.value}!\n {corr.instance}'
                             )
                         dup_check.add(folded)
+
+        # If our conversion failed to locate corridors, this is a fatal error.
+        for corridor_group in packset.all_obj(cls):
+            for mode in GameMode:
+                for direction in Direction:
+                    if not corridor_group.corridors[mode, direction, Attachment.HORIZONTAL]:
+                        ctx.errors.add(TRANS_MISSING_VARIANT.format(
+                            style=corridor_group.id,
+                            variant=f'{mode.value}_{direction.value}',
+                        ), fatal=True)
 
     @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
