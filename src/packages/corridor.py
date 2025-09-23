@@ -21,6 +21,7 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     ORIENT_TO_ATTACH,
 )
+from packages import PackagesSet
 from transtoken import AppError, TransToken, TransTokenSource
 
 
@@ -310,6 +311,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
+        # Groups we synthesised.
+        legacy_groups: set[utils.ObjectID] = set()
         for item_id, (mode, direction) in ID_TO_CORR.items():
             try:
                 item = packset.obj_by_id(packages.Item, item_id, warn=False)
@@ -328,6 +331,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         # Synthesise a new group to match.
                         corridor_group = cls(id=style_id, corridors={})
                         packset.add(corridor_group, item.pak_id, item.pak_name)
+                        legacy_groups.add(style_id)
+                        LOGGER.info('Synthesising corridor group for "{}"', style_id)
 
                     corr_list = corridor_group.corridors.setdefault(
                         (mode, direction, Attachment.HORIZONTAL),
@@ -394,42 +399,26 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Apply inheritance.
         for corridor_group in packset.all_obj(cls):
             for inherit in corridor_group.inherit:
+                corridor_group._inherit_from(ctx, packset, inherit, True)
+
+            if corridor_group.id in legacy_groups and not all(
+                corridor_group.corridors[mode, direction, Attachment.HORIZONTAL]
+                for mode in GameMode for direction in Direction
+            ):
+                # It's possible that a corridor could have nothing defined, if it referenced
+                # the item for a style that itself did update. In that case, if we have a base,
+                # try to inherit. This isn't fully correct, since the package could use <XX> refs
+                # to have loaded the items. This is compatibility code anyway, make a best effort.
                 try:
-                    parent_group = packset.obj_by_id(cls, inherit, warn=False)
+                    style = packset.obj_by_id(packages.Style, corridor_group.id)
                 except KeyError:
-                    ctx.warn_auth(corridor_group.pak_id, TransToken.untranslated(
-                        'Corridor Group "{id}" is trying to inherit from nonexistent group "{inherit}"!'
-                    ).format(id=corridor_group.id, inherit=inherit))
                     continue
-                if parent_group.inherit:
-                    # Disable recursive inheritance for simplicity, can add later if it's actually
-                    # useful.
-                    ctx.warn_auth(corridor_group.pak_id, TransToken.untranslated(
-                        'Corridor Group "{id}" cannot inherit from a group that '
-                        'itself inherits ("{inherit}"). If you need this, ask for '
-                        'it to be supported.'
-                    ).format(id=corridor_group.id, inherit=inherit))
-                    continue
-                for kind, corridors in parent_group.corridors.items():
-                    try:
-                        corridor_group.corridors[kind].extend(corridors)
-                    except KeyError:
-                        corridor_group.corridors[kind] = corridors.copy()
-
-                # Copy over options, but don't overwrite ones that already exist.
-                for opt_kind, options in parent_group.global_options.items():
-                    try:
-                        existing = corridor_group.global_options[opt_kind]
-                    except KeyError:
-                        corridor_group.global_options[opt_kind] = options.copy()
-                    else:
-                        existing_ids = {opt.id for opt in existing}
-                        for option in options:
-                            if option.id not in existing_ids:
-                                existing.append(option)
-
-                for option in parent_group.options.values():
-                    corridor_group.options.setdefault(option.id, option)
+                if style.base_style:
+                    LOGGER.warning(
+                        'Attempting to copy corridors from {} to {}',
+                        style.base_style, corridor_group.id,
+                    )
+                    corridor_group._inherit_from(ctx, packset, style.base_style, False)
 
         if utils.DEV_MODE:
             # Check no duplicate corridors exist.
@@ -454,6 +443,53 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             style=corridor_group.id,
                             variant=f'{mode.value}_{direction.value}',
                         ), fatal=True)
+
+    def _inherit_from(
+        self,
+        ctx: packages.PackErrorInfo, packset: PackagesSet,
+        parent_id: str, merge: bool,
+    ) -> None:
+        """Perform inheritance."""
+        try:
+            parent_group = packset.obj_by_id(CorridorGroup, parent_id, warn=False)
+        except KeyError:
+            ctx.warn_auth(self.pak_id, TransToken.untranslated(
+                'Corridor Group "{id}" is trying to inherit from nonexistent group "{inherit}"!'
+            ).format(id=self.id, inherit=parent_id))
+            return
+
+        if parent_group.inherit:
+            # Disable recursive inheritance for simplicity, can add later if it's actually
+            # useful.
+            ctx.warn_auth(self.pak_id, TransToken.untranslated(
+                'Corridor Group "{id}" cannot inherit from a group that '
+                'itself inherits ("{inherit}"). If you need this, ask for '
+                'it to be supported.'
+            ).format(id=self.id, inherit=parent_id))
+            return
+        for kind, corridors in parent_group.corridors.items():
+            try:
+                corr_list = self.corridors[kind]
+            except KeyError:
+                self.corridors[kind] = corridors.copy()
+            else:
+                if not corr_list or merge:
+                    corr_list.extend(corridors)
+
+        # Copy over options, but don't overwrite ones that already exist.
+        for opt_kind, options in parent_group.global_options.items():
+            try:
+                existing = self.global_options[opt_kind]
+            except KeyError:
+                self.global_options[opt_kind] = options.copy()
+            else:
+                existing_ids = {opt.id for opt in existing}
+                for option in options:
+                    if option.id not in existing_ids:
+                        existing.append(option)
+
+        for option in parent_group.options.values():
+            self.options.setdefault(option.id, option)
 
     @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:

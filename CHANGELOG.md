@@ -9,6 +9,7 @@
 * Fix the infinite value not working in any item properties options.
 * Ensure signage reconfiguration applies to exports even if window is not closed.
 * Add support for barrier holes on "Start Reversed" offset glass/grating.
+* Added some additional compatibility logic to make styles with old corridor definitions work in some additional cases.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
