@@ -129,7 +129,7 @@ class ErrorUI:
             return Result.CANCELLED
         return Result.SUCCEEDED
 
-    def add(self, error: WarningExc | TransToken) -> None:
+    def add(self, error: WarningExc | TransToken, fatal: bool = False) -> None:
         """Log an error having occurred, while still continuing to run.
 
         The result will be PARTIAL at best.
@@ -138,13 +138,14 @@ class ErrorUI:
         """
         match error:
             case TransToken():
-                self._errors.append(AppError(error))
+                self._errors.append(AppError(error, fatal=fatal))
             case AppError():
+                error.fatal |= fatal
                 self._errors.append(error)
             case _:
                 matching, rest = error.split(AppError)
                 if matching is not None:
-                    self._errors.extend(_collapse_excgroup(matching, False))
+                    self._errors.extend(_collapse_excgroup(matching, fatal))
                 if rest is not None:
                     raise rest
 
@@ -197,6 +198,8 @@ class ErrorUI:
                     return False
 
         if self._errors:
+            if not self._fatal_error and any(err.fatal for err in self._errors):
+                self._fatal_error = True
             desc = self.error_desc if self._fatal_error else self.warn_desc
             desc = desc.format(n=len(self._errors))
             # We had an error.

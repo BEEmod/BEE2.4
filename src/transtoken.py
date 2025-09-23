@@ -459,10 +459,10 @@ class AppError(Exception):
     message: TransToken
     fatal: bool
 
-    def __init__(self, message: TransToken) -> None:
+    def __init__(self, message: TransToken, *, fatal: bool = False) -> None:
         super().__init__(message)
         self.message = message
-        self.fatal = False
+        self.fatal = fatal
 
     def __str__(self) -> str:
         return f"AppError: {self.message}"

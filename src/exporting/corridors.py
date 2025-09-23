@@ -28,6 +28,7 @@ ALL_OPTION_KINDS: list[OptionGroup] = [
 TRANS_MISSING_GROUP = TransToken.ui(
     'No corridor definitions found for style "{id}"!'
 )
+TRANS_MISSING_VARIANT = TransToken.untranslated('No corridors defined for {style}:{variant}!')
 
 
 @STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA, StepResource.VCONF_DATA])
@@ -52,12 +53,20 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
                 corr.instance.casefold(): corr
                 for corr in group.corridors[mode, direction, attach]
             }
+            if not inst_to_corr:
+                raise KeyError  # Empty?
         except KeyError:
             # None defined for this corridor. This is not an error for vertical ones.
-            (LOGGER.warning if attach is Attachment.HORIZONTAL else LOGGER.debug)(
-                'No corridors defined for {}:{}_{}_{}',
-                style_id, mode.value, direction.value, attach.value,
-            )
+            if attach is Attachment.HORIZONTAL:
+                exp_data.errors.add(TRANS_MISSING_VARIANT.format(
+                    style=style_id,
+                    variant=f'{mode.value}_{direction.value}'
+                ), fatal=True)
+            else:
+                LOGGER.warning(
+                    'No corridors defined for {}:{}_{}_{}',
+                    style_id, mode.value, direction.value, attach.value,
+                )
             export[mode, direction, attach] = []
             continue
 
