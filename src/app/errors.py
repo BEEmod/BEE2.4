@@ -161,6 +161,7 @@ class ErrorUI:
     ) -> bool:
         exc_wrapped = False
         if exc_val is not None:
+            LOGGER.debug('ErrorUI block:', exc_info=exc_val)
             if not isinstance(exc_val, BaseExceptionGroup):
                 # For simplicity, wrap so we can treat them the same.
                 exc_val = BaseExceptionGroup('', [exc_val])
