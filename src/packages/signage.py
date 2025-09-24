@@ -18,6 +18,10 @@ __all__ = [
     'LEGEND_SIZE', 'CELL_SIGN_SIZE', 'CELL_ANT_SIZE',
     'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle',
 ]
+
+from transtoken import AppError, TransToken
+
+
 LOGGER = srctools.logger.get_logger(__name__)
 # Sizes for the generated legend textures.
 LEGEND_SIZE: Final = (512, 1024)
@@ -171,7 +175,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 try:
                     prop = next(data.info.find_all('styles', prop.value))
                 except StopIteration:
-                    raise ValueError(f'No style <{prop.value}>!') from None
+                    raise AppError(TransToken.untranslated(f'No style <{prop.value}>!')) from None
 
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']
@@ -186,10 +190,10 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             #         sty_id
             #     )
             if not overlay_tex:
-                raise ValueError(
+                data.errors.add(TransToken.untranslated(
                     f'"{data.id}"" signage has no "overlay" value '
                     f'option for the "{sty_id}" style!'
-                )
+                ))
 
             if 'icon' in prop:
                 img = ImgHandle.parse(prop, data.pak_id, 64, 64, subkey='icon')
@@ -224,16 +228,16 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         """Append additional styles to the signage."""
         for sty_id, opts in override.styles.items():
             if sty_id in self.styles:
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     f'Duplicate "{sty_id}" style definition for {self.id}!'
-                )
+                ))
             self.styles[sty_id] = opts
         if override.sec_id:
             if not self.sec_id:
                 self.sec_id = override.sec_id
             elif self.sec_id != override.sec_id:
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     'Mismatch in secondary IDs for '
                     f'signage "{self.id}"! '
                     f'({self.sec_id} != {override.sec_id})'
-                )
+                ))

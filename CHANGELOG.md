@@ -10,6 +10,7 @@
 * Ensure signage reconfiguration applies to exports even if window is not closed.
 * Add support for barrier holes on "Start Reversed" offset glass/grating.
 * Added some additional compatibility logic to make styles with old corridor definitions work in some additional cases.
+* Switch more package loading errors to be displayed in the more friendly error window.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.

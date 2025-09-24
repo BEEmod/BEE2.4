@@ -14,10 +14,14 @@ from packages import (
     AttrMap, ExportKey, PackagesSet, PackErrorInfo, SelPakObject, ParseData, SelitemData,
     get_config,
 )
-from transtoken import TransTokenSource
+from transtoken import TransTokenSource, TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+TRANS_INVALID_MUSIC_DURATION = TransToken.untranslated(
+    'Unknown music duration "{duration}" for music item "{music}". '
+    'Valid durations are "hours:min:sec", "min:sec" or just seconds.'
+)
 
 
 class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
@@ -119,10 +123,10 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
                 case [minute, second]:
                     snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
                 case _:
-                    raise ValueError(
-                        f'Unknown music duration "{snd_length_str}". '
-                        'Valid durations are "hours:min:sec", "min:sec" or just seconds.'
-                    )
+                    data.errors.add(TRANS_INVALID_MUSIC_DURATION.format(
+                        music=data.id, duration=snd_length_str,
+                    ))
+                    snd_length = 0
         else:
             snd_length = srctools.conv_int(snd_length_str)
 

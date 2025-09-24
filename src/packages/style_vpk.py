@@ -11,6 +11,8 @@ import srctools.logger
 import trio
 
 from packages import PakObject, ParseData
+from transtoken import AppError, TransToken
+
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages.styleVPK')
 
@@ -37,8 +39,8 @@ class StyleVPK(PakObject):
 
         # At least one exists?
         if not await trio.to_thread.run_sync(any, data.fsys.walk_folder(source_folder)):
-            raise Exception(
+            raise AppError(TransToken.untranslated(
                 f'VPK object "{data.id}" has no associated files!'
-            )
+            ))
 
         return cls(data.id, data.fsys, source_folder)

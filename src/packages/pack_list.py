@@ -2,6 +2,7 @@ from typing import override
 import srctools.logger
 
 from packages import PakObject, ParseData
+from transtoken import TransToken, AppError
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -50,7 +51,7 @@ class PackList(PakObject, allow_mult=True):
             files.append(f'materials/{prop.value}.vmt')
 
         if not files:
-            raise ValueError(f'"{data.id}" has no files to pack!')
+            raise AppError(TransToken.untranslated(f'"{data.id}" has no files to pack!'))
 
         return cls(data.id, files)
 

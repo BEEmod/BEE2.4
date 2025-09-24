@@ -417,6 +417,10 @@ class PackErrorInfo:
         """Emit a non-fatal warning, shortcut for errors.add()."""
         self.errors.add(warning)
 
+    def warn_fatal(self, warning: AppError | TransToken) -> None:
+        """Emit a fatal warning, shortcut for errors.add()."""
+        self.errors.add(warning, fatal=True)
+
     def warn_auth(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
         """If the specified package is a developer package, emit a warning."""
         if self.packset.use_dev_warnings(package):
@@ -428,11 +432,8 @@ class PackErrorInfo:
 
     def warn_auth_fatal(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
         """If the specified package is a developer package, emit a fatal warning."""
-        if not isinstance(warning, AppError):
-            warning = AppError(warning)
-        warning.fatal = True
         if self.packset.use_dev_warnings(package):
-            self.errors.add(warning)
+            self.errors.add(warning, fatal=True)
         else:  # Write it to the log.
             if isinstance(warning, AppError):
                 warning = warning.message
@@ -936,7 +937,9 @@ class PackagesSet:
                 new_obj = new_ref.resolve(self)
                 exist_obj = exist.resolve(self)
                 if new_obj is None or exist_obj is None:  # Added but somehow missing now? Just error out.
-                    raise ValueError(f'Conflicting migration: {old_ref} -> {exist} & {new_ref}')
+                    raise AppError(TransToken.untranslated(
+                        f'Conflicting migration: {old_ref} -> {exist} & {new_ref}'
+                    ))
                 if self.use_dev_warnings(new_obj.pak_id) or self.use_dev_warnings(exist_obj.pak_id):
                     errors.warn(TRANS_MIGRATION_CONFLICT.format(
                         obj_type=type(new).__name__,
@@ -1352,10 +1355,13 @@ async def parse_object(
                 )
             )
             await trio.lowlevel.checkpoint()
+    except AppError:
+        raise  # Report these to users.
+    # TODO: These should be displayed in the ErrorUI, plus needs ExceptionGroup handling.
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
     except TokenSyntaxError as e:
-        # Add the relevant package to the filename.
+        # Add the relevant package to the filename. TODO: This should just be in the parse function.
         if e.file:
             e.file = f'{obj_data.pak_id}:{e.file}'
         raise
@@ -1366,7 +1372,7 @@ async def parse_object(
         ) from e
 
     if not hasattr(object_, 'id'):
-        raise ValueError(f'"{obj_class.__name__}" object {object_} has no ID!')
+        raise AppError(TransToken.untranslated(f'"{obj_class.__name__}" object {object_} has no ID!'))
     assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
@@ -1402,9 +1408,9 @@ def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
     try:
         obj_id = kv['id'].casefold()
     except LookupError:
-        raise ValueError('No ID for "TransToken" object type!') from None
+        raise AppError(TransToken.untranslated('No ID for "TransToken" object type!')) from None
     if obj_id in pack.additional_tokens:
-        raise ValueError('Duplicate translation token "{}:{}"', pack.id, obj_id)
+        raise AppError(TransToken.untranslated(f'Duplicate translation token "{pack.id}:{obj_id}!'))
     with srctools.logger.context(f'{pack.id}:{obj_id}'):
         token = TransToken.parse(pack.id, parse_multiline_key(kv, 'text'))
 
@@ -1604,7 +1610,9 @@ class Style(SelPakObject, needs_foreground=True):
                 renderables = {}
                 vbsp = lazy_conf.BLANK
             else:
-                raise ValueError(f'Style "{data.id}" missing configuration folder!') from None
+                raise AppError(TransToken.untranslated(
+                    f'Style "{data.id}" missing configuration folder!'
+                )) from None
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f, data.pak_id)

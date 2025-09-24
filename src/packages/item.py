@@ -32,7 +32,7 @@ from packages import (
     ExportKey, PackagesSet, PackErrorInfo, PakObject, PakRef, ParseData, Style,
     desc_parse, get_config, sep_values,
 )
-from transtoken import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource, AppError
 import async_util
 import collisions
 import config
@@ -325,10 +325,10 @@ class ItemVariant:
 
             if item.name == 'all':
                 if is_extra:
-                    raise Exception(
+                    raise AppError(TransToken.untranslated(
                         'Cannot specify "all" for hidden '
                         f'editoritems blocks in {source}!'
-                    )
+                    ))
                 if pal_icon is not None:
                     self.all_icon = pal_icon
                     # If a previous BEE icon was present, remove so we use the VTF.
@@ -343,10 +343,10 @@ class ItemVariant:
                 subtype_ind = int(item.name)
                 subtype_item, subtype_ind, subtype = subtype_lookup[subtype_ind]
             except (IndexError, ValueError, TypeError):
-                raise Exception(
+                raise AppError(TransToken.untranslated(
                     f'Invalid index "{item.name}" when modifying '
                     f'editoritems for {source}'
-                ) from None
+                )) from None
             subtype_item.subtypes = subtype_item.subtypes.copy()
             subtype_item.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
 
@@ -365,10 +365,10 @@ class ItemVariant:
 
             if bee2_icon:
                 if is_extra:
-                    raise ValueError(
+                    raise AppError(TransToken.untranslated(
                         'Cannot specify BEE2 icons for hidden '
                         f'editoritems blocks in {source}!'
-                    )
+                    ))
                 self.icons[item.name] = bee2_icon
             elif pal_icon is not None:
                 # If a previous BEE icon was present, remove it so we use the VTF.
@@ -382,10 +382,10 @@ class ItemVariant:
         if 'Collisions' in kv:
             # Adjust collisions.
             if len(editor) != 1:
-                raise ValueError(
-                    'Cannot specify instances for multiple '
-                    f'editoritems blocks in {source}!'
-                )
+                raise AppError(TransToken.untranslated(
+                    'Cannot specify collisions if multiple '
+                    f'item blocks are present in {source}!'
+                ))
             editor[0].collisions = editor[0].collisions.copy()
             for coll_prop in kv.find_children('Collisions'):
                 if coll_prop.name == 'remove':
@@ -404,16 +404,19 @@ class ItemVariant:
                         contents=collisions.CollideType.parse(coll_prop['type', 'SOLID']),
                     ))
                 else:
-                    raise ValueError(f'Unknown collision type "{coll_prop.real_name}" in {source}')
+                    raise AppError(TransToken.untranslated(
+                        f'Unknown collision type "{coll_prop.real_name}" in {source}'
+                    ))
 
         if 'Instances' in kv:
-            if len(editor) != 1:
-                raise ValueError(
-                    'Cannot specify instances for multiple '
-                    f'editoritems blocks in {source}!'
-                )
-            editor[0].instances = editor[0].instances.copy()
-            editor[0].cust_instances = editor[0].cust_instances.copy()
+            if len(editor) == 1:
+                editor[0].instances = editor[0].instances.copy()
+                editor[0].cust_instances = editor[0].cust_instances.copy()
+            else:
+                raise AppError(TransToken.untranslated(
+                    'Cannot specify instances if multiple '
+                    f'item blocks are present in {source}!'
+                ))
 
         for inst in kv.find_children('Instances'):
             if inst.has_children():
@@ -432,10 +435,10 @@ class ItemVariant:
                 except IndexError:
                     # This would likely mean there's an extra definition or
                     # something.
-                    raise ValueError(
+                    raise AppError(TransToken.untranslated(
                         f'Invalid index {inst.real_name} for '
                         f'instances in {source}'
-                    ) from None
+                    )) from None
                 editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
                 inst_name = inst.name.removeprefix('bee2_')
@@ -451,10 +454,10 @@ class ItemVariant:
                 pass
         if io_props is not None:
             if len(editor) != 1:
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     'Cannot specify I/O for multiple '
                     f'editoritems blocks in {source}!'
-                )
+                ))
             force = io_props['force', '']
             editor[0].conn_config = ConnConfig.parse(editor[0].id, io_props)
             editor[0].force_input = 'in' in force
@@ -632,12 +635,14 @@ class Item(PakObject, needs_foreground=True):
                 styles[targ_style] = folder
 
                 if targ_style == folder.style:
-                    raise ValueError(
+                    raise AppError(TransToken.untranslated(
                         f'Item "{data.id}"\'s "{style.real_name}" style '
                         "can't inherit from itself!"
-                    )
+                    ))
             if def_style is None:
-                raise ValueError(f'Item "{data.id}" has version section with no styles defined!')
+                raise AppError(TransToken.untranslated(
+                    f'Item "{data.id}" has version section "{ver_id}" with no styles defined!'
+                ))
             versions[ver_id] = version = UnParsedVersion(
                 id=ver_id,
                 name=ver_name,
@@ -655,7 +660,7 @@ class Item(PakObject, needs_foreground=True):
                 version.isolate = True
 
         if def_version is None:
-            raise ValueError(f'Item "{data.id}" has no versions!')
+            raise AppError(TransToken.untranslated(f'Item "{data.id}" has no versions!'))
 
         # Parse all the folders for an item.
         async with trio.open_nursery() as nursery:
@@ -676,10 +681,11 @@ class Item(PakObject, needs_foreground=True):
             for item_variant in parsed_folders.values()
         }
         if len(subtype_counts) > 1:
-            raise ValueError(
+            raise AppError(TransToken.untranslated(
                 f'Item "{data.id}" has different '
-                f'visible subtypes in its styles: {", ".join(map(str, subtype_counts))}'
-            )
+                f'visible subtypes in its styles: {", ".join(map(str, subtype_counts))}! '
+                'All style variations must have the same number of items available for the palette.'
+            ))
 
         migrations = cls.migrations(data.packset)
         item_ref = PakRef(Item, utils.obj_id(data.id))
@@ -688,10 +694,11 @@ class Item(PakObject, needs_foreground=True):
             new_item = SubItemRef(item_ref, conv_int(kv.value))
             existing = migrations.setdefault(old_item, new_item)
             if existing != new_item:
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     f'Item migration from {old_item} is '
-                    f'configured to produce both {existing} and {new_item}!'
-                )
+                    f'configured to produce both {existing} and {new_item}! '
+                    f'Remove one entry.'
+                ))
 
         return cls(
             data.id,
@@ -731,13 +738,9 @@ class Item(PakObject, needs_foreground=True):
                         our_ver.styles[sty_id] = style
                         our_ver.inherit_kind[sty_id] = version.inherit_kind[sty_id]
                     else:
-                        raise ValueError(
-                            'Two definitions for item folder {}.{}.{}',
-                            self.id,
-                            ver_id,
-                            sty_id,
-                        )
-                        # our_style.override_from_folder(style)
+                        raise AppError(TransToken.untranslated(
+                            f'Two definitions for item folder {self.id}.{ver_id}.{sty_id} exist!'
+                        ))
 
     @override
     def __repr__(self) -> str:
@@ -992,7 +995,7 @@ class SubItemRef:
         try:
             subtype = int(raw_sub)
             if subtype < 0:
-                raise ValueError
+                raise ValueError  # Raise error below.
         except (TypeError, OverflowError, ValueError):
             raise ValueError(
                 f'Invalid subtype "{raw_sub}" for item "{raw_id}", must be a non-negative integer.'
@@ -1026,7 +1029,9 @@ async def parse_item_folder(
         try:
             f = data.fsys[path].open_str()
         except FileNotFoundError as err:
-            raise OSError(f'"{data.pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+            raise AppError(TransToken.untranslated(
+                f'"{data.pak_id}:items/{fold}" not valid! Folder likely missing!'
+            )) from err
         with f:
             tok = Tokenizer(f, path)
             for tok_type, tok_value in tok:
@@ -1066,10 +1071,10 @@ async def parse_item_folder(
     try:
         first_item, *extra_items = all_items.result()
     except ValueError:
-        raise ValueError(
+        raise AppError(TransToken.untranslated(
             f'"{data.pak_id}:items/{fold}/editoritems.txt has no '
             '"Item" block!'
-        ) from None
+        )) from None
 
     if first_item.id != utils.obj_id(data.id):
         data.warn_auth(TRANS_EDITOR_ID_MISMATCH.format(
@@ -1227,10 +1232,10 @@ async def assign_styled_items(ctx: PackErrorInfo, all_styles: Iterable[Style], i
                             # TODO: This will fail if ver_id is after us in the all_ver list.
                             #       We need to do all the versions and styles together!
                         except KeyError:
-                            raise ValueError(
+                            raise AppError(TransToken.untranslated(
                                 f'Item {item.id}\'s {sty_id} style{vers_desc} '
                                 f'referenced invalid style "{conf.style}"'
-                            ) from None
+                            )) from None
                     else:  # Style lookup from this version.
                         try:
                             start_data = styles[conf.style]
@@ -1239,31 +1244,27 @@ async def assign_styled_items(ctx: PackErrorInfo, all_styles: Iterable[Style], i
                                 # Not done yet, defer until next iteration.
                                 deferred.append((sty_id, conf))
                                 continue
-                            raise ValueError(
+                            raise AppError(TransToken.untranslated(
                                 f'Item {item.id}\'s {sty_id} style{vers_desc} '
                                 f'referenced invalid style "{conf.style}"'
-                            ) from None
+                            )) from None
 
                     # Can't have both style and folder.
                     if conf.folder:
-                        raise ValueError(
+                        raise AppError(TransToken.untranslated(
                             f'Item {item.id}\'s {sty_id} style has '
                             f'both folder and style{vers_desc}!'
-                        )
+                        ))
                 elif conf.folder:
                     # Just a folder ref, we can do it immediately.
                     # We know this dict should be set.
-                    try:
-                        start_data = item.folders[conf.filesys, conf.folder]
-                    except KeyError:
-                        LOGGER.info('Folders: {}', item.folders.keys())
-                        raise
+                    start_data = item.folders[conf.filesys, conf.folder]
                 else:
                     # No source for our data!
-                    raise ValueError(
+                    raise AppError(TransToken.untranslated(
                         f"Item {item.id}'s {sty_id} style has no data "
                         f"source{vers_desc}!"
-                    )
+                    ))
 
                 if conf.config is None:
                     styles[sty_id] = start_data.copy()
@@ -1280,10 +1281,10 @@ async def assign_styled_items(ctx: PackErrorInfo, all_styles: Iterable[Style], i
                     f'{conf.style} -> {sty_id}'
                     for sty_id, conf in deferred
                 )
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     f'Loop in style references for item {item.id}'
                     f'{vers_desc}!\nNot resolved:\n{unresolved}'
-                )
+                ))
             to_change = deferred
 
         default_style = styles[vers.def_style]

@@ -17,7 +17,7 @@ from config.widgets import (
     TimerNum as TimerNum, WidgetConfig,
 )
 from config.stylevar import State as StyleVarState
-from transtoken import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource, AppError
 import BEE2_config
 import config
 import packages
@@ -270,7 +270,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
             if wid_id in ids:
                 # Duplicates inside the definition are nonsensical.
-                raise ValueError(f'{data.id} in {data.pak_id} has duplicate widget "{wid_id}"!')
+                data.errors.add(TransToken.untranslated(
+                    f'{data.id} in {data.pak_id} has duplicate widget "{wid_id}"!'
+                ), fatal=True)
             ids.add(wid_id)
 
             try:
@@ -300,14 +302,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
             if stylevar_id := wid['legacy_stylevar_id', '']:
                 if kind is not KIND_CHECKMARK:
-                    raise ValueError(
-                        f'"{data.id}.{wid_id}": '
+                    data.errors.add(TransToken.untranslated(
+                        f'Widget "{data.id}.{wid_id}": '
                         f'Legacy Stylevars can only be checkmark kinds, not {kind}!'
-                    )
+                    ), fatal=True)
                 if is_timer:
-                    raise ValueError(
-                        f'"{data.id}.{wid_id}": Legacy Stylevars can only be singular!'
-                    )
+                    data.errors.add(TransToken.untranslated(
+                        f'Widget "{data.id}.{wid_id}": Legacy Stylevars can only be singular!'
+                    ), fatal=True)
                 if prev_conf is EmptyMapping:
                     prev_conf = bool_as_int(config.APP.get_cur_conf(
                         StyleVarState, stylevar_id,
@@ -349,9 +351,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             else:
                 # Singular Widget.
                 if default_prop.has_children():
-                    raise ValueError(
-                        f'{data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
-                    )
+                    raise AppError(TransToken.untranslated(
+                        f'Widget {data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
+                    ))
 
                 if kind is KIND_ITEM_VARIANT:
                     cur_value = ''  # Not used.
@@ -362,8 +364,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     cur_value = prev_conf
                 else:
                     LOGGER.warning(
-                        'Widget {}:{} had timer defaults, but widget is singular!',
-                        data.id, wid_id,
+                        'Widget {}:{} had timer previous configurat, but widget is singular! '
+                        'Discarding previous state:\n{}',
+                        data.id, wid_id, prev_conf
                     )
                     cur_value = default_prop.value
 
@@ -404,7 +407,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()
         if conficts:
-            raise ValueError('Duplicate IDs in "{}" override - {}', self.id, conficts)
+            raise AppError(TransToken.untranslated(
+                f'Widget "{self.id}" has multiple definitions for widgets '
+                f'{conficts} when merging overrides.'
+            ))
 
         if self.name is TransToken.BLANK:
             self.name = override.name
@@ -421,10 +427,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 or single_wid.config != single_existing.config
                 or single_wid.stylevar_id != single_existing.stylevar_id
             ):
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     f'Duplicate widget {self.id}:{single_wid.id}:'
                     f'\n{single_wid}\n{single_existing}'
-                )
+                ))
 
         for multi_wid in override.multi_widgets:
             try:
@@ -436,10 +442,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 multi_existing.kind is not multi_existing.kind
                 or multi_existing.config != multi_existing.config
             ):
-                raise ValueError(
+                raise AppError(TransToken.untranslated(
                     f'Duplicate widget {self.id}:{multi_existing.id}:'
                     f'\n{multi_wid}\n{multi_existing}'
-                )
+                ))
 
     @classmethod
     @override
@@ -551,7 +557,10 @@ class TimerOptions:
         max_value = conf.int('max', 60)
         min_value = conf.int('min', 0)
         if min_value > max_value:
-            raise ValueError('Bad min and max values!')
+            data.warn_auth(TransToken.untranslated(
+                f'Invalid min/max range "{min_value}" - "{max_value}" for timer. Swapping.'
+            ))
+            min_value, max_value = max_value, min_value
         return cls(min_value, max_value)
 
 

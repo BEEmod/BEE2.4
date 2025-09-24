@@ -86,7 +86,9 @@ def parse_specifier(specifier: str) -> CorrSpec:
             pass
         else:
             if direction is not None:
-                raise ValueError(f'Multiple entry/exit keywords in "{specifier}"!')
+                raise AppError(TransToken.untranslated(
+                    f'Multiple entry/exit keywords in corridor type "{specifier}"!'
+                ))
             direction = parsed_dir
             continue
         try:
@@ -95,7 +97,9 @@ def parse_specifier(specifier: str) -> CorrSpec:
             pass
         else:
             if attach is not None or orient is not None:
-                raise ValueError(f'Multiple attachment keywords in "{specifier}"!')
+                raise AppError(TransToken.untranslated(
+                    f'Multiple attachment keywords in corridor type "{specifier}"!'
+                ))
             attach = parsed_attach
             continue
         try:
@@ -104,7 +108,9 @@ def parse_specifier(specifier: str) -> CorrSpec:
             pass
         else:
             if attach is not None or orient is not None:
-                raise ValueError(f'Multiple attachment keywords in "{specifier}"!')
+                raise AppError(TransToken.untranslated(
+                    f'Multiple attachment keywords in corridor type "{specifier}"!'
+                ))
             orient = parsed_orient
             continue
         try:
@@ -113,12 +119,16 @@ def parse_specifier(specifier: str) -> CorrSpec:
             pass
         else:
             if mode is not None:
-                raise ValueError(f'Multiple sp/coop keywords in "{specifier}"!')
+                raise AppError(TransToken.untranslated(
+                    f'Multiple sp/coop keywords in corridor type "{specifier}"!'
+                ))
             mode = parsed_mode
             continue
         # Completely empty specifier will split into [''], allow `sp__exit` too.
         if part:
-            raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
+            raise AppError(TransToken.untranslated(
+                f'Unknown keyword "{part}" in corridor type "{specifier}"!'
+            ))
     if orient is not None:
         # Use exit so that 'up' -> ceiling, 'down' -> floor.
         attach = ORIENT_TO_ATTACH[direction or Direction.EXIT, orient]
@@ -131,23 +141,27 @@ def parse_corr_kind(specifier: str) -> CorrKind:
     if attach is None:  # Infer horizontal if unspecified.
         attach = Attachment.HORIZONTAL
     if direction is None:
-        raise ValueError(f'Direction must be specified in "{specifier}"!')
+        raise AppError(TransToken.untranslated(
+            f'Corridor type "{specifier}" must specify a direction!'
+        ))
     if mode is None:
-        raise ValueError(f'Game mode must be specified in "{specifier}"!')
+        raise AppError(TransToken.untranslated(
+            f'Corridor type "{specifier}" must specify a game mode!'
+        ))
     return mode, direction, attach
 
 
 def parse_option(
-    pak_id: utils.ObjectID,
+    data: packages.ParseData,
     kv: Keyvalues,
 ) -> Option:
     """Parse a KV1 config into an option."""
     opt_id = utils.obj_id(kv.real_name, 'corridor option')
-    name = TransToken.parse(pak_id, kv['name'])
+    name = TransToken.parse(data.pak_id, kv['name'])
     valid_ids: set[utils.ObjectID] = set()
     values: list[OptValue] = []
     fixup = kv['var']
-    desc = TransToken.parse(pak_id, packages.parse_multiline_key(kv, 'description'))
+    desc = TransToken.parse(data.pak_id, packages.parse_multiline_key(kv, 'description'))
 
     for child in kv.find_children('Values'):
         val_id = utils.obj_id(child.real_name, 'corridor option value')
@@ -156,11 +170,13 @@ def parse_option(
         valid_ids.add(val_id)
         values.append(OptValue(
             id=val_id,
-            name=TransToken.parse(pak_id, child.value),
+            name=TransToken.parse(data.pak_id, child.value),
         ))
 
     if not values:
-        raise ValueError(f'Option "{opt_id}" has no valid values!')
+        raise AppError(TransToken.untranslated(
+            f'Corridor option "{opt_id}" for style "{data.id}" has no valid values!'
+        ))
 
     try:
         default = utils.special_id(kv['default'], 'corridor option default')
@@ -201,7 +217,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         global_options: dict[OptionGroup, list[Option]] = defaultdict(list)
         for opt_kv in data.info.find_children('Options'):
             with logger.context(opt_kv.real_name):
-                option = parse_option(data.pak_id, opt_kv)
+                option = parse_option(data, opt_kv)
             if option.id in options:
                 raise AppError(TRANS_DUPLICATE_OPTION.format(option=option.id, group=data.id))
             options[option.id] = option
@@ -242,10 +258,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         mode, direction, attach, kv['Name', kv['instance']],
                     )
                 else:
-                    raise ValueError(
+                    raise AppError(TransToken.untranslated(
                         f'Non-horizontal {mode.value}_{direction.value}_{attach.value} corridor '
                         f'"{kv["Name", kv["instance"]]}" cannot be defined as a legacy corridor!'
-                    )
+                    ))
             try:
                 name = TransToken.parse(data.pak_id, kv['Name'])
             except LookupError:
@@ -427,11 +443,11 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     dup_check = set()
                     for corr in corridors:
                         if (folded := corr.instance.casefold()) in dup_check:
-                            raise ValueError(
+                            ctx.warn_fatal(TransToken.untranslated(
                                 f'Duplicate corridor instance in '
                                 f'{corridor_group.id}:{mode.value}_{direction.value}_'
                                 f'{orient.value}!\n {corr.instance}'
-                            )
+                            ))
                         dup_check.add(folded)
 
         # If our conversion failed to locate corridors, this is a fatal error.

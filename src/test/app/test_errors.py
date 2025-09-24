@@ -33,26 +33,32 @@ async def handler_fail(title: TransToken, desc: TransToken, errors: list[AppErro
 
 def test_handler_install() -> None:
     """Test installing correctly prevents reentrancy and handles exceptions."""
-    assert ErrorUI._handler is None
+    def cur_handler() -> object:
+        """Wrap the handler object for our assertions, so checkers don't incorrectly narrow."""
+        return ErrorUI._handler
+
+    assert cur_handler() is None
     with ErrorUI.install_handler(handler_fail):
-        assert ErrorUI._handler is handler_fail
+        assert cur_handler() is handler_fail
 
-    assert ErrorUI._handler is None
+    assert cur_handler() is None
 
-    with pytest.raises(ZeroDivisionError):
-        assert ErrorUI._handler is None
+    try:
+        assert cur_handler() is None
         with ErrorUI.install_handler(handler_fail):
-            assert ErrorUI._handler is handler_fail
+            assert cur_handler() is handler_fail
             raise ZeroDivisionError
+    except ZeroDivisionError:
+        pass
 
-    assert ErrorUI._handler is None
+    assert cur_handler() is None
 
     with ErrorUI.install_handler(handler_fail):
         with pytest.raises(ValueError, match="already installed"):
             with ErrorUI.install_handler(handler_fail):
                 pass
-        assert ErrorUI._handler is handler_fail
-    assert ErrorUI._handler is None
+        assert cur_handler() is handler_fail
+    assert cur_handler() is None
 
 
 async def test_success() -> None:
