@@ -109,7 +109,7 @@ def on_error(
             ).format(err=err)),
         )
     except Exception:
-        pass
+        LOGGER.exception('Failed to show messages:')
 
     try:
         import config
@@ -124,7 +124,7 @@ def on_error(
         config.APP.write_file(config.APP_LOC)
     except Exception:
         # Ignore failures...
-        pass
+        LOGGER.exception('Failed to enable log window:')
 
 
 @deprecated('Pass the core nursery down instead.')

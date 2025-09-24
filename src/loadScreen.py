@@ -6,7 +6,7 @@ the main process is busy loading.
 The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
-from typing import Self, assert_never
+from typing import Self
 
 from collections.abc import (
     AsyncGenerator, Collection, Generator, MutableMapping,
@@ -77,8 +77,12 @@ def suppress_screens() -> Generator[None, None, None]:
     for screen in _ALL_SCREENS.values():
         if not screen.active:
             continue
-        screen.suppress()
-        active.append(screen)
+        try:
+            screen.suppress()
+        except ValueError:
+            pass  # Can happen if the queue is closed.
+        else:
+            active.append(screen)
     try:
         yield None
     finally:
@@ -315,7 +319,6 @@ async def _listen_to_process() -> None:
                     LOGGER.info('Cancelling load screen {!r}, scope={}', screen.title, screen._scope)
                     if screen._scope is not None:
                         screen._scope.cancel('user pressed cancel')
-
 
 
 _bg_started = False

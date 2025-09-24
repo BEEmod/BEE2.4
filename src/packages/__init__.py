@@ -1390,10 +1390,11 @@ async def parse_object(
                 e.file = f'{override_data.pak_id}:{e.file}'
             raise
         except Exception as e:
-            raise ValueError(
+            e.add_note(
                 f'Error occured parsing {obj_id} override '
                 f'from package {override_data.pak_id}!'
-            ) from e
+            )
+            raise
 
         await trio.lowlevel.checkpoint()
         object_.add_over(override)
