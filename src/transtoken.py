@@ -16,6 +16,8 @@ from pathlib import Path
 import string
 
 from srctools import EmptyMapping, logger
+from srctools.tokenizer import TokenSyntaxError
+
 from trio_util import AsyncValue
 import attrs
 
@@ -463,6 +465,11 @@ class AppError(Exception):
         super().__init__(message)
         self.message = message
         self.fatal = fatal
+
+    @classmethod
+    def from_syntax(cls, error: TokenSyntaxError) -> 'AppError':
+        """Convert a TokenSyntaxError into an AppError."""
+        return cls(TransToken.untranslated(f'Invalid syntax:\n{error!s}'))
 
     def __str__(self) -> str:
         return f"AppError: {self.message}"

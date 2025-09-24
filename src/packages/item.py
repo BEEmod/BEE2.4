@@ -18,7 +18,7 @@ from weakref import WeakKeyDictionary
 
 from aioresult import ResultCapture
 from srctools import VMF, FileSystem, Keyvalues, logger, conv_int
-from srctools.tokenizer import Token, Tokenizer
+from srctools.tokenizer import Token, Tokenizer, TokenSyntaxError
 import attrs
 import trio
 
@@ -1032,16 +1032,19 @@ async def parse_item_folder(
             raise AppError(TransToken.untranslated(
                 f'"{data.pak_id}:items/{fold}" not valid! Folder likely missing!'
             )) from err
-        with f:
-            tok = Tokenizer(f, path)
-            for tok_type, tok_value in tok:
-                if tok_type is Token.STRING:
-                    if tok_value.casefold() != 'item':
-                        raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok, data.pak_id, first_id))
-                    first_id = None  # Subsequent items cannot be blank.
-                elif tok_type is not Token.NEWLINE:
-                    raise tok.error(tok_type)
+        try:
+            with f:
+                tok = Tokenizer(f, f'{data.pak_id}:{path}')
+                for tok_type, tok_value in tok:
+                    if tok_type is Token.STRING:
+                        if tok_value.casefold() != 'item':
+                            raise tok.error('Unknown item option "{}"!', tok_value)
+                        items.append(EditorItem.parse_one(tok, data.pak_id, first_id))
+                        first_id = None  # Subsequent items cannot be blank.
+                    elif tok_type is not Token.NEWLINE:
+                        raise tok.error(tok_type)
+        except TokenSyntaxError as err:
+            raise AppError.from_syntax(err) from err
         return items
 
     def parse_vmf(path: str) -> VMF | None:
@@ -1050,6 +1053,8 @@ async def parse_item_folder(
             vmf_keyvalues = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return None
+        except TokenSyntaxError as err:
+            raise AppError.from_syntax(err) from err
         else:
             return VMF.parse(vmf_keyvalues)
 
@@ -1059,6 +1064,8 @@ async def parse_item_folder(
             prop = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return Keyvalues('Properties', [])
+        except TokenSyntaxError as err:
+            raise AppError.from_syntax(err) from err
         else:
             return prop.find_key('Properties', or_blank=True)
 
