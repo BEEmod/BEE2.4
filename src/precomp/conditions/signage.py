@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import Enum
+import itertools
 
 import srctools.logger
 from precomp import tiling, texturing, template_brush, conditions
@@ -55,13 +56,14 @@ class Sign:
         )
 
 
-SIGNAGES: dict[str, Sign] = {}
+# The int is the frame type - for connection signs, the blue/orange frame.
+SIGNAGES: dict[str, tuple[int, Sign]] = {}
 
 # Special connection signage type.
-CONN_SIGNAGES: dict[str, Sign] = {
-    str(time): Sign('', f'<overlay.{sign}>')
-    for time, sign in
-    enumerate([
+CONN_SIGNAGES: dict[str, tuple[int, Sign]] = {
+    str(time): (frame, Sign('', f'<overlay.{sign}>'))
+    for time, (frame, sign) in
+    enumerate(itertools.product([0, 1, 2], [
         'square',
         'cross',
         'dot',
@@ -72,14 +74,15 @@ CONN_SIGNAGES: dict[str, Sign] = {
         'star',
         'circle',
         'wavy',
-    ], start=3)
+    ]), start=3)
 }
 
 
 def load_signs(conf: Keyvalues) -> None:
     """Load in the signage data."""
     for prop in conf.find_children('Signage'):
-        SIGNAGES[prop.name] = sign = Sign.parse(prop)
+        sign = Sign.parse(prop)
+        SIGNAGES[prop.name] = (0, sign)  # Never uses a frame.
         try:
             prim = prop.find_key('primary')
         except NoKeyError:
@@ -97,11 +100,12 @@ def load_signs(conf: Keyvalues) -> None:
 
 
 @conditions.make_result('SignageItem')
-def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
+def res_signage(vmf: VMF, map_info: conditions.MapInfo, inst: Entity, res: Keyvalues) -> None:
     """Implement the Signage item."""
     sign: Sign | None
+    frame_ind = 0
     try:
-        sign = (
+        frame_ind, sign = (
             CONN_SIGNAGES if
             res.bool('connection')
             else SIGNAGES
@@ -118,7 +122,7 @@ def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
 
     if has_arrow:
         sign_prim = sign
-        sign_sec = SIGNAGES['arrow']
+        _, sign_sec = SIGNAGES['arrow']
     elif sign is not None:
         sign_prim = sign.primary or sign
         sign_sec = sign.secondary or None
@@ -193,6 +197,8 @@ def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
             )
             return
 
+    shape_frame_mat = texturing.OVERLAYS.get_all('shapeframe', False)
+
     if sign_prim is not None:
         over = place_sign(
             vmf,
@@ -213,6 +219,15 @@ def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
                 pass
             else:
                 tile[u, v] = tile[u, v].as_4x4
+
+        if frame_ind != 0 and frame_ind <= len(shape_frame_mat):
+            frame_over = over.copy()
+            vmf.add_ent(frame_over)
+            shape_frame_mat[frame_ind - 1].apply_over(frame_over)
+            vbsp.IGNORED_OVERLAYS.add(frame_over)
+            frame_over['renderorder'] = '1'  # After regular frame.
+            if tiledef is not None:
+                tiledef.bind_overlay(frame_over)
 
     if sign_sec is not None:
         if has_arrow and res.bool('arrowDown'):
