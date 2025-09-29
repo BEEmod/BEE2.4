@@ -1,5 +1,5 @@
 """Implements the selected palette and list of items."""
-from typing import Final, Never, Any
+from typing import Final, Never
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping

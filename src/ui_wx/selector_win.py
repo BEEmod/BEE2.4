@@ -695,7 +695,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, wx.Frame, GroupHeader]):
                 self.wid_props_icon.SetCursor(wx.Cursor(wx.CURSOR_SIZENESW))
             case 'sample':
                 self.wid_props_icon.SetCursor(wx.Cursor(wx.CURSOR_HAND))
-            case 'sample':
+            case None:
                 self.wid_props_icon.SetCursor(wx.NullCursor)
 
     @override

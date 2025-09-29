@@ -123,7 +123,7 @@ def replace(base: LazyConf, replacements: list[tuple[re.Pattern[str], str]]) -> 
 		copy = await base()
 		for prop in copy.iter_tree():
 			name = prop.real_name
-			if name is not None:
+			if not prop.is_root():
 				for func in rep_funcs:
 					name = func(name)
 				prop.name = name

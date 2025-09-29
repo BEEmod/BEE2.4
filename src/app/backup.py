@@ -254,12 +254,16 @@ class Date:
     def __le__(self, other: Date) -> bool:
         if self.date is None:
             return other.date is None
+        elif other.date is None:
+            return False
         else:
             return self.date <= other.date
 
     def __ge__(self, other: Date) -> bool:
         if self.date is None:
             return other.date is None
+        elif other.date is None:
+            return True
         else:
             return self.date >= other.date
 

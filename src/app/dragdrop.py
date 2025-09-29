@@ -448,8 +448,6 @@ class ManagerBase[ItemT, ParentT]:
                 if free.contents is None:
                     free.contents = item
                     sound.fx('config')
-                    if slot.is_flexi:
-                        slot.contents = None
                     self.on_modified.set()
                     return
                 elif free.contents is item:
