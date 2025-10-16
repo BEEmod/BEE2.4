@@ -23,7 +23,7 @@ import packages
 from packages import PakRef
 import utils
 from config.gen_opts import AfterExport
-from config.last_sel import LastSelected
+from config.last_sel import LastGame
 from config.windows import WindowState
 import config
 from transtoken import TransToken
@@ -551,7 +551,7 @@ async def on_game_changed() -> None:
                 TK_ROOT,
                 TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name),
             )
-            config.APP.store_conf(LastSelected(utils.obj_id(game.name)), 'game')
+            config.APP.store_conf(LastGame(game.uuid))
 
 
 async def init_windows(

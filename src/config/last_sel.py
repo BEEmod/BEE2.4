@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import override
+from uuid import UUID
 
 from srctools import Keyvalues
 from srctools.dmx import Element
@@ -72,4 +73,37 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
         """Export to a DMX element."""
         elem = Element('LastSelected', 'DMElement')
         elem['selected'] = self.id
+        return elem
+
+
+@config.APP.register
+@attrs.frozen
+class LastGame(config.Data, conf_name='LastGame'):
+    """Stores the UUID of the last selected game."""
+    uuid: UUID
+
+    @classmethod
+    def parse_kv1(cls, data: Keyvalues, /, version: int) -> LastGame:
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+        return cls(UUID(hex=data['uuid']))
+
+    def export_kv1(self, /) -> Keyvalues:
+        return Keyvalues('LastGame', [
+            Keyvalues('uuid', self.uuid.hex),
+        ])
+
+    @classmethod
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> LastGame:
+        """Parse DMX elements."""
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+        return cls(UUID(bytes=data['uuid'].val_bytes))
+
+    @override
+    def export_dmx(self) -> Element:
+        """Export to a DMX element."""
+        elem = Element('LastGame', 'DMElement')
+        elem['uuid'] = self.uuid.bytes
         return elem

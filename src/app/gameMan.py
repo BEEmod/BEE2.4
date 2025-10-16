@@ -26,6 +26,7 @@ from app import quit_app
 from async_util import EdgeTrigger
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
+from config.last_sel import LastSelected, LastGame
 from exporting.compiler import terminate_error_server, restore_backup
 from exporting.files import INST_PATH
 from exporting.gameinfo import edit_gameinfos
@@ -383,6 +384,41 @@ async def load(dialogs: Dialogs) -> None:
             quit_app()
             return
         loadScreen.main_loader.unsuppress()  # Show it again
+
+    # Now, try to restore the player's last selected game.
+    try:
+        last_uuid = config.APP.get_cur_conf(LastGame)
+    except KeyError:
+        pass
+    else:
+        for game in all_games:
+            if game.uuid == last_uuid.uuid:
+                selected_game.value = game
+                selectedGame_radio.set(all_games.index(game))
+                return
+        else:
+            LOGGER.warning('Game with UUID {} does not exist?', last_uuid)
+
+    # Not defined or not found. Check for our old LastSelected definition, which uses the display name.
+    LOGGER.info('Checking LastSelected for last game...')
+    try:
+        last_game = config.APP.get_cur_conf(LastSelected, 'game')
+    except KeyError:
+        pass
+    else:
+        for game in all_games:
+            if game.name.upper() == last_game.id:
+                selected_game.value = game
+                selectedGame_radio.set(all_games.index(game))
+                # Store under the proper config type.
+                config.APP.store_conf(LastGame(game.uuid))
+                config.APP.discard_conf(LastSelected, 'game')
+                return
+        else:
+            LOGGER.warning('Game with name "{}" does not exist?', last_game.id)
+
+    # Can't find anything, pick the first.
+    LOGGER.warning('No LastSelected game defined!')
     selected_game.value = all_games[0]
 
 
