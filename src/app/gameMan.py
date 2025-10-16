@@ -4,6 +4,7 @@ from typing import Self, TypeGuard
 
 from collections.abc import Iterator, Mapping
 from pathlib import Path
+from uuid import UUID, uuid4
 import os
 import shutil
 import subprocess
@@ -16,7 +17,6 @@ import tkinter as tk
 from srctools import EmptyMapping, FileSystemChain, Keyvalues
 from srctools.game import Game as GameInfo
 import srctools.logger
-import srctools.fgd
 import attrs
 import trio_util
 import trio
@@ -65,10 +65,11 @@ MOD_FOLDERS = {
 }
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, kw_only=True)
 class Game:
     """A game that we are able to mod."""
     name: str = attrs.field(eq=False)
+    uuid: UUID
     steamID: str
     root: str
     # The last modified date of packages, so we know whether to copy it over.
@@ -93,31 +94,44 @@ class Game:
         return trio.Path(self.root)
 
     @classmethod
-    def parse(cls, gm_id: str, config: ConfigFile) -> Self:
+    def parse(cls, disp_name: str, config: ConfigFile) -> Self:
         """Parse out the given game ID from the config file."""
-        steam_id = config.get_val(gm_id, 'SteamID', '<none>')
+        steam_id = config.get_val(disp_name, 'SteamID', '<none>')
         if not steam_id.isdigit():
-            raise ValueError(f'Game {gm_id} has invalid Steam ID: {steam_id}')
+            raise ValueError(f'Game {disp_name} has invalid Steam ID: {steam_id}')
 
-        folder = config.get_val(gm_id, 'Dir', '')
+        folder = config.get_val(disp_name, 'Dir', '')
         if not folder:
-            raise ValueError(f'Game {gm_id} has no folder!')
+            raise ValueError(f'Game {disp_name} has no folder!')
+
+        try:
+            uuid = UUID(hex=config.get_val(disp_name, 'uuid', ''))
+        except ValueError:
+            uuid = uuid4()
+            LOGGER.debug('Generated uuid for game "{}" = {}', disp_name, uuid)
 
         if not os.path.exists(folder):
-            raise ValueError(f'Folder {folder} does not exist for game {gm_id}!')
+            raise ValueError(f'Folder {folder} does not exist for game {disp_name}!')
 
-        exp_style = config.get_val(gm_id, 'exported_style', '') or None
+        exp_style = config.get_val(disp_name, 'exported_style', '') or None
 
         # This flag is only set if we parse from a config that doesn't include it.
-        unmarked_dlc3 = config.getboolean(gm_id, 'unmarked_dlc3', True)
+        unmarked_dlc3 = config.getboolean(disp_name, 'unmarked_dlc3', True)
 
         mod_times: dict[str, int] = {}
 
-        for name, value in config.items(gm_id):
+        for name, value in config.items(disp_name):
             if name.startswith('pack_mod_'):
                 mod_times[name.removeprefix('pack_mod_').casefold()] = srctools.conv_int(value)
 
-        game = cls(gm_id, steam_id, folder, exp_style, unmarked_dlc3)
+        game = cls(
+            name=disp_name,
+            steamID=steam_id,
+            uuid=uuid,
+            root=folder,
+            exported_style=exp_style,
+            unmarked_dlc3_vpk=unmarked_dlc3,
+        )
         game.mod_times.value = mod_times
         return game
 
@@ -127,6 +141,7 @@ class Game:
         CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
+        CONFIG[self.name]['uuid'] = self.uuid.hex
         CONFIG[self.name]['unmarked_dlc3'] = srctools.bool_as_int(self.unmarked_dlc3_vpk)
         if self.exported_style is not None:
             CONFIG[self.name]['exported_style'] = self.exported_style
@@ -432,7 +447,10 @@ async def add_game(dialogs: Dialogs) -> bool:
             else:
                 break
 
-        new_game = Game(name, gm_id, folder)
+        new_game = Game(
+            name=name, steamID=gm_id,
+            root=folder, uuid=uuid4(),
+        )
         all_games.append(new_game)
         if game_menu is not None:
             add_menu_opts(game_menu)
