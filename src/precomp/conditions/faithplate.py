@@ -1,5 +1,5 @@
 """Modify and inspect faith plates."""
-from srctools import Angle, Keyvalues, Entity, logger
+from srctools import Angle, Keyvalues, Entity, logger, Vec
 from precomp import faithplate, template_brush, conditions
 from precomp.lazy_value import LazyValue
 
@@ -61,7 +61,12 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
         template = template_brush.get_template(temp_name)
     else:
         template = None
-    offset = LazyValue.parse(res['offset', '']).as_vec()
+    try:
+        offset_str = res['offset']
+    except LookupError:
+        offset: LazyValue[Vec] | None = None
+    else:
+        offset = LazyValue.parse(offset_str).as_vec()
 
     def apply_attrs(inst: Entity) -> None:
         """Apply the modification."""
