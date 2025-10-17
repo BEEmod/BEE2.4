@@ -147,7 +147,9 @@ state = ContextVar('tk_markdown_state', default=no_state)
 
 if not hasattr(base_renderer.BaseRenderer, '__class_getitem__'):
     # Patch in generic support.
-    base_renderer.BaseRenderer.__class_getitem__ = lambda item: base_renderer.BaseRenderer  # type: ignore
+    base_renderer.BaseRenderer.__class_getitem__ = lambda item: base_renderer.BaseRenderer
+elif utils.CODE_DEV_MODE:
+    raise ValueError('Generic patch not necessary.')
 
 
 class TKRenderer(base_renderer.BaseRenderer[list[Block]]):
