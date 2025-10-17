@@ -14,6 +14,16 @@ def _reset_handler() -> None:
     ErrorUI._handler = None
 
 
+def result(errors: ErrorUI) -> Result:
+    """Wrap the result attribute to discard narrowing.
+
+    Asserting the result attribute makes MyPy narrow the attribute to a single enum,
+    giving false unreachable errors. But a function prevents that.
+    # TODO: Can remove this if Mypy gets an option to discard narrows after await.
+    """
+    return errors.result
+
+
 def test_exception() -> None:
     """Test the exception behaviour."""
     msg = TransToken.untranslated("The message")
@@ -94,12 +104,12 @@ async def test_nonfatal() -> None:
     task: list[str] = []
     with ErrorUI.install_handler(catch):
         async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
             # Enum assert above makes Mypy think this cannot occur.
-            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
+            assert result(error_block) is Result.PARTIAL
             task.append("mid")
 
             error_block.add(ExceptionGroup("two", [
@@ -120,7 +130,7 @@ async def test_nonfatal() -> None:
             assert reraised.value.exceptions == (unrelated, )
 
             task.append("after")
-            assert error_block.result is Result.PARTIAL  # We caught the rest, not fatal.
+            assert result(error_block) is Result.PARTIAL  # We caught the rest, not fatal.
         success = True  # The async-with did not raise.
 
     assert success
@@ -149,17 +159,17 @@ async def test_fatal_only_err() -> None:
     task: list[str] = []
     with ErrorUI.install_handler(catch):
         async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
+            assert result(error_block) is Result.PARTIAL
             task.append("mid")
 
             raise exc2
 
     assert task == ["before", "mid"]
-    assert error_block.result is Result.FAILED
+    assert result(error_block) is Result.FAILED
     assert caught_errors == [exc1, exc2]
 
 
@@ -171,11 +181,11 @@ async def test_fatal_exc() -> None:
     task: list[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc)
-            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
+            assert result(error_block) is Result.PARTIAL
             task.append("mid")
 
             raise unrelated
@@ -196,11 +206,11 @@ async def test_fatal_group() -> None:
     task: list[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
+            assert result(error_block) is Result.PARTIAL
             task.append("mid")
 
             raise group
@@ -216,11 +226,11 @@ async def test_cancel() -> None:
     """Test cancelling the error handler is detected."""
     with ErrorUI.install_handler(handler_fail), trio.CancelScope() as scope:
         async with ErrorUI() as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             scope.cancel()
             await trio.lowlevel.checkpoint()
             raise AssertionError('Not cancelled?')
-    assert error_block.result is Result.CANCELLED
+    assert result(error_block) is Result.CANCELLED
 
 
 async def test_multi_cancel(autojump_clock: trio.abc.Clock) -> None:
@@ -231,7 +241,7 @@ async def test_multi_cancel(autojump_clock: trio.abc.Clock) -> None:
         trio.CancelScope() as scope,
     ):
         async with ErrorUI() as error_block:
-            assert error_block.result is Result.SUCCEEDED
+            assert result(error_block) is Result.SUCCEEDED
             scope.cancel()
             try:
                 await trio.lowlevel.checkpoint()
@@ -242,6 +252,6 @@ async def test_multi_cancel(autojump_clock: trio.abc.Clock) -> None:
                     BaseExceptionGroup('Child', [cancelled, ZeroDivisionError()])
                 ]) from None
             raise AssertionError('Not cancelled?')
-    assert error_block.result is Result.FAILED
+    assert result(error_block) is Result.FAILED
     assert group.group_contains(BufferError)
     assert group.group_contains(ZeroDivisionError)
