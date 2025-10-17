@@ -9,7 +9,7 @@ from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 import dirty_equals
 
-from collisions import BBox, CollideType, NonBBoxError, Volume, trace_ray, Hit
+from collisions import BBox, CollideType, NonBBoxError, Volume, trace_ray
 
 
 type Tuple3 = tuple[int, int, int]

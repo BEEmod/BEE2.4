@@ -1,6 +1,6 @@
 """Tk-specific code for the window that shows item information."""
 from __future__ import annotations
-from typing import override
+from typing import override, Any
 
 from tkinter import ttk
 import tkinter as tk
@@ -61,7 +61,7 @@ class ContextWin(ContextWinBase):
 
     def __init__(
         self,
-        item_picker: ItemPickerBase,
+        item_picker: ItemPickerBase[Any],
         tk_img: TKImages,
         cur_style: AsyncValue[PakRef[Style]],
     ) -> None:

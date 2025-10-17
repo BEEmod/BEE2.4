@@ -141,9 +141,6 @@ class UserError(BaseException):
         else:
             ctx = ''
 
-        if isinstance(message, str):  # Temporary, prevent this breaking.
-            message = TransToken.untranslated(message)
-
         if leakpoints:
             textlist = [f'({point})' for point in leakpoints]
 
@@ -252,11 +249,6 @@ TOK_CONNECTION_REQUIRED_ITEM = TransToken.ui(
 TOK_CONNECTIONS_UNKNOWN_INSTANCE = TransToken.ui(
     'The instance named "<var>{item}</var>" is not recognised! If you just swapped styles and '
     'exported, you will need to restart Portal 2. Otherwise check the relevant package.'
-)
-
-TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
-    'The instance "<var>{inst}</var>" is reciving inputs, but none were configured in the item. '
-    'Check for reuse of the instance in multiple items, or restart Portal 2 if you just exported.'
 )
 
 TOK_CORRIDOR_EMPTY_GROUP = TransToken.ui(

@@ -11,7 +11,7 @@ from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
 import trio
 
-from config.widgets import WidgetConfig, TIMER_STR_INF, parse_timer, TIMER_NUMS_INF
+from config.widgets import WidgetConfig, TIMER_STR_INF, parse_timer
 from config import COMPILER
 
 

@@ -300,7 +300,7 @@ class ExportedTemplate:
     visgroups: set[str]
     picker_results: dict[str, Portalable | None]
     picker_type_results: dict[str, TileType | None]
-    debug_marker: Callable[..., None] | None
+    debug_marker: Callable[..., Entity] | None
 
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
@@ -861,9 +861,10 @@ def import_template(
 
     dbg_visgroup: VisGroup | None = None
     dbg_group: EntityGroup | None = None
-    dbg_add: Callable[..., None] | None = None
+    dbg_add: Callable[..., Entity] | None = None
     if template.debug:
         # Find the visgroup for template debug data, and create an entity group.
+        # TODO: Use fetch_debug_visgroup()?
         for dbg_visgroup in vmf.vis_tree:
             if dbg_visgroup.name == 'Templates':
                 break
@@ -871,13 +872,14 @@ def import_template(
             dbg_visgroup = vmf.create_visgroup('Templates', (113, 113, 0))
         dbg_group = EntityGroup(vmf, color=Vec(113, 113, 0))
 
-        def dbg_add(classname: str, **kwargs: ValidKVs) -> None:
+        def dbg_add(classname: str, **kwargs: ValidKVs) -> Entity:
             """Add a marker to the map."""
             ent = vmf.create_ent(classname, **kwargs)
             ent.visgroup_ids.add(dbg_visgroup.id)
             ent.groups.add(dbg_group.id)
             ent.vis_shown = False
             ent.hidden = True
+            return ent
 
         dbg_add(
             'bee2_template_conf',

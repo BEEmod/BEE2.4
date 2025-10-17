@@ -467,7 +467,7 @@ class AppError(Exception):
         self.fatal = fatal
 
     @classmethod
-    def from_syntax(cls, error: TokenSyntaxError) -> 'AppError':
+    def from_syntax(cls, error: TokenSyntaxError) -> AppError:
         """Convert a TokenSyntaxError into an AppError."""
         return cls(TransToken.untranslated(f'Invalid syntax:\n{error!s}'))
 

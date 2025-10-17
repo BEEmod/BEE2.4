@@ -1,5 +1,5 @@
 """Instrumentation which outputs statistics about Trio tasks."""
-from typing import Any, override
+from typing import Any, override, Never
 
 from operator import itemgetter
 import pprint
@@ -51,7 +51,7 @@ class Tracer(trio.abc.Instrument):
         self.formatter = SmallRepr(compact=True)
 
     @staticmethod
-    def _get_coro(task: trio.lowlevel.Task) -> types.CoroutineType:
+    def _get_coro(task: trio.lowlevel.Task) -> 'types.CoroutineType[object, Never, object]':
         """Assert that the task's coroutine is a Python coroutine."""
         assert isinstance(task.coro, types.CoroutineType)
         return task.coro

@@ -628,12 +628,6 @@ def calc_connections(
         input_items: list[Item] = []  # Instances we trigger
         inputs: dict[str, list[Output]] = defaultdict(list)
 
-        if item.inst.outputs and item.config is None:
-            raise ValueError(
-                f'No connections for item "{instance_traits.get_item_id(item.inst)}", '
-                f'but outputs in the map!'
-            )
-
         for out in item.inst.outputs:
             inputs[out.target].append(out)
 
@@ -674,12 +668,6 @@ def calc_connections(
                     ) from None
                 else:
                     input_items.append(inp_item)
-                    if inp_item.config is None:
-                        raise user_errors.UserError(
-                            user_errors.TOK_CONNECTIONS_INSTANCE_NO_IO.format(
-                                inst=inp_item.inst['filename'],
-                            )
-                        )
 
         for inp_item in input_items:
             # Default A/B type.
@@ -1020,7 +1008,10 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         relay['origin'] = relay_loc
     else:
         relay['origin'] = item.inst['origin']
-    LOGGER.debug('Placing timer relay "{}" @ {}, pos={!r}, inst={}', rl_name, relay['origin'], item.config.timer_sound_pos, item.inst)
+    LOGGER.debug(
+        'Placing timer relay "{}" @ {}, pos={!r}',
+        rl_name, relay['origin'], item.config.timer_sound_pos,
+    )
 
     for cmd in item.config.timer_done_cmd:
         relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))

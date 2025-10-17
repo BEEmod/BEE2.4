@@ -1106,7 +1106,7 @@ async def parse_item_folder(
     # extra_items is any extra blocks (offset catchers, extent items).
     # These must not have a palette section - it'll override any the user
     # chooses.
-    for i, extra_item in enumerate(extra_items, 2):
+    for extra_item in extra_items:
         extra_item.generate_collisions()
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:

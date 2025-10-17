@@ -6,7 +6,6 @@ from __future__ import annotations
 from collections.abc import Callable
 
 import tkinter as tk
-import warnings
 import weakref
 
 import attr
@@ -144,9 +143,6 @@ def set_tooltip(
 
     Keyword arguments will not change settings if unset.
     """
-    if isinstance(text, str):
-        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
-        text = TransToken.untranslated(text)
     try:
         old = DATA[widget]
     except KeyError:
@@ -175,10 +171,6 @@ def add_tooltip(
     If show_when_disabled is false, no context menu will be shown if the
     target widget is disabled.
     """
-    if isinstance(text, str):
-        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
-        text = TransToken.untranslated(text)
-
     DATA[targ_widget] = TooltipData(text, image, delay)
 
     event_id = None  # The id of the enter event, so we can cancel it.

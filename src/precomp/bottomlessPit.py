@@ -1,4 +1,5 @@
 """Generates Bottomless Pits."""
+from typing import Any
 from srctools import FrozenVec, Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
@@ -13,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 BOTTOMLESS_PIT_MIN = 192
 
 # The set config options for pits. If SETTINGS is empty, no pits are used.
-SETTINGS: dict = {}  # TODO: Type correctly
+SETTINGS: dict[str, Any] = {}  # TODO: Type correctly
 PIT_INST: dict[str, list[str]] = {}
 
 
