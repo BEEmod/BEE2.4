@@ -378,7 +378,7 @@ class SamplePlayer:
         child_sys = self.system.get_system(file)
         # Special case raw filesystems - Pyglet is more efficient
         # if it can just open the file itself.
-        if isinstance(child_sys, RawFileSystem) and False:
+        if isinstance(child_sys, RawFileSystem):
             load_path = Path(child_sys.path, file.path)
             LOGGER.debug('Loading sound directly from {!r}', load_path)
             return load_path
