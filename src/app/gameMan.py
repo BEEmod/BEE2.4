@@ -555,12 +555,3 @@ def add_menu_opts(menu: tk.Menu) -> None:
             value=val,
             command=set_from_radio,
         )
-
-
-def set_game_by_name(name: utils.SpecialID) -> None:
-    """Select the game with the specified name."""
-    for game in all_games:
-        if utils.obj_id(game.name) == name:
-            selected_game.value = game
-            selectedGame_radio.set(all_games.index(game))
-            break

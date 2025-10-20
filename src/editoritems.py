@@ -1731,10 +1731,7 @@ class Item:
             f.write(f'\t"Type" "{self.id}"\n')
         f.write('\t"Editor"\n\t\t{\n')
         if self.subtype_prop is not None:
-            if isinstance(self.subtype_prop, str):
-                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop}"\n')
-            else:
-                f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
+            f.write(f'\t\t"SubtypeProperty" "{self.subtype_prop.id}"\n')
         for subtype in self.subtypes:
             subtype.export(f)
         f.write(f'\t\t"MovementHandle" "{self.handle.value}"\n')

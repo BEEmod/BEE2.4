@@ -51,12 +51,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         LOGGER.debug('Loading settings...')
 
         await gameMan.load(DIALOG)
-        try:
-            last_game = config.APP.get_cur_conf(LastSelected, 'game')
-        except KeyError:
-            pass
-        else:
-            gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
 
