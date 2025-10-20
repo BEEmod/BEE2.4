@@ -932,17 +932,6 @@ def import_conditions() -> None:
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 
-DOC_META_COND = '''
-
-### Meta-Conditions
-
-Metaconditions are conditions run automatically by the compiler. These exist
-so package conditions can choose a priority to run before or after these 
-operations.
-
-
-'''
-
 SPECIAL_GROUP = '00special'
 DOC_SPECIAL_GROUP = '''\
 ### Specialized Conditions
@@ -975,20 +964,15 @@ async def dump_conditions(filename: trio.Path) -> None:
             await file.write(line)
         await file.write('\n')
 
-        for test_key, priority, func in ALL_META:
-            await file.write(f'#### `{test_key}` ({priority.value}):\n\n')
-            await file.write(dump_func_docs(func))
-            await file.write('\n\n')
+        await file.write('## Table of Contents:')
 
         all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
             (ALL_TESTS, 'Tests'),
             (ALL_RESULTS, 'Results'),
         ]
+        # Store the organised conditions, so we can write the table of contents first.
+        groups = []
         for lookup, type_name in all_cond_types:
-            await file.write('<!------->\n')
-            await file.write(f'## {type_name}\n')
-            await file.write('<!------->\n')
-
             lookup_grouped: dict[str, list[
                 tuple[str, tuple[str, ...], CondCall[Any]]
             ]] = defaultdict(list)
@@ -1008,7 +992,7 @@ async def dump_conditions(filename: trio.Path) -> None:
             if not lookup_grouped['']:
                 del lookup_grouped['']
 
-            await file.write('\n<details open>\n<summary>Table Of Contents</summary>\n\n')
+            await file.write(f'\n<details open>\n<summary>{type_name}</summary>\n\n')
             for (group, funcs) in sorted(lookup_grouped.items()):
                 if group == '':
                     await file.write('* Ungrouped Conditions\n')
@@ -1022,7 +1006,22 @@ async def dump_conditions(filename: trio.Path) -> None:
                         f'\t* [{names}](#beecond-{type_name.casefold()}-{test_key.casefold()})\n'
                     )
             await file.write('</details>\n\n')
+            groups.append(lookup_grouped)
 
+        await file.write('-' * 32 + '\n')
+
+        await file.write('## Meta-Conditions:\n\n')
+
+        for test_key, priority, func in ALL_META:
+            await file.write(f'#### `{test_key}` ({priority.value}):\n\n')
+            await file.write(dump_func_docs(func))
+            await file.write('\n\n')
+
+        for (lookup, type_name), lookup_grouped in zip(all_cond_types, groups):
+
+            await file.write('<!------->\n')
+            await file.write(f'## {type_name}\n')
+            await file.write('<!------->\n')
             for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
                 if group == '':
                     group = 'Ungrouped Conditions'
@@ -1278,6 +1277,7 @@ def fetch_debug_visgroup(
         visgroup = vmf.create_visgroup(vis_name, (r, g, b))
 
     group = EntityGroup(vmf, color=Vec(r, g, b), shown=False)
+    vmf.groups[group.id] = group
 
     def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
         """Add a marker to the map."""
