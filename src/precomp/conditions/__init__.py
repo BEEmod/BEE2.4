@@ -29,7 +29,7 @@ closure.
 """
 from __future__ import annotations
 
-from typing import Protocol, Any, Final, overload, cast, get_type_hints
+from typing import Protocol, Any, Final, overload, cast, get_type_hints, ClassVar
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from collections import defaultdict
 from decimal import Decimal
@@ -554,6 +554,10 @@ class CondCall[CallResultT]:
         CallResultT | Callable[[Entity], CallResultT],
     ] = attrs.field(init=False)
 
+    # The entity should never be used in setup functions. Pass a dummy object
+    # so errors occur if it's used.
+    _DUMMY_ENT: ClassVar[Entity] = cast(Entity, cast(object, 'SetupHasNoEntity'))
+
     def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
             self.func,
@@ -583,30 +587,31 @@ class CondCall[CallResultT]:
         conf: Keyvalues,
     ) -> CallResultT:
         """Execute the callback."""
+        cback: Callable[[Entity], CallResultT] | CallResultT
         if self._setup_data is None:
+            # As mentioned below, there isn't a setup function, so this must be a valid result.
             return self._cback(ent.map, coll, info, voice, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
-            if id(conf) in self._setup_data:
+            try:
                 cback = self._setup_data[id(conf)]
+            except KeyError:
+                pass  # First call, try calling as a setup function.
+                # Do this outside the try: so we don't chain exceptions.
             else:
-                # The entity should never be used in setup functions. Pass a dummy object
-                # so errors occur if it's used.
-                cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
-                    ent.map, coll, info, voice,
-                    cast(Entity, object()),
-                    conf,
-                )
+                return cback(ent)
 
-            if not callable(cback):
+            cback = self._cback(ent.map, coll, info, voice, self._DUMMY_ENT, conf)
+            if callable(cback):
+                self._setup_data[id(conf)] = cback
+                return cback(ent)
+            else:
                 # We don't actually have a setup func,
                 # this func just doesn't care about entities.
                 # Fix this incorrect assumption, then return
                 # the result.
                 self._setup_data = None
                 return cback
-
-            return cback(ent)
 
 
 def _get_cond_group(func: Any) -> str | None:
