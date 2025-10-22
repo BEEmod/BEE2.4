@@ -410,7 +410,11 @@ def check_blockpos_type(inst: Entity, kv: Keyvalues) -> bool:
             pos2 = conditions.resolve_offset(inst, kv['offset2', '0 0 0'], scale=128, zoff=-128)
     else:
         types = kv.value.split()
-        pos1 = conditions.resolve_offset(inst, '0 0 0', scale=128, zoff=-128)
+        pos1 = Vec(0, 0, -128)
+        pos1.localise(
+            Vec.from_str(inst['origin']),
+            Angle.from_str(inst['angles']),
+        )
 
     bbox: Iterable[Vec]
     if pos2 is not None:
