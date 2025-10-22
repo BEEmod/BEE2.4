@@ -5,7 +5,7 @@ import math
 from typing import Literal, assert_never
 
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Callable
 from pathlib import Path
 import functools
 import itertools
@@ -16,6 +16,7 @@ import attrs
 import utils
 from plane import PlaneGrid, PlaneKey
 from precomp import rand, texturing, brushLoc
+from precomp.conditions import fetch_debug_visgroup
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize, GenCat
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile, Axis
 import consts
@@ -514,6 +515,16 @@ def generate_brushes(vmf: VMF) -> None:
         make_subtile.cache_info(), make_texdef.cache_info(),
     )
 
+    if utils.DEV_MODE:
+        # For debugging texture definitions, generate a sample for every tile generator.
+        gallery_vis = fetch_debug_visgroup(vmf, 'Material Gallery')
+        for key, generator in texturing.GENERATORS.items():
+            match key:
+                case GenCat() as cat, Orient() as orient, Portalable() as port:
+                    generate_tile_gallery(vmf, gallery_vis, cat, orient, port, generator)
+                case _:
+                    pass
+
 
 def calculate_plane(
     plane_key: PlaneKey,
@@ -523,6 +534,11 @@ def calculate_plane(
 ) -> None:
     """Calculate the textures to use for a plane of tiles."""
     orient = Orient.from_normal(plane_key.normal)
+
+    generators = {
+        colour: texturing.gen(texturing.GenCat.NORMAL, orient, colour)
+        for colour in Portalable
+    }
 
     # Reprocess subtiles into textures by repeatedly spreading.
     while subtile_pos:
@@ -581,7 +597,7 @@ def calculate_plane(
                 max_u, max_v,
                 subtile.type.value, subtile.antigel,
             )
-            gen = texturing.gen(texturing.GenCat.NORMAL, orient, subtile.type.color)
+            gen = generators[subtile.type.color]
             # Figure out tile sizes we can use. TODO: Cache this generated list.
             sizes: list[TileSize] = []
             counts: list[int] = []
@@ -877,3 +893,58 @@ def generate_plane(
                     missing_tiles('info_null', origin=pos)
         for tiledef in tiledefs:
             tiledef.brush_faces.append(front)
+
+
+def generate_tile_gallery(
+    vmf: VMF, gallery_vis: Callable[[Entity], object],
+    cat: GenCat, orient: Orient, port: Portalable,
+    generator: texturing.Generator,
+) -> None:
+    """For testing purposes, export a gallery of all available tiles."""
+    offset = {
+        GenCat.NORMAL: 0,
+        GenCat.PANEL: 256,
+        GenCat.BULLSEYE: 512,
+    }[cat]
+    if port is Portalable.BLACK:
+        offset += 128
+    match orient:
+        case Orient.WALL:
+            plane = PlaneKey((0, 1, 0), 512 + offset)
+        case Orient.FLOOR:
+            plane = PlaneKey((0, 0, 1), -offset)
+        case Orient.CEILING | Orient.CEIL:  # TODO Mypy, redundant.
+            plane = PlaneKey((0, 0, -1), 512 + offset)
+
+    LOGGER.info('Generating tile gallery for {}.{}.{} @ {}', cat, orient, port, plane)
+
+    offset_x = offset_y = 0
+    for size, confs in generator.textures.items():
+        assert isinstance(size, TileSize), f'{size!s}, {size!r}'
+        desc = f'{cat.name}_{orient.name}_{port.name}_{size}'
+        for tile in sorted(set(confs), key=lambda conf: conf.mat):
+            width, height = size.size
+            brush, front = make_tile(
+                vmf,
+                Vec(height * 16, width * 16, 0),
+                Vec(0, 0, 1),
+                tile,
+                width=width * 32,
+                height=height * 32,
+            )
+            tile_min = Vec(0, 0, 0)
+            front.uaxis.offset = -(Vec.dot(tile_min, front.uaxis.vec()) / front.uaxis.scale)
+            front.vaxis.offset = -(Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
+            brush.localise(plane.plane_to_world(
+                offset_x + height * 16,
+                offset_y + width * 16,
+            ), plane.orient)
+            ent = vmf.create_ent('func_brush', targetname=desc)
+            ent.solids = [brush]
+            ent.comments = f'{width}x{height}, repeat={tile.repeat_limit}, off={tile.off_x}, {tile.off_y}'
+            gallery_vis(ent)
+
+            offset_x += max(width, height) * 32 + 32
+            if offset_x >= 3072:
+                offset_x = 0
+                offset_y += 256 + 32
