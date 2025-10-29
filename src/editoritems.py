@@ -337,15 +337,25 @@ class InstCount:
     # If set, this is an auto-generated filename.
     is_marker: bool = attrs.field(kw_only=True, default=False)
 
-    @classmethod
-    def marker_fname(cls, item_id: str, ind: int) -> FSPath:
-        """Produce the marker filename for an item and index."""
-        return FSPath(cls.MARKER_FOLDER, item_id.casefold(), f'{ind}.vmf')
-
     @property
     def is_blank(self) -> bool:
         """Whether the filename is blank, indicating the instance should be discarded."""
         return self.inst == EMPTY_FNAME
+
+    @classmethod
+    def marker_fname(cls, item_id: utils.ObjectID, ind: int) -> FSPath:
+        """Produce the marker filename for an item and index."""
+        return FSPath(cls.MARKER_FOLDER, item_id.casefold(), f'{ind}.vmf')
+
+    @classmethod
+    def parse_marker(cls, fname: FSPath) -> tuple[utils.ObjectID, int] | None:
+        """If this filename is for a marker, return the original item ID and instance index."""
+        parts = fname.parts
+        if len(parts) != 4 or parts[0].casefold() != "instances" or parts[1] != "bee2_marker":
+            return None
+        item_id = utils.obj_id(parts[2])
+        index = conv_int(parts[3].casefold().removesuffix(".vmf"))
+        return item_id, index
 
 
 @attrs.frozen

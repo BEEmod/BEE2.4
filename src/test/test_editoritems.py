@@ -240,3 +240,13 @@ def test_invalid_cust_inst_marker() -> None:
                 }
             }} // End exporting + item
             ''', PAK_ID)
+
+
+def test_parse_marker_filename() -> None:
+    """Test parsing a marker filename back into the item."""
+    assert InstCount.parse_marker(FSPath("instances/blah.vmf")) is None
+    assert InstCount.parse_marker(FSPath("instances/bee2_marker")) is None
+    assert InstCount.parse_marker(FSPath("instances/bee2_marker/item")) is None
+
+    assert InstCount.parse_marker(FSPath("instances/bee2_marker/some_ITEm/5.vMF")) == (utils.obj_id('some_item'), 5)
+    assert InstCount.parse_marker(FSPath("instances/bee2_marker/another_item/0.vmf")) == (utils.obj_id('another_item'), 0)
