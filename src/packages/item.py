@@ -271,7 +271,7 @@ class ItemVariant:
             for ind, inst in enumerate(editor.instances):
                 inst_desc += [
                     f'* {ind}: ',
-                    f'"`{inst.inst}`"\n' if inst.inst != FSPath() else '""\n',
+                    f'"`{inst.inst}`"\n' if not inst.is_blank else '""\n',
                 ]
             for name, inst_path in editor.cust_instances.items():
                 inst_desc += [
@@ -419,15 +419,15 @@ class ItemVariant:
                 ))
 
         for inst in kv.find_children('Instances'):
+            ent_count = brush_count = side_count = 0
             if inst.has_children():
-                inst_data = InstCount(
-                    FSPath(inst['name']),
-                    inst.int('entitycount'),
-                    inst.int('brushcount'),
-                    inst.int('brushsidecount'),
-                )
+                inst_fname = inst['name']
+                ent_count = inst.int('entitycount')
+                brush_count = inst.int('brushcount')
+                side_count = inst.int('brushsidecount')
             else:  # Allow just specifying the file.
-                inst_data = InstCount(FSPath(inst.value), 0, 0, 0)
+                inst_fname = inst.value
+            is_marker = inst_fname.casefold() == InstCount.MARKER_KEY
 
             if inst.real_name.isdecimal():  # Regular numeric
                 try:
@@ -439,10 +439,20 @@ class ItemVariant:
                         f'Invalid index {inst.real_name} for '
                         f'instances in {source}'
                     )) from None
-                editor[0].set_inst(ind, inst_data)
+                if is_marker:
+                    inst_fname = InstCount.marker_fname(editor[0].id, ind)
+                editor[0].set_inst(ind, InstCount(
+                    inst_fname, ent_count, brush_count, side_count,
+                    is_marker=is_marker,
+                ))
             else:  # BEE2 named instance
+                if is_marker:
+                    raise AppError(TransToken.untranslated(
+                        f'Custom instance "{inst.name}" cannot be '
+                        f'defined as a <marker> in {source}'
+                    ))
                 inst_name = inst.name.removeprefix('bee2_')
-                editor[0].cust_instances[inst_name] = inst_data.inst
+                editor[0].cust_instances[inst_name] = FSPath(inst_fname)
 
         # Override IO commands.
         io_props: Keyvalues | None = None

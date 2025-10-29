@@ -232,7 +232,6 @@ SPECIAL_INST_FOLDED = {
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
     cust_instances: dict[str, str]
-    EMPTY = editoritems.FSPath()
     for item in items:
         # Extra definitions: key -> filename.
         # Make sure to do this first, so numbered instances are set in
@@ -249,7 +248,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
-            '' if inst.inst == EMPTY else str(inst.inst)
+            '' if inst.is_blank else str(inst.inst)
             for inst in item.instances
         ]
         for ind, inst in enumerate(item.instances):

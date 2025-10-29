@@ -1,6 +1,6 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
-from typing import ClassVar, Protocol, Any
+from typing import ClassVar, Protocol, Any, Final
 
 from operator import itemgetter
 import string
@@ -38,6 +38,7 @@ type _SubTypeState = tuple[
     TransToken, list[str], list[str], list[int],
     TransToken, int, int, FSPath | None,
 ]
+EMPTY_FNAME: Final = FSPath()
 
 
 class ItemClass(Enum):
@@ -325,11 +326,26 @@ class Connection:
 @attrs.define
 class InstCount:
     """Instances have several associated counts."""
+    MARKER_KEY: ClassVar[str] = '<marker>'
+    MARKER_FOLDER: ClassVar[str] = 'instances/bee2_marker/'
+
     # The actual filename.
     inst: FSPath = attrs.field(converter=FSPath)
     ent_count: int = 0
     brush_count: int = 0
     face_count: int = 0
+    # If set, this is an auto-generated filename.
+    is_marker: bool = attrs.field(kw_only=True, default=False)
+
+    @classmethod
+    def marker_fname(cls, item_id: str, ind: int) -> FSPath:
+        """Produce the marker filename for an item and index."""
+        return FSPath(cls.MARKER_FOLDER, item_id.casefold(), f'{ind}.vmf')
+
+    @property
+    def is_blank(self) -> bool:
+        """Whether the filename is blank, indicating the instance should be discarded."""
+        return self.inst == EMPTY_FNAME
 
 
 @attrs.frozen
@@ -1094,7 +1110,7 @@ class Item:
         else:
             raise tok.error('File ended without closing item block!')
 
-        # Done, check we're not missing critical stuff.
+        # Done, check we're not missing critical stuff, process things which need all data available.
         if not item_id_set:
             raise tok.error('No item ID ("type") set!')
 
@@ -1105,6 +1121,11 @@ class Item:
                 item.properties[prop_name.casefold()].allow_user_default = False
             except KeyError:
                 LOGGER.warning('Subtype property of "{}" set, but property not present!', prop_name)
+
+        # Now we have the item ID, set the marker filenames.
+        for ind, inst in enumerate(item.instances):
+            if inst.is_marker:
+                inst.inst = InstCount.marker_fname(item.id, ind)
 
         # Parse the connection info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
@@ -1287,8 +1308,8 @@ class Item:
             #         inst_name, tok.line_num, tok.filename)
 
         block_tok, inst_file = next(tok.skipping_newlines())
+        ent_count = brush_count = side_count = 0
         if block_tok is Token.BRACE_OPEN:
-            ent_count = brush_count = side_count = 0
             inst_file = None
             for block_key in tok.block('Instances', consume_brace=False):
                 folded_key = block_key.casefold()
@@ -1304,15 +1325,20 @@ class Item:
                     raise tok.error('Unknown instance option {}', block_key)
             if inst_file is None:
                 raise tok.error('No instance filename provided!')
-            inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count)
-        elif block_tok is Token.STRING:
-            inst = InstCount(FSPath(inst_file))
-        else:
+        elif block_tok is not Token.STRING:
             raise tok.error(block_tok)
-        if inst_ind is not None:
-            self.set_inst(inst_ind, inst)
+        is_marker = inst_file.casefold() == InstCount.MARKER_KEY
+        if inst_ind is None:
+            if is_marker:
+                raise tok.error('Custom instance "{}" cannot be a marker!', inst_name)
+            self.cust_instances[inst_name.casefold()] = FSPath(inst_file)
         else:
-            self.cust_instances[inst_name.casefold()] = inst.inst
+            # Standard ordinal instance. If a marker, leave it blank, we'll set the filename later
+            # once we're fully parsed and have the ID set.
+            if is_marker:
+                inst_file = ''
+            inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count, is_marker=is_marker)
+            self.set_inst(inst_ind, inst)
 
     def _parse_connections(
         self,

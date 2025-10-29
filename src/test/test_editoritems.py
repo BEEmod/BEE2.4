@@ -1,5 +1,7 @@
 """Test Editoritems syntax."""
 from srctools import Vec
+from srctools.tokenizer import TokenSyntaxError
+import pytest
 
 import utils
 from app.localisation import TransToken
@@ -14,7 +16,7 @@ PAK_ID = utils.obj_id('test_package')
 START_EXPORTING = '''
 Item
 {
-    "Type"		"SOME_ITEM"
+    "Type"		"TEST_ITEM_ID"
     "Editor"
     {
         "SubType"
@@ -170,8 +172,16 @@ def test_instances() -> None:
             {
             "Name" "instances/somewhere_else/item.vmf"
             }
-        "5" "instances/skipping_indexes.vmf"
+        "8" "instances/skipping_indexes.vmf"
         "2" "instances/direct_path.vmf"
+        "3" "<marker>"
+        "5"
+            {
+            "Name" "<marker>"
+            "EntityCount"		"1" 
+            "BrushCount"		"2"
+            "BrushSideCount"	"3"
+            }
         "cust_name"
             {
             "Name" "instances/a_custom_item.vmf"
@@ -183,16 +193,50 @@ def test_instances() -> None:
     }} // End exporting + item
     ''', PAK_ID)
     assert renderables == {}
-    assert len(item.instances) == 6
-    assert item.instances[0] == InstCount(FSPath("instances/p2editor/something.vmf"), 30, 28, 4892)
-    assert item.instances[1] == InstCount(FSPath("instances/somewhere_else/item.vmf"), 0, 0, 0)
-    assert item.instances[2] == InstCount(FSPath("instances/direct_path.vmf"), 0, 0, 0)
-    assert item.instances[3] == InstCount(FSPath(), 0, 0, 0)
-    assert item.instances[4] == InstCount(FSPath(), 0, 0, 0)
-    assert item.instances[5] == InstCount(FSPath("instances/skipping_indexes.vmf"), 0, 0, 0)
-    # Counts discarded for custom items, and casefolded.
+    assert len(item.instances) == 9
+    assert item.instances[0] == InstCount(
+        FSPath("instances/p2editor/something.vmf"),
+        ent_count=30, brush_count=28, face_count=4892,
+        is_marker=False,
+    )
+    assert item.instances[1] == InstCount(FSPath("instances/somewhere_else/item.vmf"), 0, 0, 0, is_marker=False)
+    assert item.instances[2] == InstCount(FSPath("instances/direct_path.vmf"), 0, 0, 0, is_marker=False)
+    assert item.instances[3] == InstCount(FSPath("instances/bee2_marker/test_item_id/3.vmf"), 0, 0, 0, is_marker=True)
+    assert item.instances[4] == InstCount(FSPath(), 0, 0, 0, is_marker=False)
+    assert item.instances[5] == InstCount(FSPath("instances/bee2_marker/test_item_id/5.vmf"), 1, 2, 3, is_marker=True)
+    assert item.instances[6] == InstCount(FSPath(), 0, 0, 0, is_marker=False)
+    assert item.instances[7] == InstCount(FSPath(), 0, 0, 0, is_marker=False)
+    assert item.instances[8] == InstCount(FSPath("instances/skipping_indexes.vmf"), 0, 0, 0, is_marker=False)
+    # Counts discarded for custom items, names casefolded.
     assert item.cust_instances == {
         "another_name": FSPath("instances/more_custom.vmf"),
         "second_cust": FSPath("instances/even_more.vmf"),
         "cust_name": FSPath("instances/a_custom_item.vmf"),
     }
+
+
+def test_invalid_cust_inst_marker() -> None:
+    """Check markers are disallowed in custom instances."""
+    with pytest.raises(TokenSyntaxError, match='Custom instance "cust_name" cannot be a marker!'):
+        Item.parse(START_EXPORTING + '''
+            "Instances"
+                {
+                "cust_name" "<marker>"
+                }
+            }} // End exporting + item
+            ''', PAK_ID)
+
+    with pytest.raises(TokenSyntaxError, match='Custom instance "cust_name" cannot be a marker!'):
+        Item.parse(START_EXPORTING + '''
+            "Instances"
+                {
+                "cust_name"
+                    {
+                    "Name" "<marker>"
+                    "EntityCount"		"327" 
+                    "BrushCount"		"1"
+                    "BrushSideCount"	"32"
+                    }
+                }
+            }} // End exporting + item
+            ''', PAK_ID)
