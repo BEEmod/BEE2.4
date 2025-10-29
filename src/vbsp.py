@@ -1703,6 +1703,8 @@ async def main(argv: list[str]) -> None:
             coll.export_debug(vmf, vis_name='collisions')
         coll.export_vscript(vmf)
 
+        # Remove blank instances, check for markers.
+        conditions.cleanup_instances(vmf)
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
             for out in ent.outputs:

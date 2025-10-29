@@ -236,6 +236,11 @@ TOK_VBSP_MISSING_INSTANCE = TransToken.ui(
     'Try other configurations for this item, it may be the case that only some are missing.',
 )
 
+TOK_MARKER_INST_PERSISTS = TransToken.ui(
+    'The following "marker" items remain present in the map. This indicates an error in the '
+    'item\'s configuration, these should have been replaced or removed.'
+)
+
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
     'Bad Glass Floorbeam template! The template must have a single brush, aligned along the '
     '<var>X</var> axis.'

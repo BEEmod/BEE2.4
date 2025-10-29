@@ -57,6 +57,8 @@ from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
 from quote_pack import QuoteInfo
 import consts
+import editoritems
+import user_errors
 import utils
 
 
@@ -68,6 +70,8 @@ __all__ = [
     'add_inst', 'add_suffix', 'add_output', 'local_name', 'fetch_debug_visgroup', 'set_ent_keys',
     'resolve_offset',
 ]
+
+
 COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = srctools.logger.get_logger('conditions', alias='cond.core')
@@ -824,14 +828,6 @@ def check_all(
             # Suppress errors for future conditions.
             ALL_INST.update(extra)
 
-    # Clear out any blank instances. This allows code elsewhere to have a convenient way
-    # to just delete instances.
-    for inst in vmf.by_class['func_instance']:
-        # If editoritems instances are set to "", PeTI will autocorrect it to
-        # ".vmf" - we need to handle that too.
-        if inst['file'].casefold() in ('', '.vmf'):
-            inst.remove()
-
     LOGGER.info('---------------------')
     LOGGER.info(
         'Conditions executed, {}/{} ({:.0%}) skipped!',
@@ -901,6 +897,32 @@ def check_test(
             return not desired_result
     else:
         return res is desired_result
+
+
+def cleanup_instances(vmf: VMF) -> None:
+    """Destroy any blank instances, and check for markers still being present."""
+    marker_items: set[tuple[utils.ObjectID, int]] = set()
+    marker_fnames: set[str] = set()
+    marker_pos: list[Vec] = []
+    for inst in vmf.by_class['func_instance']:
+        # If editoritems instances are set to "", PeTI will autocorrect it to
+        # ".vmf" - we need to handle that too.
+        fname = inst['file']
+        if fname.casefold() in ('', '.vmf'):
+            inst.remove()
+            continue
+        tup = editoritems.InstCount.parse_marker(editoritems.FSPath(fname))
+        if tup is not None:
+            marker_items.add(tup)
+            marker_fnames.add(fname)
+            marker_pos.append(Vec.from_str(inst['origin']))
+    if marker_items:
+        LOGGER.error('Marker instances: {}', marker_fnames)
+        raise user_errors.UserError(
+            user_errors.TOK_MARKER_INST_PERSISTS,
+            textlist=[f'{fname} (#{ind})' for fname, ind in marker_items],
+            voxels=marker_pos,
+        )
 
 
 def import_conditions() -> None:
@@ -1022,8 +1044,7 @@ async def dump_conditions(filename: trio.Path) -> None:
             await file.write(dump_func_docs(func))
             await file.write('\n\n')
 
-        for (lookup, type_name), lookup_grouped in zip(all_cond_types, groups):
-
+        for (lookup, type_name), lookup_grouped in zip(all_cond_types, groups, strict=True):
             await file.write('<!------->\n')
             await file.write(f'## {type_name}\n')
             await file.write('<!------->\n')
