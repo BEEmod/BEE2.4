@@ -5,6 +5,7 @@ so that data structures can be shared.
 We take care not to directly import gettext and babel, so the compiler can omit those.
 """
 from __future__ import annotations
+from typing_extensions import deprecated
 from typing import (
     Any, ClassVar, Final, LiteralString, Never, NoReturn, Protocol, cast, override,
 )
@@ -311,6 +312,7 @@ class PluralTransToken(TransToken):
     token_plural: str
 
     @classmethod
+    @deprecated("Not permitted")
     def _not_allowed(cls, *args: Never, **kwargs: Never) -> NoReturn:
         raise NotImplementedError('This is not allowed.')
 

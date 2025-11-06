@@ -14,7 +14,6 @@ from app import (
 )
 from app.dialogs import check_future_config
 from config.gen_opts import GenOptions
-from config.last_sel import LastSelected
 from config.windows import WindowState
 from trio_debug import Tracer
 from ui_tk import TK_ROOT, route_callback_exceptions, wid_transtoken

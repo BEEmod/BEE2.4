@@ -13,7 +13,6 @@ import utils
 from app import img, lazy_conf
 from app.mdown import MarkdownData
 import packages
-import editoritems
 from corridor import (
     Attachment, CorrKind, CorrSpec, OptValue, OptionGroup,
     Orient, Direction, GameMode,
@@ -363,7 +362,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         except IndexError:
                             LOGGER.warning('Corridor {}:{} does not have enough instances!', style_id, item_id)
                             break
-                        if inst.inst == editoritems.FSPath():  # Blank, not used.
+                        if inst.is_blank:  # Should be skipped.
                             continue
                         fname = str(inst.inst)
                         if (folded := fname.casefold()) in dup_check:

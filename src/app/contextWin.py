@@ -287,7 +287,7 @@ class ContextWinBase:
             if pos == -1:
                 icon = IMG_ALPHA
             else:
-                icon = item.get_icon(style_ref, item.visual_subtypes[pos])
+                icon = item.get_icon(self.packset, style_ref, item.visual_subtypes[pos])
             self.ui_set_props_icon(ind, icon, ind == sel_pos)
 
         desc = get_description(

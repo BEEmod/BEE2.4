@@ -223,7 +223,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         if item is None:
             return INFO_ERROR
         style = self.selected_style.value
-        icon = item.get_icon(style, ref.subtype)
+        icon = item.get_icon(self.packset, style, ref.subtype)
         all_icon = item.get_all_icon(style)
         if all_icon is not None:
             return DragInfo(icon, ref.item.id, all_icon)
