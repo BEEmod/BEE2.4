@@ -61,7 +61,8 @@ class ErrorInfo:
     language_file: Path | None = None
     # Logging context
     context: str = ''
-    faces: dict[Kind, list[SimpleTile]] = attrs.Factory(dict)
+    # Copy of the tiledef data, so we can preview the level. Disable repr, this is massive.
+    faces: dict[Kind, list[SimpleTile]] = attrs.field(factory=dict, repr=False)
     # Voxels of interest in the map.
     voxels: list[TuplePos] = attrs.Factory(list)
     # Points of interest in the map.
@@ -135,9 +136,12 @@ class UserError(BaseException):
         """
         if utils.DEV_MODE:
             try:
-                ctx = f'Error occured in: <code>{", ".join(logger.CTX_STACK.get())}</code>'
+                ctx = ", ".join(logger.CTX_STACK.get())
             except LookupError:
                 ctx = ''
+            else:
+                if ctx:
+                    ctx = f'Error occured in: <code>{ctx}</code>'
         else:
             ctx = ''
 
@@ -171,7 +175,7 @@ class UserError(BaseException):
         )
 
     def __str__(self) -> str:
-        return f'Error message: {self.info.message!r}'
+        return repr(self.info)
 
 
 # Define a translation token for every error message that can be produced. The app will translate
