@@ -873,9 +873,9 @@ class Item(PakObject, needs_foreground=True):
             icon = icon.overlay_text(inherit_kind.value.title(), 12)
         return icon
 
-    def get_icon(self, style: PakRef[Style], sub_key: int) -> img.Handle:
+    def get_icon(self, packset: PackagesSet, style: PakRef[Style], sub_key: int) -> img.Handle:
         """Get an icon for the given subkey."""
-        return self._inherit_overlay(style, self._get_icon(style, sub_key))
+        return self._inherit_overlay(style, self._get_icon(packset, style, sub_key))
 
     def get_all_icon(self, style: PakRef[Style]) -> img.Handle | None:
         """Get the 'all' group icon for the specified style."""
@@ -890,7 +890,7 @@ class Item(PakObject, needs_foreground=True):
             ), 64, 64)
         return self._inherit_overlay(style, icon)
 
-    def _get_icon(self, style: PakRef[Style], subKey: int) -> img.Handle:
+    def _get_icon(self, packset: PackagesSet, style: PakRef[Style], subKey: int) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         variant = self.selected_version().get(style)
         try:
@@ -901,13 +901,15 @@ class Item(PakObject, needs_foreground=True):
         try:
             subtype = variant.editor.subtypes[subKey]
         except IndexError:
-            LOGGER.warning(
+            packset.obj_warn(
+                self,
                 'No subtype number {} for {} in {} style!',
                 subKey, self.id, style,
             )
             return img.Handle.error(64, 64)
         if subtype.pal_icon is None:
-            LOGGER.warning(
+            packset.obj_warn(
+                self,
                 'No palette icon for {} subtype {} in {} style!',
                 self.id, subKey, style,
             )

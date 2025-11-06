@@ -809,9 +809,10 @@ class PackagesSet:
     mel_music_fsys: FileSystem | None = None
     tag_music_fsys: FileSystem | None = None
 
-    # Objects we've warned about not being present. Since this is stored
-    # here it'll automatically clear when reloading. If None, it's suppressed instead.
-    _unknown_obj_warnings: set[tuple[type[PakObject], str]] | None = attrs.Factory(set)
+    # Stores keys used to avoid warning multiple times about errors.
+    # Since this is stored here, reloading packages automatically resets. If None,
+    # warnings repeat each time.
+    _warnings: set[tuple[PakRef[Any], str, *tuple[object, ...]]] | None = attrs.Factory(set)
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.
@@ -820,12 +821,12 @@ class PackagesSet:
     @classmethod
     def blank(cls) -> Self:
         """Create an empty set, with all types marked as finished."""
-        pakset = cls()
+        pakset: Self = cls()
         event = trio.Event()
         event.set()
         pakset._parsed.update(OBJ_TYPES.values())
         pakset._type_ready = dict.fromkeys(pakset._parsed, event)
-        pakset._unknown_obj_warnings = None
+        pakset._warnings = None
         return pakset
 
     @property
@@ -848,6 +849,20 @@ class PackagesSet:
         except KeyError:
             LOGGER.warning('Trying to warn about package "{}" which does not exist?', package)
             return True  # Missing, warn about it?
+
+    def obj_warn(self, obj: PakObject | PakRef[Any], message: str, *args: object) -> None:
+        """Warn about an issue with the specified object.
+
+        If not already warned for this package, log it.
+        """
+        if isinstance(obj, PakObject):
+            obj = obj.reference()
+        key = (obj, message, *args)
+        if self._warnings is None:
+            LOGGER.warning(message, *args)
+        elif key not in self._warnings:
+            LOGGER.warning(message, *args)
+            self._warnings.add(key)
 
     def ready(self, cls: type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
@@ -892,13 +907,12 @@ class PackagesSet:
         try:
             return obj_dict[obj_id.casefold()]
         except KeyError:
-            if (
-                warn
-                and self._unknown_obj_warnings is not None
-                and (key := (cls, obj_id)) not in self._unknown_obj_warnings
-            ):
-                self._unknown_obj_warnings.add(key)
-                LOGGER.warning('The {} package object "{}" does not exist!', cls.__name__, obj_id)
+            if warn:
+                self.obj_warn(
+                    PakRef(cls, utils.obj_id(obj_id)),
+                    'The {} package object "{}" does not exist!',
+                    cls.__name__, obj_id,
+                )
             raise
 
     def add(self, obj: PakObject, pak_id: utils.SpecialID, pak_name: str) -> None:
