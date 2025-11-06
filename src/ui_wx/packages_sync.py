@@ -13,6 +13,9 @@ from . import MAIN_WINDOW
 from .core import start_main
 
 
+RIGHT_ARROW = '\N{WIDE-HEADED RIGHTWARDS HEAVY BARB ARROW}'
+
+
 class WxUI(SyncUIBase):
     """Wx implementation of the packages-sync UI."""
     # This is a dev tool, we don't need to translate.
@@ -183,7 +186,12 @@ class WxUI(SyncUIBase):
         self.applies_to_all.value = False
 
     def ui_add_confirm_file(self, src: trio.Path, dest: trio.Path, /) -> None:
-        self.check_confirm.Append(f'{src}\n->{dest}', (src, dest))
+        item = self.check_confirm.Append(
+            f'{self.short_path(src)} {RIGHT_ARROW} {self.short_path(dest)} ',
+            (src, dest),
+        )
+        self.check_confirm.Check(item, True)
+        MAIN_WINDOW.Fit()
 
     def ui_get_files(self, /) -> list[tuple[trio.Path, trio.Path]]:
         """Get selected files."""
