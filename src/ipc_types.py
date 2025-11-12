@@ -1,11 +1,30 @@
 """Defines types for the messages that can be passed to loadscreen/bg_daemon."""
-from typing import Literal, NewType
+from typing import Literal, NewType, TypedDict
 
 import attrs
+
+from transtoken import TransToken
 
 
 StageID = NewType('StageID', str)
 ScreenID = NewType('ScreenID', int)
+
+
+class LoadTranslations[ValT: (TransToken, str)](TypedDict):
+    """Small set of translated strings, passed from the main process.
+
+    This is a TransToken dict in the main process, but reified into str on the daemon.
+    """
+    skip: ValT
+    version: ValT
+    cancel: ValT
+    clear: ValT
+    copy: ValT
+    log_title: ValT
+    log_show: ValT
+    level_debug: ValT
+    level_info: ValT
+    level_warn: ValT
 
 
 @attrs.frozen
@@ -17,7 +36,7 @@ class Load2Daemon_SetForceOnTop:
 @attrs.frozen
 class Load2Daemon_UpdateTranslations:
     """Update text on loading screens."""
-    translations: dict[str, str]
+    translations: LoadTranslations[str]
 
 
 @attrs.frozen

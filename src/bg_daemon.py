@@ -21,7 +21,7 @@ from PIL import ImageTk
 from ui_tk import TK_ROOT, tk_tools
 from app import img
 from ipc_types import (
-    ScreenID, StageID,
+    ScreenID, StageID, LoadTranslations,
     ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,
 )
 import ipc_types
@@ -33,7 +33,9 @@ QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 
 # Stores translated strings, which are done in the main process.
-TRANSLATION = {
+TRANSLATION: LoadTranslations[str] = {
+    'clear': 'Clear',
+    'copy': 'Copy',
     'skip': 'Skipped',
     'version': 'Version: 2.4.389',
     'cancel': 'Cancel',
@@ -882,7 +884,7 @@ def run_background(
     queue_rec_log: multiprocessing.Queue[ARGS_SEND_LOGGING],
     queue_reply_log: multiprocessing.Queue[ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
-    translations: dict[str, str],
+    translations: LoadTranslations[str],
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
     global QUEUE_REPLY_LOAD

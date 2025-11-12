@@ -40,7 +40,7 @@ _QUEUE_REPLY_LOGGING: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOGGING] = mult
 
 LOGGER = srctools.logger.get_logger(__name__)
 # All tokens used by the subprocess. We translate here before passing it down.
-TRANSLATIONS = {
+TRANSLATIONS: ipc_types.LoadTranslations[TransToken] = {
     'skip': TransToken.ui('Skipped!'),
     'version': TransToken.ui('Version: {ver}').format(ver=utils.BEE_VERSION),
     'cancel': TransToken.ui('Cancel'),
