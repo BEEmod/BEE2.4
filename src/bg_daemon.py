@@ -22,7 +22,7 @@ from ui_tk import TK_ROOT, tk_tools
 from app import img
 from ipc_types import (
     ScreenID, StageID, LoadTranslations,
-    ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,
+    ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING, ARGS_REPLY_LOGGING,
 )
 import ipc_types
 import utils
@@ -394,6 +394,7 @@ class SplashScreen(BaseLoadScreen):
         splash_max_width = max(self.win.winfo_screenwidth() * 0.6, 500)
         splash_max_height = max(self.win.winfo_screenheight() * 0.6, 500)
         splash_img, splash_info = img.select_splash_image(splash_max_width, splash_max_height)
+        QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_MainSetSplash(splash_info))
         # We've picked, if info is set, add text for it.
         splash_credits = splash_info.format_title(TRANSLATION)
         if splash_credits:

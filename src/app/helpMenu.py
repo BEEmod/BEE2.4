@@ -6,12 +6,14 @@ whatever reason.
 """
 from __future__ import annotations
 
-import abc
+from collections.abc import Callable, AsyncIterator
+from contextlib import aclosing
 from enum import Enum
 import io
 import urllib.error
 import urllib.request
 import webbrowser
+import abc
 
 from srctools.dmx import Element, NULL
 import attrs
@@ -23,6 +25,8 @@ from async_util import EdgeTrigger
 from app.dialogs import Dialogs
 from app.mdown import MarkdownData
 from transtoken import TransToken
+from loadScreen import selected_splash
+from ipc_types import SplashInfo
 import utils
 
 
@@ -80,6 +84,11 @@ WEB_RESOURCES = [
 TRANS_CREDITS_TITLE = TransToken.ui('BEE2 Credits')
 TRANS_CREDITS_BUTTON = TransToken.ui('Credits...')
 TRANS_CLOSE_BUTTON = TransToken.ui('Close')
+TRANS_SPLASH_AUTHOR_TITLE = TransToken.ui('Splash screen: {title} by {author}...')
+TRANS_SPLASH_TITLE = TransToken.ui('Splash screen: {title}...')
+TRANS_SPLASH_AUTHOR = TransToken.ui('Splash screen by {author}...')
+TRANS_SPLASH_URL = TransToken.ui('Splash screen credits...')  # Have just a url, be vague.
+TRANS_SPLASH_UNKNOWN = TransToken.ui('Unknown splash screen')  # No url, no info, just error
 
 # language=Markdown
 CREDITS_TEXT = '''\
@@ -449,7 +458,7 @@ def get_versions() -> dict[str, str]:
     }
 
 
-class CreditsWindowBase:
+class CreditsWindowBase(abc.ABC):
     """The window showing credits information."""
     open: EdgeTrigger[()]
     _close_event: trio.Event
@@ -550,3 +559,53 @@ async def open_url(dialogs: Dialogs, url_key: str) -> None:
             detail=f'"{url}"',
         ):
             webbrowser.open(url)
+
+
+async def _splash_open_task(
+    dialogs: Dialogs, open_trigger: EdgeTrigger[()],
+    open_scope: trio.CancelScope, url: str,
+) -> None:
+    """Prompt to open the splash's workshop page."""
+    with open_scope:
+        while True:
+            await open_trigger.wait()
+            if await dialogs.ask_yes_no(
+                title=TransToken.ui('BEEMOD 2 - Open URL'),
+                message=TransToken.ui('Do you want to see the workshop page?'),
+                detail=f'"{url}"',
+            ):
+                webbrowser.open(url)
+
+
+async def splash_btn_task(
+    dialogs: Dialogs,
+    set_button: Callable[[TransToken, bool], object],
+    open_trigger: EdgeTrigger[()],
+) -> None:
+    """Implements behaviour for the splash screen menu option.
+
+     This shows the map title, author, and lets you open its workshop page.
+     :param dialogs: Allow opening dialogs.
+     :param set_button: Configure the button with specific text and an is-enabled state.
+     :param open_trigger: Should be bound to the button.
+     """
+    open_scope = trio.CancelScope()
+
+    agen: AsyncIterator[SplashInfo]
+    async with trio.open_nursery() as nursery, aclosing(selected_splash.eventual_values()) as agen:
+        async for splash in agen:
+            open_scope.cancel()
+            if (url := splash.workshop_link) is not None:
+                open_scope = trio.CancelScope()
+                nursery.start_soon(_splash_open_task, dialogs, open_trigger, open_scope, url)
+            if splash.title and splash.author:
+                title = TRANS_SPLASH_AUTHOR_TITLE.format(title=splash.title, author=splash.author)
+            elif splash.title:
+                title = TRANS_SPLASH_TITLE.format(title=splash.title)
+            elif splash.author:
+                title = TRANS_SPLASH_AUTHOR.format(author=splash.author)
+            elif url is not None:
+                title = TRANS_SPLASH_URL
+            else:
+                title = TRANS_SPLASH_UNKNOWN
+            set_button(title, url is not None)

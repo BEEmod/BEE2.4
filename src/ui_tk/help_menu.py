@@ -10,10 +10,12 @@ import trio
 
 from app.helpMenu import (
     ICONS, SEPERATOR, TRANS_CLOSE_BUTTON, TRANS_CREDITS_BUTTON,
-    TRANS_CREDITS_TITLE, WEB_RESOURCES, CreditsWindowBase, open_url,
+    TRANS_CREDITS_TITLE, WEB_RESOURCES, CreditsWindowBase, open_url, splash_btn_task
 )
 from app.mdown import MarkdownData
 import utils
+from async_util import EdgeTrigger
+from transtoken import TransToken
 
 from . import TK_ROOT, tk_tools
 from .dialogs import DIALOG
@@ -90,6 +92,7 @@ async def create(
 ) -> None:
     """Create and operate the application 'Help' menu."""
     credit_window = CreditsWindow()
+    open_splash_map: EdgeTrigger[()] = EdgeTrigger()
 
     async with trio.open_nursery() as nursery:
         for res in WEB_RESOURCES:
@@ -104,12 +107,22 @@ async def create(
                 set_menu_text(menu, res.name)
 
         menu.add_separator()
+        menu.add_command(command=open_splash_map.trigger)
+        splash_ind = menu.index('end')
+        assert splash_ind is not None
+
         menu.add_command(command=credit_window.open.trigger)
         credit_ind = menu.index('end')
         assert credit_ind is not None
-        set_menu_text(menu, TRANS_CREDITS_BUTTON)
+        set_menu_text(menu, TRANS_CREDITS_BUTTON, credit_ind)
+
+        def set_splash(text: TransToken, enabled: bool) -> None:
+            """Set the state of the splash credits option."""
+            set_menu_text(menu, text, splash_ind)
+            menu.entryconfigure(splash_ind, state='normal' if enabled else 'disabled')
 
         nursery.start_soon(credit_window.display_task)
+        nursery.start_soon(splash_btn_task,DIALOG, set_splash, open_splash_map)
         async with aclosing(credit_window.open.ready.eventual_values()) as agen:
             task_status.started()
             async for enabled in agen:

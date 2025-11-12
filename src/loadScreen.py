@@ -16,6 +16,7 @@ from weakref import WeakValueDictionary
 import contextlib
 import multiprocessing
 
+from trio_util import AsyncValue
 import attrs
 import srctools.logger
 import trio
@@ -55,6 +56,8 @@ TRANSLATIONS: ipc_types.LoadTranslations[TransToken] = {
     'splash_title_author': TransToken.ui('Splash Screen: {title} by {author}'),
     'splash_author': TransToken.ui('Splash Screen by {author}'),
 }
+# The splash that was displayed, sent back from the screen.
+selected_splash = AsyncValue(ipc_types.SplashInfo('', '', None))
 
 
 def show_main_loader(is_compact: bool, app_scope: trio.CancelScope) -> None:
@@ -313,6 +316,8 @@ async def _listen_to_process() -> None:
                 # Save the compact state to the config.
                 conf = APP.get_cur_conf(GenOptions)
                 APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
+            case ipc_types.Daemon2Load_MainSetSplash():
+                selected_splash.value = op.info
             case ipc_types.Daemon2Load_Cancel():
                 try:
                     screen = _ALL_SCREENS[op.screen]

@@ -29,7 +29,7 @@ import attrs
 import srctools.logger
 import trio
 
-from ipc_types import LoadTranslations
+from ipc_types import SplashInfo
 from consts import Theme
 import utils
 
@@ -157,32 +157,6 @@ TRANSPARENT_VTF = {
     ImageFormats.BGR888_BLUESCREEN, ImageFormats.RGB888_BLUESCREEN,
     ImageFormats.DXT1_ONEBITALPHA, ImageFormats.DXT5,
 } - {ImageFormats.BGRX5551, ImageFormats.BGRX8888}
-
-
-@attrs.frozen
-class SplashInfo:
-    """Information about the selected splash screen, for displaying credits."""
-    title: str
-    author: str
-    workshop_id: int | None
-
-    @property
-    def workshop_link(self) -> str | None:
-        """Return the URL for its webpage."""
-        if self.workshop_id is None:
-            return None
-        return f'https://steamcommunity.com/sharedfiles/filedetails/?id={self.workshop_id}'
-
-    def format_title(self, translations: LoadTranslations[str]) -> str:
-        """Combine title and author for the splash screen."""
-        if self.title and self.author:
-            return translations['splash_title_author'].format(title=self.title, author=self.author)
-        elif self.title:
-            return translations['splash_title'].format(title=self.title)
-        elif self.author:
-            return translations['splash_author'].format(author=self.author)
-        else:
-            return ''
 
 
 @attrs.frozen
@@ -1491,7 +1465,7 @@ def select_splash_image(
     possible = []
 
     for path in folder.iterdir():
-        if path.name != 'credits.vdf':
+        if path.suffix.casefold() in ['.png', '.jpg', '.jpeg']:
             possible.append(path)
     if possible:
         path = random.choice(possible)

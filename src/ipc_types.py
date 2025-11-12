@@ -31,6 +31,32 @@ class LoadTranslations[ValT: (TransToken, str)](TypedDict):
 
 
 @attrs.frozen
+class SplashInfo:
+    """Information about the selected splash screen, for displaying credits."""
+    title: str
+    author: str
+    workshop_id: int | None
+
+    @property
+    def workshop_link(self) -> str | None:
+        """Return the URL for its webpage."""
+        if self.workshop_id is None:
+            return None
+        return f'https://steamcommunity.com/sharedfiles/filedetails/?id={self.workshop_id}'
+
+    def format_title(self, translations: LoadTranslations[str]) -> str:
+        """Combine title and author for the splash screen."""
+        if self.title and self.author:
+            return translations['splash_title_author'].format(title=self.title, author=self.author)
+        elif self.title:
+            return translations['splash_title'].format(title=self.title)
+        elif self.author:
+            return translations['splash_author'].format(author=self.author)
+        else:
+            return ''
+
+
+@attrs.frozen
 class Load2Daemon_SetForceOnTop:
     """Set the window-on-top behaviour for loadscreens."""
     on_top: bool
@@ -117,12 +143,18 @@ class Daemon2Load_MainSetCompact:
     compact: bool
 
 
+@attrs.frozen
+class Daemon2Load_MainSetSplash:
+    """Transmit the selected splash screen for the help menu to display."""
+    info: SplashInfo
+
+
 type ARGS_SEND_LOAD = (
     Load2Daemon_SetForceOnTop | Load2Daemon_UpdateTranslations | Load2Daemon_SetIsCompact
     | Load2Daemon_Init | Load2Daemon_SetLength | Load2Daemon_Set | Load2Daemon_Skip
     | Load2Daemon_Hide | Load2Daemon_Reset | Load2Daemon_Destroy | Load2Daemon_Show
 )
-type ARGS_REPLY_LOAD = Daemon2Load_Cancel | Daemon2Load_MainSetCompact
+type ARGS_REPLY_LOAD = Daemon2Load_Cancel | Daemon2Load_MainSetCompact | Daemon2Load_MainSetSplash
 type ARGS_SEND_LOGGING = (  # logging -> daemon
     tuple[Literal['log'], str, str] |
     tuple[Literal['visible'], bool] |
