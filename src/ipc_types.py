@@ -25,6 +25,9 @@ class LoadTranslations[ValT: (TransToken, str)](TypedDict):
     level_debug: ValT
     level_info: ValT
     level_warn: ValT
+    splash_title: ValT
+    splash_title_author: ValT
+    splash_author: ValT
 
 
 @attrs.frozen

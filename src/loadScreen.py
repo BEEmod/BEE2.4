@@ -51,6 +51,9 @@ TRANSLATIONS: ipc_types.LoadTranslations[TransToken] = {
     'level_debug': TransToken.ui('Debug messages'),
     'level_info': TransToken.ui('Default'),
     'level_warn': TransToken.ui('Warnings Only'),
+    'splash_title': TransToken.ui('Splash Screen: {title} by {author}'),
+    'splash_title_author': TransToken.ui('Splash Screen: {title} by {author}'),
+    'splash_author': TransToken.ui('Splash Screen by {author}'),
 }
 
 

@@ -12,7 +12,7 @@ from abc import abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import aclosing
 from fractions import Fraction
-from pathlib import Path, PurePath
+from pathlib import PurePath
 import abc
 import functools
 import itertools
@@ -20,7 +20,7 @@ import logging
 import weakref
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
-from srctools import Keyvalues, Vec
+from srctools import Keyvalues, KeyValError, Vec
 from srctools.filesys import (
     File as FSFile, FileSystem, FileSystemChain, RawFileSystem,
 )
@@ -29,6 +29,7 @@ import attrs
 import srctools.logger
 import trio
 
+from ipc_types import LoadTranslations
 from consts import Theme
 import utils
 
@@ -156,6 +157,32 @@ TRANSPARENT_VTF = {
     ImageFormats.BGR888_BLUESCREEN, ImageFormats.RGB888_BLUESCREEN,
     ImageFormats.DXT1_ONEBITALPHA, ImageFormats.DXT5,
 } - {ImageFormats.BGRX5551, ImageFormats.BGRX8888}
+
+
+@attrs.frozen
+class SplashInfo:
+    """Information about the selected splash screen, for displaying credits."""
+    title: str
+    author: str
+    workshop_id: int | None
+
+    @property
+    def workshop_link(self) -> str | None:
+        """Return the URL for its webpage."""
+        if self.workshop_id is None:
+            return None
+        return f'https://steamcommunity.com/sharedfiles/filedetails/?id={self.workshop_id}'
+
+    def format_title(self, translations: LoadTranslations[str]) -> str:
+        """Combine title and author for the splash screen."""
+        if self.title and self.author:
+            return translations['splash_title_author'].format(title=self.title, author=self.author)
+        elif self.title:
+            return translations['splash_title'].format(title=self.title)
+        elif self.author:
+            return translations['splash_author'].format(author=self.author)
+        else:
+            return ''
 
 
 @attrs.frozen
@@ -1450,48 +1477,80 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def make_splash_screen(
+def select_splash_image(
     max_width: float,
     max_height: float,
-    base_height: int,
-    text1_bbox: tuple[int, int, int, int],
-    text2_bbox: tuple[int, int, int, int],
-) -> Image.Image:
-    """Create the splash screen image.
+) -> tuple[Image.Image, SplashInfo]:
+    """Select the underlying image for the splash screen.
 
-    This uses a random screenshot from the splash_screens directory.
-    It then adds the gradients on top.
+    This is a random screenshot from the splash_screens directory, with associated info.
+    The image should be passed along to make_splash_screen, with text bboxes.
     """
     import random
     folder = utils.install_path('images/splash_screen')
-    user_folder = folder / 'user'
-    path = Path('<nothing>')
-    if user_folder.exists():
-        folder = user_folder
-    try:
-        path = random.choice(list(folder.iterdir()))
-        with path.open('rb') as img_file:
-            image = Image.open(img_file)
-            image.load()
-    except (FileNotFoundError, IndexError, OSError):
-        # Not found, substitute a gray block.
-        LOGGER.warning('No splash screen found (tried "{}")', path)
-        image = Image.new(
-            mode='RGB',
-            size=(round(max_width), round(max_height)),
-            color=(128, 128, 128),
-        )
+    possible = []
+
+    for path in folder.iterdir():
+        if path.name != 'credits.vdf':
+            possible.append(path)
+    if possible:
+        path = random.choice(possible)
+        try:
+            with path.open('rb') as img_file:
+                image = Image.open(img_file)
+                image.load()
+        except OSError as exc:
+            LOGGER.warning(
+                'Could not open splash screen (tried "{}")', path, exc_info=exc,
+            )
+        else:
+            # Now, parse the credits file to see if we have any.
+            try:
+                with open(folder / 'credits.vdf', 'r', encoding='utf8') as f:
+                    credits_kv = Keyvalues.parse(f)
+            except (OSError, KeyValError) as exc:
+                LOGGER.warning('Could not parse splash credits.vdf:', exc_info=exc)
+                return image, SplashInfo('', '', None)
+            try:
+                cred_block = credits_kv.find_block(path.stem)
+            except LookupError:
+                # Not found.
+                LOGGER.warning('No credits for splash screen {}', path.name)
+                return image, SplashInfo('', '', None)
+            return image, SplashInfo(
+                title=cred_block['title', ''],
+                author=cred_block['author', ''],
+                workshop_id=cred_block.int('workshopid', None),
+            )
     else:
-        if image.height > max_height:
-            image = image.resize((
-                round(image.width / image.height * max_height),
-                round(max_height),
-            ))
-        if image.width > max_width:
-            image = image.resize((
-                round(max_width),
-                round(image.height / image.width * max_width),
-            ))
+        LOGGER.warning('No splash screens defined!')
+
+    # Couldn't find anything. Return a blank block.
+    return Image.new(
+        mode='RGB',
+        size=(round(max_width), round(max_height)),
+        color=(128, 128, 128),
+    ), SplashInfo('', '', None)
+
+
+def make_splash_screen(
+    max_width: float,
+    max_height: float,
+    image: Image.Image,
+    base_height: int,
+    text_bboxes: list[tuple[int, int, int, int]],
+) -> Image.Image:
+    """Composite gradients into the splash screen image."""
+    if image.height > max_height:
+        image = image.resize((
+            round(image.width / image.height * max_height),
+            round(max_height),
+        ))
+    if image.width > max_width:
+        image = image.resize((
+            round(max_width),
+            round(image.height / image.width * max_width),
+        ))
 
     draw = ImageDraw.Draw(image, 'RGBA')
 
@@ -1520,7 +1579,7 @@ def make_splash_screen(
     # Draw the shadows behind the text.
     # This is done by progressively drawing smaller rectangles
     # with a low alpha. The center is overdrawn more making it thicker.
-    for x1, y1, x2, y2 in [text1_bbox, text2_bbox]:
+    for x1, y1, x2, y2 in text_bboxes:
         for border in reversed(range(5)):
             draw.rectangle(
                 (
@@ -1529,7 +1588,7 @@ def make_splash_screen(
                     x2 + border,
                     y2 + border,
                 ),
-                fill=(0, 150, 120, 20),
+                fill=(0, 150, 120, 40),
             )
 
     logo_img = Image.open(utils.install_path('images/BEE2/splash_logo.png'))
