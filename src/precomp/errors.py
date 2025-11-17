@@ -37,7 +37,6 @@ def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
     """Load tiledef info into a simplified tiles list."""
-
     tiles_white = UserError.simple_tiles["white"]
     tiles_black = UserError.simple_tiles["black"]
     tiles_goo_partial = UserError.simple_tiles["goopartial"]
@@ -47,6 +46,10 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
             continue
         block_type = grid.lookup_world(tile.pos + 128 * tile.normal)
         if not block_type.inside_map:
+            continue
+        if block_type.is_pit and (tile.normal.z > 0.5 or not block_type.is_top):
+            # Just remove all faces inside bottomless pits, so they drop out of the map.
+            # Keep ceilings/walls on the top level so it's still got some drop.
             continue
         # Tint the area underneath goo, by just using two textures with the appropriate tints.
         if tile.base_type.is_goo_side:
@@ -66,7 +69,8 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
         })
     goo_tiles = UserError.simple_tiles["goo"]
     for pos, block in grid.items():
-        if block.is_top:  # Both goo and bottomless pits.
+        # Add the top surface for all goo voxels.
+        if block.is_goo and block.is_top:
             goo_tiles.append({
                 'orient': 'd',
                 'position': _vec2tup(pos + (0.5, 0.5, 0.75)),
