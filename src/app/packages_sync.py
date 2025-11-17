@@ -54,6 +54,8 @@ class SyncUIBase(ReflowWindow, abc.ABC):
         self.applies_to_all = AsyncBool()
         # Packages to pick from, in order.
         self.packages: list[Package] = []
+        # Location of P2, for simplifying file paths.
+        self.p2_loc: trio.Path | None = None
         self.selected_pack: EdgeTrigger[Package | None] = EdgeTrigger()
 
         self.can_confirm = AsyncBool(False)
@@ -73,6 +75,27 @@ class SyncUIBase(ReflowWindow, abc.ABC):
         """Ask for the package this file should use."""
         self.ui_set_ask_pack(src, dest)
         return await self.selected_pack.wait()
+
+    def short_path(self, path: trio.Path) -> str:
+        """Simplify a path, if possible."""
+        if self.p2_loc is not None:
+            try:
+                relative = path.relative_to(self.p2_loc)
+            except ValueError:
+                pass
+            else:
+                if relative.is_relative_to('sdk_content/maps/'):
+                    return f'<portal2>:{relative.relative_to('sdk_content/maps/').as_posix()}'
+                elif relative.parts[0].casefold() in ('bee2', 'bee2_dev'):
+                    return f'<portal2>:{relative.relative_to(relative.parts[0]).as_posix()}'
+        for pack in self.packages:
+            try:
+                relative = path.relative_to(pack.path / 'resources')
+            except ValueError:
+                pass
+            else:
+                return f'<{pack.id}>:{relative.as_posix()}'
+        return str(path)
 
     @classmethod
     @abc.abstractmethod
@@ -270,6 +293,7 @@ async def main_gui(
 
     LOGGER.info('Done!')
     ui.packages = list(packset.packages.values())
+    ui.p2_loc = portal2_loc
     core_nursery.start_soon(ui.pack_btn_task)
 
     exp_file_send, exp_file_rec = trio.open_memory_channel[trio.Path](1)
@@ -301,8 +325,7 @@ async def main_gui(
 
     def do_copy(src: trio.Path, dest: trio.Path) -> None:
         print(f'Copy {src} -> {dest}')
-        with open(src, 'rb') as sf, open(dest, 'wb') as df:
-            shutil.copyfileobj(sf, df)
+        shutil.copyfile(src, dest)
 
     core_nursery.start_soon(delay_enable)
 
