@@ -122,7 +122,7 @@ async def create(
             menu.entryconfigure(splash_ind, state='normal' if enabled else 'disabled')
 
         nursery.start_soon(credit_window.display_task)
-        nursery.start_soon(splash_btn_task,DIALOG, set_splash, open_splash_map)
+        nursery.start_soon(splash_btn_task, DIALOG, set_splash, open_splash_map)
         async with aclosing(credit_window.open.ready.eventual_values()) as agen:
             task_status.started()
             async for enabled in agen:

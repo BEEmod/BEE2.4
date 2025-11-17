@@ -16,7 +16,10 @@ import attrs
 from srctools import Keyvalues, conv_bool
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
-from srctools.vmf import Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs, VisGroup
+from srctools.vmf import (
+    Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs, VisGroup,
+    localise_overlay,
+)
 from srctools.dmx import Element
 import srctools.logger
 
@@ -745,6 +748,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         ))
 
     coll: list[CollisionDef] = []
+    visgroup_set: set[str]
     for ent in vmf.by_class['bee2_collision_bbox']:
         visgroup_set = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
         for bbox in collisions.BBox.from_ent(ent):
@@ -917,7 +921,7 @@ def import_template(
             if int(side) in id_mapping
         )
 
-        srctools.vmf.localise_overlay(new_overlay, origin, orient)
+        localise_overlay(new_overlay, origin, orient)
         orig_target = new_overlay['targetname']
 
         # Only change the targetname if the overlay is not global, and we have

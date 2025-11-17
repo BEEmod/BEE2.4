@@ -786,10 +786,10 @@ def generate_plane(
     grid_pos: PlaneGrid[TileDef] = PlaneGrid()
 
     # We fill this plane first, then empty as we place each tile.
-    subtile_pos = PlaneGrid(default=SubTile(TileType.VOID, False))
+    subtile_pos: PlaneGrid[SubTile] = PlaneGrid(default=SubTile(TileType.VOID, False))
     # We also preserve an unmodified copy to consult.
     # We clear the default to ensure an error is raised if indexed incorrectly.
-    orig_tiles = PlaneGrid(subtile_pos)
+    orig_tiles: PlaneGrid[SubTile] = PlaneGrid(subtile_pos)
 
     if dump_path is not None:
         dump_path /= (

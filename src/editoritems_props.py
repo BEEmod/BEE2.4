@@ -389,7 +389,7 @@ prop_track_move_direction: ItemPropKind[Angle] = ItemPropKind(
 # 2 |
 # 1 |__
 # 0
-def _parse_pist_lower(value: str) -> int:
+def _parse_pist_lower(value: str, /) -> int:
     # Bug, previous versions mistakenly wrote rounded floats.
     value = value.removesuffix('.0')
     try:
@@ -401,7 +401,7 @@ def _parse_pist_lower(value: str) -> int:
     raise ValueError(f'Position {value} not in 0, 1, 2, 3!')
 
 
-def _parse_pist_upper(value: str) -> int:
+def _parse_pist_upper(value: str, /) -> int:
     # Bug, previous versions mistakenly wrote rounded floats.
     value = value.removesuffix('.0')
     try:
@@ -655,7 +655,7 @@ prop_angled_panel_type: ItemPropKind[str] = ItemPropKind(
 )
 
 
-def _parse_angled_panel_anim(value: str) -> PanelAnimation:
+def _parse_angled_panel_anim(value: str, /) -> PanelAnimation:
     """Parse angled panel animations."""
     orig_value = value
     value = value.casefold()

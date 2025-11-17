@@ -1480,7 +1480,7 @@ def select_splash_image(
         else:
             # Now, parse the credits file to see if we have any.
             try:
-                with open(folder / 'credits.vdf', 'r', encoding='utf8') as f:
+                with open(folder / 'credits.vdf', encoding='utf8') as f:
                     credits_kv = Keyvalues.parse(f)
             except (OSError, KeyValError) as exc:
                 LOGGER.warning('Could not parse splash credits.vdf:', exc_info=exc)

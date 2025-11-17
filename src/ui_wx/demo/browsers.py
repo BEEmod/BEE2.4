@@ -7,7 +7,6 @@ import wx
 
 import packages
 from app import gameMan, lifecycle
-from config.last_sel import LastSelected
 from ui_wx.browsers import SoundBrowser
 from ui_wx.dialogs import DIALOG
 from ui_wx import MAIN_WINDOW

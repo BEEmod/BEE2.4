@@ -1,14 +1,17 @@
 """A value read from configs, which defers applying fixups until later."""
 from __future__ import annotations
 
-from typing import override
+from typing import override, overload
 from collections.abc import Callable
 
 import abc
 import operator
 
 from srctools.vmf import Entity, Output
-from srctools import conv_int, conv_float, conv_bool, Vec, Angle, Matrix
+from srctools import (
+    conv_int, conv_float, conv_bool, Vec, Angle, Matrix, FrozenVec, FrozenAngle,
+    FrozenMatrix,
+)
 
 import utils
 
@@ -106,6 +109,15 @@ class LazyValue[U](abc.ABC):
     def casefold(self: LazyValue[str]) -> LazyValue[str]:
         """Call str.casefold(). TODO Replace with object IDs?"""
         return self.map(str.casefold, 'str.casefold')
+
+    @overload
+    def freeze(self: LazyValue[Vec]) -> LazyValue[FrozenVec]: ...
+    @overload
+    def freeze(self: LazyValue[Angle]) -> LazyValue[FrozenAngle]: ...
+    @overload
+    def freeze(self: LazyValue[Matrix]) -> LazyValue[FrozenMatrix]: ...
+    def freeze(self: LazyValue[Vec | Angle | Matrix]) -> LazyValue[FrozenVec | FrozenAngle | FrozenMatrix]:
+        return self.map(lambda s: s.freeze(), 'freeze')
 
     def as_obj_id(self: LazyValue[str], kind: str) -> LazyValue[utils.ObjectID]:
         """Call utils.obj_id()."""

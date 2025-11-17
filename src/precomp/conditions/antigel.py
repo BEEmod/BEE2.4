@@ -28,6 +28,7 @@ class Marker:
 
 
 LOGGER = get_logger(__name__)
+COND_MOD_NAME: str | None = None
 PACKAGE_ID = utils.special_id('BEE2_BLOCKS')
 
 

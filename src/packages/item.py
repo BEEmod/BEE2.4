@@ -420,6 +420,7 @@ class ItemVariant:
 
         for inst in kv.find_children('Instances'):
             ent_count = brush_count = side_count = 0
+            inst_fname: str | FSPath
             if inst.has_children():
                 inst_fname = inst['name']
                 ent_count = inst.int('entitycount')

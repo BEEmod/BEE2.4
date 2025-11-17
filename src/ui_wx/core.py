@@ -19,7 +19,6 @@ from ui_wx import wid_transtoken
 from ui_wx.img import WX_IMG
 from ui_wx import APP, MAIN_WINDOW
 from config.gen_opts import GenOptions
-from config.last_sel import LastSelected
 import config
 import app
 import loadScreen

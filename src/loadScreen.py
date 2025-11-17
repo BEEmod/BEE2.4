@@ -6,7 +6,7 @@ the main process is busy loading.
 The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
-from typing import Self
+from typing import Self, cast
 
 from collections.abc import (
     AsyncGenerator, Collection, Generator, MutableMapping,
@@ -301,9 +301,10 @@ async def _update_translations() -> None:
     """Update the translations whenever the language changes."""
     while True:
         await CURRENT_LANG.wait_transition()
-        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_UpdateTranslations(
-            {key: str(tok) for key, tok in TRANSLATIONS.items()},
-        ))
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_UpdateTranslations(cast(
+            ipc_types.LoadTranslations[str],
+            {key: str(tok) for key, tok in TRANSLATIONS.items()}
+        )))
 
 
 async def _listen_to_process() -> None:

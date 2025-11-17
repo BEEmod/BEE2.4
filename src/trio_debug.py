@@ -58,7 +58,7 @@ class Tracer(trio.abc.Instrument):
 
     def _get_linenum(self, task: trio.lowlevel.Task) -> int:
         coro = self._get_coro(task)
-        if (frame := coro.cr_frame) is not None:
+        if (frame := coro.cr_frame) is not None:  # type: ignore[comparison-overlap]  # Can be none in 3.12+
             return frame.f_lineno
         else:
             return coro.cr_code.co_firstlineno
@@ -67,7 +67,7 @@ class Tracer(trio.abc.Instrument):
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
-        if (frame := self._get_coro(task).cr_frame) is not None:
+        if (frame := self._get_coro(task).cr_frame) is not None:  # type: ignore[comparison-overlap]  # Can be none in 3.12+
             self.args[task] = frame.f_locals.copy()
         else:
             self.args[task] = {'???': '???'}

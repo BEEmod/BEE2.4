@@ -33,7 +33,7 @@ def test_parse_kv1() -> None:
     ]), 1)
     assert last.uuid == GAME_1
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='UUID'):
         LastGame.parse_kv1(Keyvalues('LastGame', [
             Keyvalues('uuid', 'notauuid'),
         ]), 1)
@@ -44,6 +44,7 @@ def test_export_kv1() -> None:
     kv = LastGame(GAME_2).export_kv1()
     assert len(kv) == 1
     assert kv['uuid'] == GAME_2.hex
+
 
 def test_parse_dmx() -> None:
     """Test parsing DMX state."""
