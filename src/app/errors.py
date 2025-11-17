@@ -24,6 +24,7 @@ DEFAULT_WARN_DESC = TransToken.ui_plural(
     "An error occurred while performing this task, but it was partially successful:",
     "Multiple errors occurred while performing this task, but it was partially successful:",
 )
+TRANS_WARNING_SEP = TransToken.ui("The following warnings also occurred:")
 
 
 class Result(Enum):
@@ -201,6 +202,7 @@ class ErrorUI:
         if self._errors:
             if not self._fatal_error and any(err.fatal for err in self._errors):
                 self._fatal_error = True
+            self._errors.sort(key=lambda err: 0 if err.fatal else 1)
             desc = self.error_desc if self._fatal_error else self.warn_desc
             desc = desc.format(n=len(self._errors))
             # We had an error.

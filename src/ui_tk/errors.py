@@ -1,13 +1,13 @@
 """Handler for app.errors."""
 from __future__ import annotations
 
-from tkinter import ttk
+from tkinter import ttk, font
 import tkinter as tk
 import math
 
 import trio
 
-from app.errors import ErrorUI
+from app.errors import ErrorUI, TRANS_WARNING_SEP
 from app import quit_app
 from transtoken import AppError, TransToken
 
@@ -76,6 +76,9 @@ async def display_errors(
     wid_error_frm.columnconfigure(0, weight=1)
     wid_error_canv.create_window(0, 0, anchor='nw', window=wid_error_frm)
 
+    wid_warning_sep = tk.Label(wid_error_frm, bg='white', relief='ridge')
+    set_text(wid_warning_sep, TRANS_WARNING_SEP)
+
     scrollbar = tk_tools.HidingScroll(
         wid_error_border, orient='vertical',
         command=wid_error_canv.yview,
@@ -99,6 +102,10 @@ async def display_errors(
 
     # Cache the labels and separators.
     error_widgets: list[tuple[tk.Label, ttk.Separator]] = []
+
+    font_norm = font.nametofont('TkDefaultFont')
+    font_bold = font_norm.copy()
+    font_bold['weight'] = 'bold'
 
     def on_resize(e: object) -> None:
         """Resize labels when the window does."""
@@ -126,13 +133,30 @@ async def display_errors(
                     ttk.Separator(wid_error_frm, orient='horizontal'),
                 ))
             error_wid_iter = iter(error_widgets)
+            # Fatal errors sort first, display a message after if any warnings come next.
+            was_fatal = False
+            wants_sep = False
+            row = 0
+            wid_warning_sep.grid_forget()
             for i, (error, (label, sep)) in enumerate(zip(errors, error_wid_iter, strict=False)):
                 set_text(label, error.message)
-                label.grid(row=2 * i, column=0, pady=(4, 4), sticky='W')
-                if i != 0:
-                    # Place behind for all except the first, so it goes in between.
-                    # The first separator is unused, but that isn't important.
-                    sep.grid(row=2 * i - 1, column=0, padx=2, sticky='EW')
+                if error.fatal:
+                    was_fatal = True
+                    label['font'] = font_bold
+                else:
+                    label['font'] = font_norm
+                    if was_fatal:
+                        was_fatal = wants_sep = False
+                        wid_warning_sep.grid(row=row, column=0, pady=(4, 4), sticky='EW')
+                        row += 1
+                if wants_sep:
+                    # Place before each, if there's a previous message needing a separator.
+                    # We won't use all the separators, but that's fine.
+                    sep.grid(row=row, column=0, padx=2, sticky='EW')
+                    row += 1
+                label.grid(row=row, column=0, pady=(4, 4), sticky='W')
+                row += 1
+                wants_sep = True
             for label, sep in error_wid_iter:
                 set_text(label, TransToken.BLANK)
                 label.grid_remove()
