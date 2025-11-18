@@ -25,6 +25,7 @@ DEFAULT_WARN_DESC = TransToken.ui_plural(
     "Multiple errors occurred while performing this task, but it was partially successful:",
 )
 TRANS_WARNING_SEP = TransToken.ui("The following warnings also occurred:")
+TRANS_TOO_MANY_ERRORS = TransToken.ui("Too many errors ({count}) occurred, see log for details.")
 
 
 class Result(Enum):
@@ -221,5 +222,10 @@ class ErrorUI:
                     "\n".join([str(err.message) for err in self._errors]),
                 )
                 # This is a class-level callable, do not pass self.
-                await ErrorUI._handler(self.title, desc, self._errors)
+                if len(self._errors) > 100:
+                    # If we have too many, UI perf suffers, and most of these aren't going to be useful.
+                    too_many = AppError(TRANS_TOO_MANY_ERRORS.format(count=len(self._errors)))
+                    await ErrorUI._handler(self.title, desc, [too_many, *self._errors[:10], too_many])
+                else:
+                    await ErrorUI._handler(self.title, desc, self._errors)
         return True
