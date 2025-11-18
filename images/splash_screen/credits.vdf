@@ -1,0 +1,130 @@
+"bruh_moment"
+	{
+	"title" "Bruh Moment"
+	"author" "Konclan"
+	"workshopid" "1776278771"
+	}
+
+"ceiling_whacks"
+	{
+	"title" "Ceiling Whacks"
+	"author" "Demon Arisen"
+	"workshopid" "3058373765"
+	}
+
+"cheating_death"
+	{
+	"title" "Cheating Death"
+	"author" "NicolasDreams"
+	"workshopid" "3330949881"
+	}
+
+"extinguish"
+	{
+	"title" "Extinguish"
+	"author" "Demon Arisen"
+	"workshopid" "1427200708"
+	}
+
+"extrude"
+	{
+	"title" "Extrude"
+	"author" "Demon Arisen"
+	"workshopid" "1817375015"
+	}
+
+"4th_drop"
+	{
+	"title" "Fourth Drop"
+	"author" "ComandrTNT"
+	"workshopid" "3381829978"
+	}
+
+"like_a_bullet"
+	{
+	"title" ""
+	"author" "Eric Northman"
+	"workshopid" "3027868287"
+	}
+
+"marathon"
+	{
+	"title" "Marathon"
+	"author" "Demon Arisen"
+	"workshopid" "1652682464"
+	}
+
+"occlude"
+	{
+	"title" "Occlude"
+	"author" "Fumbly Bumbly"
+	"workshopid" "2244850207"
+	}
+
+"shieldbearer"
+	{
+	"title" "Shieldbearer"
+	"author" "Demon Arisen"
+	"workshopid" "2171810685"
+	}
+
+"skate"
+	{
+	"title" "Skate"
+	"author" "Demon Arisen"
+	"workshopid" "1865079467"
+	}
+
+"sneaky_gun"
+	{
+	"title" "Sneaky Gun"
+	"author" "NicolasDreams"
+	"workshopid" "3400469942"
+	}
+
+"some_time_ago"
+	{
+	"title" "Some Time Ago"
+	"author" "Eric Northman"
+	"workshopid" "2969467145"
+	}
+
+"vertigo"
+	{
+	"title" "Vertigo"
+	"author" "Fumbly Bumbly"
+	"workshopid" "2770142234"
+	}
+
+// These are bespoke setups, see BEEmod/BEE2.4#438
+
+"splash_fling"
+	{
+	"title" "\"Fling\""
+	"author" "TheDarkBomber"
+	}
+
+"splash_cube_alter"
+	{
+	"title" "\"Cube Altar\""
+	"author" "Byzarru"
+	}
+
+"splash_cube_alter"
+	{
+	"title" "\"Cube Altar\""
+	"author" "Byzarru"
+	}
+
+"turrets"
+	{
+	"title" "\"Turrets\""
+	"author" "Byzarru"
+	}
+
+
+"square_root_of_minus_portal"
+	{
+	"title" "\"Square Root of Minus Portal + Portals\""
+	"author" "Byzarru"
+	}
