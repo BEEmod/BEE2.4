@@ -11,13 +11,13 @@ from typing import Final, Self, override, ClassVar, assert_never
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from enum import Enum
-from pathlib import PurePosixPath as FSPath
+from pathlib import PurePosixPath as FSPath, PureWindowsPath as CasePath
 import copy
 import re
 from weakref import WeakKeyDictionary
 
 from aioresult import ResultCapture
-from srctools import VMF, FileSystem, Keyvalues, logger, conv_int
+from srctools import VMF, FileSystem, Keyvalues, logger, conv_int, FileSystemChain
 from srctools.tokenizer import Token, Tokenizer, TokenSyntaxError
 import attrs
 import trio
@@ -49,6 +49,9 @@ TRANS_INCOMPLETE_GROUPING = TransToken.untranslated('"{filename}" has incomplete
 TRANS_EDITOR_ID_MISMATCH = TransToken.untranslated(
     'Item ID "{obj_id}" does not match "{editor_id}" in "{path}"!\n'
     'Info.txt ID will override, update editoritems!',
+)
+TRANS_MISSING_INSTANCE = TransToken.untranslated(
+    'Instance "{fname}" does not exist in packages! Use <marker> if it should be consumed by conditions.'
 )
 
 
@@ -258,12 +261,17 @@ class ItemVariant:
         for item in self.editor_extra:
             yield from item.iter_trans_tokens(f'{source}:{item.id}')
 
+    def iter_editor(self) -> Iterator[EditorItem]:
+        """Yield the main item along with extra items."""
+        yield self.editor
+        yield from self.editor_extra
+
     def instance_desc(self) -> MarkdownData:
         """Produce a description of the instances used by this item."""
         if self._inst_desc is not None:
             return self._inst_desc
         inst_desc = []
-        for editor in [self.editor] + self.editor_extra:
+        for editor in self.iter_editor():
             if editor is self.editor:
                 inst_desc.append('\n\n**Instances:**\n')
             else:
@@ -774,9 +782,19 @@ class Item(PakObject, needs_foreground=True):
         await packset.ready(Style).wait()
         LOGGER.info('Allocating styled items...')
         styles = packset.all_obj(Style)
+
         async with trio.open_nursery() as nursery:
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, ctx, styles, item_to_style)
+        # In dev mode, also check instances exist.
+        if DEV_MODE.value:
+            inst_fsys = FileSystemChain()
+            for pack in ctx.packset.packages.values():
+                inst_fsys.add_sys(pack.fsys, 'resources/instances/')
+            async with trio.open_nursery() as nursery:
+                for item_to_style in packset.all_obj(Item):
+                    nursery.start_soon(item_to_style._validate_instances, inst_fsys, ctx)
+
         # Migrations cannot be from an item that actually exists. If so, warn and remove.
         migrations = cls.migrations(packset)
         for from_item, to_item in list(migrations.items()):
@@ -919,6 +937,27 @@ class Item(PakObject, needs_foreground=True):
         return img.Handle.file(utils.PackagePath(
             variant.pak_id, str(subtype.pal_icon)
         ), 64, 64)
+
+    async def _validate_instances(self, fsys: FileSystemChain, ctx: PackErrorInfo) -> None:
+        """Check all the instances this item uses exists."""
+        instances = set()
+        root = CasePath('instances/bee2/')
+        for version in self.versions.values():
+            for style_id, variant in version.styles.items():
+                for editor in variant.iter_editor():
+                    await trio.lowlevel.checkpoint()
+                    for ind, inst in enumerate(editor.instances):
+                        if inst.is_marker or inst.is_blank:
+                            continue
+                        try:
+                            instances.add(CasePath(inst.inst).relative_to(root))
+                        except ValueError:
+                            LOGGER.warning('Invalid instance: {} in {}', inst.inst, variant.source)
+        for fname in instances:
+            try:
+                await trio.to_thread.run_sync(fsys.__getitem__, fname.as_posix())
+            except FileNotFoundError:
+                ctx.warn(TRANS_MISSING_INSTANCE.format(fname=fname))
 
 
 class ItemConfig(PakObject, allow_mult=True):
