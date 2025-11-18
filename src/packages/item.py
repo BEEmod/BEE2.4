@@ -787,7 +787,8 @@ class Item(PakObject, needs_foreground=True):
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, ctx, styles, item_to_style)
         # In dev mode, also check instances exist.
-        if DEV_MODE.value:
+        if config.APP.get_cur_conf(GenOptions).log_missing_instances:
+            LOGGER.info('Checking for missing instances...')
             inst_fsys = FileSystemChain()
             for pack in ctx.packset.packages.values():
                 inst_fsys.add_sys(pack.fsys, 'resources/instances/')

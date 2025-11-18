@@ -539,13 +539,22 @@ async def init_dev_tab(
     await trio.lowlevel.checkpoint()
 
     make_checkbox(
+        frm_check, 'log_missing_instances',
+        desc=TransToken.ui("Log missing instances"),
+        tooltip=TransToken.ui(
+            'Log when an item uses instances not in loaded packages. This may incicate a typo or '
+            'files not copied into the package. If the instance is replaced later, use "<marker>".'
+        ),
+    ).grid(row=2, column=0, sticky='W')
+
+    make_checkbox(
         frm_check, 'log_item_fallbacks',
         desc=TransToken.ui("Log when item uses parent's style"),
         tooltip=TransToken.ui(
             'Log when an item reuses a variant from a parent style (1970s using 1950s items, '
             'for example). This is usually fine, but may need to be fixed.'
         ),
-    ).grid(row=2, column=0, sticky='W')
+    ).grid(row=3, column=0, sticky='W')
 
     make_checkbox(
         frm_check, 'visualise_inheritance',
@@ -554,7 +563,7 @@ async def init_dev_tab(
             'Add overlays to item icons to display which inherit from parent styles or '
             'have no applicable style.'
         ),
-    ).grid(row=3, column=0, sticky='W')
+    ).grid(row=4, column=0, sticky='W')
     await trio.lowlevel.checkpoint()
 
     make_checkbox(

@@ -51,6 +51,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
     log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+    log_missing_instances: bool = False
     visualise_inheritance: bool = False
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
 
