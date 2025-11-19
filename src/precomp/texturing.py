@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import ClassVar, TYPE_CHECKING, Any
 
-from collections.abc import Sequence, Iterable
+from collections.abc import Sequence, Iterable, Mapping
 from pathlib import Path
 from enum import Enum, StrEnum
 import string
@@ -593,7 +593,8 @@ DEFAULT_WEIGHTS = {
 class GeneratorConstructOpts:
     """In-progress configuration used to construct generators."""
     options: dict[str, Any]
-    weights: dict[TileSize, int] = attrs.Factory(DEFAULT_WEIGHTS.copy)
+    weights: dict[TileSize, int] = attrs.Factory(dict)
+    small_weights: dict[TileSize, int] = attrs.Factory(dict)
     textures: dict[str, list[MaterialConf]] = attrs.Factory(dict)
 
 
@@ -725,6 +726,21 @@ def apply(
 
     generator.get(loc - face.normal(), tex_name).apply(face)
 
+
+def _parse_weights(weights: dict[TileSize, int], conf: Keyvalues, key: str) -> None:
+    for subprop in conf.find_children(key):
+        try:
+            size = TileSize(subprop.name)
+        except ValueError:
+            LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
+            continue
+        try:
+            weights[size] = int(subprop.value)
+        except (TypeError, ValueError, OverflowError):
+            LOGGER.warning(
+                'Invalid weight "{}" for size {}',
+                subprop.value, subprop.real_name,
+            )
 
 def load_config(conf: Keyvalues) -> None:
     """Setup all the generators from the config data."""
@@ -879,19 +895,8 @@ def load_config(conf: Keyvalues) -> None:
                         MaterialConf(tex_default, tile_size=tex_name)
                         if isinstance(tex_default, str) else tex_default
                     ]
-            for subprop in gen_conf.find_children('weights'):
-                try:
-                    size = TileSize(subprop.name)
-                except ValueError:
-                    LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
-                    continue
-                try:
-                    opts.weights[size] = int(subprop.value)
-                except (TypeError, ValueError, OverflowError):
-                    LOGGER.warning(
-                        'Invalid weight "{}" for size {}',
-                        subprop.value, subprop.real_name,
-                    )
+            _parse_weights(opts.weights, gen_conf, 'weights')
+            _parse_weights(opts.small_weights, gen_conf, 'smallweights')
         else:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
@@ -969,16 +974,23 @@ def load_config(conf: Keyvalues) -> None:
                     generator = GenClump
                 case _:
                     raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
+            if not opts.weights:
+                # If not defined, use defaults.
+                opts.weights |= DEFAULT_WEIGHTS
+            if not opts.small_weights:
+                # Both are the same. We don't need to copy, the generators treat these as const.
+                opts.small_weights = opts.weights
+            # Ensure all tile sizes are present.
+            for size in TileSize:
+                opts.weights.setdefault(size, 0)
+                opts.small_weights.setdefault(size, 0)
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gentor = generator(
-            gen_cat, gen_orient, gen_portal,
-            opts.options, opts.weights, opts.textures,
-        )
+        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, opts)
 
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
@@ -1122,18 +1134,22 @@ class Generator(abc.ABC):
     # For P1 style primarily, defines a 'bottom trim' which restricts tile sizes.
     bottom_trim_pattern: Sequence[TileSize]
 
+    options: Mapping[str, Any]
+    textures: Mapping[str, Sequence[MaterialConf]]
+    weights: Mapping[TileSize, int]
+    # Alt weights, used when a tile is smaller than 128x128
+    small_weights: Mapping[TileSize, int]
     def __init__(
         self,
         category: GenCat,
         orient: Orient | None,
         portal: Portalable | None,
-        options: dict[str, Any],
-        weights: dict[TileSize, int],
-        textures: dict[str, list[MaterialConf]],
+        options: GeneratorConstructOpts,
     ) -> None:
-        self.options = options
-        self.textures = textures
-        self.weights = weights
+        self.options = options.options
+        self.textures = options.textures
+        self.weights = options.weights
+        self.small_weights = options.small_weights
 
         # Tells us the category each generator matches to.
         self.category = category
@@ -1143,10 +1159,10 @@ class Generator(abc.ABC):
         try:
             self.bottom_trim_pattern = [
                 BOTTOM_TRIM_CHAR[char]
-                for char in options['bottomtrim']
+                for char in self.options['bottomtrim']
             ] or ()
         except KeyError:
-            raise ValueError(f'Invalid bottom trim pattern "{options['bottomtrim']}"') from None
+            raise ValueError(f'Invalid bottom trim pattern "{self.options['bottomtrim']}"') from None
 
     def get(self, loc: FrozenVec | Vec, tex_name: str, *, antigel: bool | None = None) -> MaterialConf:
         """Get one texture for a position.
@@ -1227,11 +1243,9 @@ class GenRandom(Generator):
         category: GenCat,
         orient: Orient | None,
         portal: Portalable | None,
-        options: dict[str, Any],
-        weights: dict[TileSize, int],
-        textures: dict[str, list[MaterialConf]],
+        options: GeneratorConstructOpts,
     ) -> None:
-        super().__init__(category, orient, portal, options, weights, textures)
+        super().__init__(category, orient, portal, options)
         # For enum constants, use the id() to lookup - this
         # way we're effectively comparing by identity.
         self.enum_data: dict[int, str] = {}
@@ -1277,11 +1291,9 @@ class GenClump(Generator):
         category: GenCat,
         orient: Orient | None,
         portal: Portalable | None,
-        options: dict[str, Any],
-        weights: dict[TileSize, int],
-        textures: dict[str, list[MaterialConf]],
+        options: GeneratorConstructOpts,
     ) -> None:
-        super().__init__(category, orient, portal, options, weights, textures)
+        super().__init__(category, orient, portal, options)
 
         # A seed only unique to this generator.
         self.gen_seed = b''

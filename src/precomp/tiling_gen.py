@@ -601,11 +601,12 @@ def calculate_plane(
             # Figure out tile sizes we can use. TODO: Cache this generated list.
             sizes: list[TileSize] = []
             counts: list[int] = []
+            weights = gen.small_weights if width < 4 or height < 4 else gen.weights
             for size in ALLOWED_SIZES[subtile.type]:
                 if size.width <= width and size.height <= height:
                     tex_list = gen.get_all(size, subtile.antigel)
                     if tex_list:
-                        weight = gen.weights[size]
+                        weight = weights[size]
                         # If the weight is zero, only include if no larger tile matches.
                         if weight == 0:
                             if sizes:
