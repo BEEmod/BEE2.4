@@ -589,6 +589,14 @@ DEFAULT_WEIGHTS = {
 }
 
 
+@attrs.define(kw_only=True)
+class GeneratorConstructOpts:
+    """In-progress configuration used to construct generators."""
+    options: dict[str, Any]
+    weights: dict[TileSize, int] = attrs.Factory(DEFAULT_WEIGHTS.copy)
+    textures: dict[str, list[MaterialConf]] = attrs.Factory(dict)
+
+
 def format_gen_key(gen_key: GenCat | tuple[GenCat, Orient, Portalable]) -> str:
     """Convert the GenCat into a string for nice display."""
     if isinstance(gen_key, GenCat):
@@ -743,9 +751,7 @@ def load_config(conf: Keyvalues) -> None:
     ))
 
     # We put the configurations for each generator in here, before constructing them.
-    all_options: dict[GenKey, dict[str, Any]] = {}
-    all_weights: dict[GenKey, dict[TileSize, int]] = {}
-    all_textures: dict[GenKey, dict[str, list[MaterialConf]]] = {}
+    all_constr_opts: dict[GenKey, GeneratorConstructOpts] = {}
 
     gen_cat: GenCat
     gen_orient: Orient | None
@@ -818,16 +824,14 @@ def load_config(conf: Keyvalues) -> None:
             is_ceil = gen_key[1] is Orient.CEIL
 
         # First parse the options.
-        all_options[gen_key] = parse_options({
-            prop.name or '': prop.value
-            for prop in
-            gen_conf.find_children('Options')
-        }, global_options, is_ceil)
-
-        all_weights[gen_key] = weights = DEFAULT_WEIGHTS.copy()
-        textures: dict[str, list[MaterialConf]] = {}
+        opts = all_constr_opts[gen_key] = GeneratorConstructOpts(
+            options=parse_options({
+                prop.name or '': prop.value
+                for prop in
+                gen_conf.find_children('Options')
+            }, global_options, is_ceil)
+        )
         tex_name: str
-        all_textures[gen_key] = textures
 
         # Now do textures.
         if is_tile:
@@ -835,7 +839,7 @@ def load_config(conf: Keyvalues) -> None:
             # only use the defaults if no textures were specified.
             tile_size: TileSize
             for tile_size in TileSize:
-                textures[tile_size] = [
+                opts.textures[tile_size] = [
                     conf for kv in gen_conf.find_all(str(tile_size))
                     for conf in MaterialConf.parse(kv, tile_size)
                 ]
@@ -843,35 +847,35 @@ def load_config(conf: Keyvalues) -> None:
             if '1x2' in gen_conf and not has_block_mats:
                 LOGGER.warning('1x2 textures have changed to actually be two vertical tiles!')
 
-            if NEW_TILE_GEN and TileSize.TILE_DOUBLE in textures and all_options[gen_key]['scaleup256']:
+            if NEW_TILE_GEN and TileSize.TILE_DOUBLE in opts.textures and opts.options['scaleup256']:
                 # Reimplement this logic.
-                textures[TileSize.TILE_DOUBLE] = [
+                opts.textures[TileSize.TILE_DOUBLE] = [
                     attrs.evolve(conf, scale=conf.scale * 2) for conf in
-                    textures[TileSize.TILE_DOUBLE]
+                    opts.textures[TileSize.TILE_DOUBLE]
                 ]
 
-            if all_options[gen_key]['mixrotation']:
+            if opts.options['mixrotation']:
                 # Automatically rotate tiles.
                 orig_defs: dict[TileSize, list[MaterialConf]] = {
                     tex_name: tex_list.copy()
-                    for tex_name, tex_list in textures.items()
+                    for tex_name, tex_list in opts.textures.items()
                     if isinstance(tex_name, TileSize)  # Always true.
                 }
                 for start_size, mat_list in orig_defs.items():
                     for rot in QuarterRot:
                         size = start_size.rotated if rot.flips_uv else start_size
                         for mat in mat_list:
-                            textures[size].append(attrs.evolve(
+                            opts.textures[size].append(attrs.evolve(
                                 mat,
                                 tile_size=size, rotation=mat.rotation + rot
                             ))
 
             # If not provided, use defaults. Otherwise, ignore them entirely.
-            if not any(textures.values()):
+            if not any(opts.textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
                     assert isinstance(tex_name, TileSize), f'{tex_name}: {tex_default}'
                     # Use default scale/rotation.
-                    textures[tex_name] = [
+                    opts.textures[tex_name] = [
                         MaterialConf(tex_default, tile_size=tex_name)
                         if isinstance(tex_default, str) else tex_default
                     ]
@@ -882,7 +886,7 @@ def load_config(conf: Keyvalues) -> None:
                     LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
                     continue
                 try:
-                    weights[size] = int(subprop.value)
+                    opts.weights[size] = int(subprop.value)
                 except (TypeError, ValueError, OverflowError):
                     LOGGER.warning(
                         'Invalid weight "{}" for size {}',
@@ -891,7 +895,7 @@ def load_config(conf: Keyvalues) -> None:
         else:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
-                textures[tex_name] = tex = [
+                opts.textures[tex_name] = tex = [
                     conf for kv in gen_conf.find_all(str(tex_name))
                     for conf in MaterialConf.parse(kv)
                 ]
@@ -926,12 +930,12 @@ def load_config(conf: Keyvalues) -> None:
             continue
         gen_cat, gen_orient, gen_portal = gen_key
 
-        textures = all_textures[gen_key]
+        textures = all_constr_opts[gen_key].textures
 
         if not any(textures.values()) and gen_cat is not GenCat.NORMAL:
             # For the additional categories of tiles, we copy the entire
             # NORMAL one over if it's not set.
-            for text_name, mat_list in all_textures[GenCat.NORMAL, gen_orient, gen_portal].items():
+            for text_name, mat_list in all_constr_opts[GenCat.NORMAL, gen_orient, gen_portal].textures.items():
                 textures[text_name] = mat_list.copy()
 
         if not textures[TileSize.TILE_4x4]:
@@ -939,7 +943,7 @@ def load_config(conf: Keyvalues) -> None:
 
         # Copy all other textures to the 1x1 size if the option was set.
         # Do it before inheriting tiles, so there won't be duplicates.
-        if all_options[gen_key]['mixtiles'] and not NEW_TILE_GEN:
+        if all_constr_opts[gen_key].options['mixtiles'] and not NEW_TILE_GEN:
             block_tex = textures[TileSize.TILE_1x1]
             block_tex += textures[TileSize.TILE_4x4]
             block_tex += textures[TileSize.TILE_2x2]
@@ -952,13 +956,11 @@ def load_config(conf: Keyvalues) -> None:
 
     # Now finally create the generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
-        options = all_options[gen_key]
-        weights = all_weights[gen_key]
-        textures = all_textures[gen_key]
         generator: type[Generator]
+        opts = all_constr_opts[gen_key]
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
-            algo = options['algorithm']
+            algo = opts.options['algorithm']
             gen_cat, gen_orient, gen_portal = gen_key
             match algo.casefold():
                 case 'rand':
@@ -973,7 +975,10 @@ def load_config(conf: Keyvalues) -> None:
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, weights, textures)
+        GENERATORS[gen_key] = gentor = generator(
+            gen_cat, gen_orient, gen_portal,
+            opts.options, opts.weights, opts.textures,
+        )
 
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
