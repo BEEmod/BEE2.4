@@ -2054,6 +2054,12 @@ class Item:
                 'The ButtonType property does nothing if the '
                 'item class is not ItemButtonFloor, only instance 0 is shown.'
             )
+        # ITEM_CUBE is fine, code handles
+        if self.anchor_barriers and self.handle in (Handle.DUAL_OFF, Handle.QUAD_OFF):
+            LOGGER.warning(
+                "Items with both HANDLE_6/8_POSITIONS and CanAnchorOnBarriers cause the item's "
+                'position to reset whenever geometry changes.'
+            )
         # The indicator items are special, they always have just one input...
         if self.has_prim_input() and 'connectioncount' not in self.properties and self.id not in ANTLINE_ITEMS:
             LOGGER.warning(
