@@ -209,14 +209,16 @@ class ErrorUI:
             # We had an error.
             if ErrorUI._handler is None:
                 LOGGER.error(
-                    "ErrorUI block failed, but no handler installed!\ntitle={}\ndesc={}\n{}",
+                    "ErrorUI block failed ({}x), but no handler installed!\ntitle={}\ndesc={}\n{}",
+                    len(self._errors),
                     self.title,
                     desc,
                     "\n".join([str(err.message) for err in self._errors]),
                 )
             else:
                 LOGGER.error(
-                    "ErrorUI block failed.\ntitle={}\ndesc={}\n{}",
+                    "ErrorUI block failed ({}x).\ntitle={}\ndesc={}\n{}",
+                    len(self._errors),
                     self.title,
                     desc,
                     "\n".join([str(err.message) for err in self._errors]),
