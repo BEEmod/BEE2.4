@@ -1294,6 +1294,7 @@ def retexture_template(
                 force=tile_setter.force,
                 picker_name=tile_setter.picker_name,
                 color=repr(tile_setter.color),
+                force_colour=repr(force_colour),
             )
 
         if tile_setter.color is AppliedColour.COPY:
@@ -1347,6 +1348,8 @@ def retexture_template(
 
             # Inverting applies to all of these.
             if force_colour is AppliedColour.INVERT:
+                setter_color = ~setter_color
+            if tile_setter.color is AppliedColour.INVERT:
                 setter_color = ~setter_color
 
             setter_type = TileType.with_color_and_size(
