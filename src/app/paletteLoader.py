@@ -376,8 +376,7 @@ class Palette:
                 message = config.build_version_mismatch_prompt(
                     unknown, can_skip=not readonly, pal_name=name,
                 )
-                # XXX: useless walrus assignment required for mypy#17230
-                match _ := await dialogs.ask_custom(
+                match await dialogs.ask_custom(
                     message,
                     TRANS_BTN_QUIT, TRANS_BTN_DISCARD,
                     None if readonly else TRANS_BTN_SKIP,
@@ -387,7 +386,7 @@ class Palette:
                         sys.exit()
                     case 1:
                         pass  # Continue
-                    case 2:
+                    case 2:  # Skip - this exception will make parsing skip the file with a warning.
                         raise FutureVersionError('<configs>')
                     case never:
                         assert_never(never)
@@ -507,8 +506,6 @@ async def load_palettes(dialogs: Dialogs) -> list[Palette]:
         LOGGER.info('Loading "{}"', name)
         path = os.path.join(PAL_DIR, name)
 
-        pos_file: IO[str] | None = None
-        prop_file: IO[str] | None = None
         try:
             if name.endswith(PAL_EXT):
                 try:
@@ -531,13 +528,28 @@ async def load_palettes(dialogs: Dialogs) -> list[Palette]:
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
-                with zipfile.ZipFile(path) as zip_file:
-                    pos_file = io.TextIOWrapper(zip_file.open('positions.txt'), encoding='ascii', errors='ignore')
-                    prop_file = io.TextIOWrapper(zip_file.open('properties.txt'), encoding='ascii', errors='ignore')
+                with (
+                    zipfile.ZipFile(path) as zip_file,
+                    io.TextIOWrapper(zip_file.open('positions.txt'), encoding='ascii', errors='ignore') as pos_file,
+                    io.TextIOWrapper(zip_file.open('properties.txt'), encoding='ascii', errors='ignore') as prop_file,
+                ):
+                    # Legacy parsing of BEE2.2 files...
+                    try:
+                        palettes.append(parse_legacy(pos_file, prop_file, name))
+                    except ValueError as exc:
+                        LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
+                        continue
             elif os.path.isdir(path):
                 # Open from the subfolder
-                pos_file = open(os.path.join(path, 'positions.txt'), encoding='ascii', errors='ignore')
-                prop_file = open(os.path.join(path, 'properties.txt'), encoding='ascii', errors='ignore')
+                with(
+                    open(os.path.join(path, 'positions.txt'), encoding='ascii', errors='ignore') as pos_file,
+                    open(os.path.join(path, 'properties.txt'), encoding='ascii', errors='ignore') as prop_file,
+                ):
+                    try:
+                        palettes.append(parse_legacy(pos_file, prop_file, name))
+                    except ValueError as exc:
+                        LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
+                        continue
             else:  # A non-palette file, skip it.
                 LOGGER.debug('Skipping "{}"', name)
                 continue
@@ -545,19 +557,6 @@ async def load_palettes(dialogs: Dialogs) -> list[Palette]:
             #  KeyError is returned by zipFile.open() if file is not present
             LOGGER.warning('Bad palette file "{}"!', name, exc_info=exc)
             continue
-        else:
-            # Legacy parsing of BEE2.2 files...
-            try:
-                palettes.append(parse_legacy(pos_file, prop_file, name))
-            except ValueError as exc:
-                LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
-                continue
-        finally:
-            if pos_file is not None:
-                pos_file.close()
-            if prop_file is not None:
-                prop_file.close()
-
         LOGGER.warning('"{}" is a legacy palette - resaving!', name)
         # Resave with the new format, then delete originals.
         if name.endswith('.zip'):
