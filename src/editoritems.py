@@ -1271,35 +1271,37 @@ class Item:
         passed-in keyvalues block for later parsing.
         """
         for key in tok.block('Exporting'):
-            folded_key = key.casefold()
-            if folded_key == 'targetname':
-                self.targetname = tok.expect(Token.STRING)
-            elif folded_key == 'offset':
-                self.offset = Vec.from_str(tok.expect(Token.STRING))
-            elif folded_key == 'instances':
-                # We allow several syntaxes for instances, since the counts are
-                # pretty useless. Instances can be defined by position (for originals),
-                # or by name for use in conditions.
-                for inst_name in tok.block('Instance'):
-                    self._parse_instance_block(tok, inst_name)
-            elif folded_key == 'connectionpoints':
-                self._parse_connection_points(tok)
-            elif folded_key == 'occupiedvoxels':
-                self._parse_occupied_voxels(tok)
-            elif folded_key == 'embeddedvoxels':
-                self._parse_embedded_voxels(tok)
-            elif folded_key == 'collisions':
-                self._parse_collisions(tok)
-            elif folded_key == 'embedface':
-                self._parse_embed_faces(tok)
-            elif folded_key == 'overlay':
-                self._parse_overlay(tok)
-            elif folded_key == 'inputs':
-                self._parse_connections(tok, connections, self.conn_inputs)
-            elif folded_key == 'outputs':
-                self._parse_connections(tok, connections, self.conn_outputs)
-            else:
-                raise tok.error('Unknown export option {}!', key)
+            match key.casefold():
+                case 'targetname':
+                    self.targetname = tok.expect(Token.STRING)
+                case 'offset':
+                    self.offset = Vec.from_str(tok.expect(Token.STRING))
+                case 'instances':
+                    # We allow several syntaxes for instances, since the counts are
+                    # pretty useless. Instances can be defined by position (for originals),
+                    # or by name for use in conditions.
+                    for inst_name in tok.block('Instance'):
+                        self._parse_instance_block(tok, inst_name)
+                case 'connectionpoints':
+                    self._parse_connection_points(tok)
+                case 'occupiedvoxels':
+                    self._parse_occupied_voxels(tok)
+                case 'embeddedvoxels':
+                    self._parse_embedded_voxels(tok)
+                case 'collisions':
+                    self._parse_collisions(tok)
+                case 'embedface':
+                    self._parse_embed_faces(tok)
+                case 'overlay':
+                    self._parse_overlay(tok)
+                case 'inputs':
+                    self._parse_input_outputs(tok, connections, self.conn_inputs)
+                case 'outputs':
+                    self._parse_input_outputs(tok, connections, self.conn_outputs)
+                case 'connections':
+                    self._parse_bee_connections(tok, connections, key)
+                case _:
+                    raise tok.error('Unknown export option {}!', key)
 
     def _parse_instance_block(self, tok: Tokenizer, inst_name: str) -> None:
         """Parse a section in the instances block."""
@@ -1310,7 +1312,7 @@ class Item:
         except ValueError:
             inst_ind = None
             if inst_name.casefold().startswith('bee2_'):
-                inst_name = inst_name.removeprefix('bee2_')
+                inst_name = inst_name[4:]
             # else:
             #     LOGGER.warning(
             #         'Custom instance name "{}" should have bee2_ prefix (line '
@@ -1350,7 +1352,7 @@ class Item:
             inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count, is_marker=is_marker)
             self.set_inst(inst_ind, inst)
 
-    def _parse_connections(
+    def _parse_input_outputs(
         self,
         tok: Tokenizer,
         kv_block: Keyvalues,
@@ -1369,16 +1371,7 @@ class Item:
             except ValueError:
                 # Our custom BEEMOD options.
                 if conn_name.casefold() in ('bee', 'bee2'):
-                    for key in tok.block(conn_name):
-                        value = tok.expect(Token.STRING, skip_newline=False)
-                        if key.casefold() == 'force':
-                            value = value.casefold()
-                            if 'in' in value:
-                                self.force_input = True
-                            if 'out' in value:
-                                self.force_output = True
-                        else:
-                            kv_block.append(Keyvalues(key, value))
+                    self._parse_bee_connections(tok, kv_block, conn_name)
                     continue  # We deal with this after the export block is done.
                 else:
                     raise tok.error('Unknown connection type "{}"!', conn_name) from None
@@ -1400,6 +1393,24 @@ class Item:
                     raise tok.error('Unknown option "{}"!', conn_key)
             if activate is not None or deactivate is not None:
                 target[conn_type] = Connection(act_name, activate, deact_name, deactivate)
+
+    def _parse_bee_connections(
+        self, tok: Tokenizer, kv_block: Keyvalues, block_name: str,
+    ) -> None:
+        """Collect keyvalues from a connections block.
+
+        These are merged together before final parsing, since they can be placed in three locations.
+        """
+        for key in tok.block(block_name):
+            value = tok.expect(Token.STRING, skip_newline=False)
+            if key.casefold() == 'force':
+                value = value.casefold()
+                if 'in' in value:
+                    self.force_input = True
+                if 'out' in value:
+                    self.force_output = True
+            else:
+                kv_block.append(Keyvalues(key, value))
 
     def _finalise_connections(self) -> None:
         """Apply legacy outputs to the config, and do some verification."""
