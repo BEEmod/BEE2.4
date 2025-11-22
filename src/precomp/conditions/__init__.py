@@ -46,7 +46,7 @@ import types
 import warnings
 
 from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle
-from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
+from srctools.vmf import VMF, Entity, Output, Solid, ValidKVs
 from srctools import Keyvalues
 import attrs
 import srctools.logger
@@ -1302,9 +1302,6 @@ def fetch_debug_visgroup(
         # Create the visgroup.
         visgroup = vmf.create_visgroup(vis_name, (r, g, b))
 
-    group = EntityGroup(vmf, color=Vec(r, g, b), shown=False)
-    vmf.groups[group.id] = group
-
     def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
         """Add a marker to the map."""
         if isinstance(target, str):
@@ -1317,10 +1314,6 @@ def fetch_debug_visgroup(
             vmf.add_ent(target)
 
         target.visgroup_ids.add(visgroup.id)
-        if isinstance(target, Solid):
-            target.group_id = group.id
-        else:
-            target.groups.add(group.id)
         target.vis_shown = False
         target.hidden = True
         return target
