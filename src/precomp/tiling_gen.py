@@ -263,17 +263,18 @@ def _bevel_extend_u(
         # but if they're all bevelled, stop immediately including that.
         end_bevel = bevel_plane[u, min_v] & Bevels.u_min
         if (
-            # Stop if either end mismatches that side, any texture mismatches, or the leading edge
-            # is not all the same as mentioned.
+            # Stop if either end mismatches that side.
             bevel_plane[u, min_v] & Bevels.v_min != bevel_min or
-            bevel_plane[u, max_v] & Bevels.v_max != bevel_max or
-            any(
-                texture_plane.get((u, v)) is not tile
-                or bevel_plane[u, v] & Bevels.u_min != end_bevel
-                for v in column
-            )
+            bevel_plane[u, max_v] & Bevels.v_max != bevel_max
         ):
             return min_u, bevels
+        for v in column:
+            # Stop if the new leading edge is not all the same, or any texture mismatches exist.
+            if (
+                bevel_plane[u, v] & Bevels.u_min != end_bevel
+                or texture_plane.get((u, v)) is not tile
+            ):
+                return min_u, bevels
         # Else: all good, we can advance to it.
         min_u = u
         if end_bevel:  # This is bevelled, stop now.
@@ -303,14 +304,15 @@ def _bevel_extend_v(
         end_bevel = bevel_plane[min_u, v] & Bevels.v_min
         if (
             bevel_plane[min_u, v] & Bevels.u_min != bevel_min or
-            bevel_plane[max_u, v] & Bevels.u_max != bevel_max or
-            any(
-                texture_plane.get((u, v)) is not tile
-                or bevel_plane[u, v] & Bevels.v_min != end_bevel
-                for u in row
-            )
+            bevel_plane[max_u, v] & Bevels.u_max != bevel_max
         ):
             return min_v, bevels
+        for u in row:
+            if (
+                bevel_plane[u, v] & Bevels.v_min != end_bevel
+                or texture_plane.get((u, v)) is not tile
+            ):
+                return min_v, bevels
         # Else: all good, we can advance to it.
         min_v = v
         if end_bevel:  # This is bevelled, stop now.
