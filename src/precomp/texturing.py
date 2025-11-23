@@ -742,6 +742,7 @@ def _parse_weights(weights: dict[TileSize, int], conf: Keyvalues, key: str) -> N
                 subprop.value, subprop.real_name,
             )
 
+
 def load_config(conf: Keyvalues) -> None:
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
@@ -961,7 +962,7 @@ def load_config(conf: Keyvalues) -> None:
 
     # Now finally create the generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
-        generator: type[Generator]
+        generator_cls: type[Generator]
         opts = all_constr_opts[gen_key]
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
@@ -969,9 +970,9 @@ def load_config(conf: Keyvalues) -> None:
             gen_cat, gen_orient, gen_portal = gen_key
             match algo.casefold():
                 case 'rand':
-                    generator = GenRandom
+                    generator_cls = GenRandom
                 case 'clump':
-                    generator = GenClump
+                    generator_cls = GenClump
                 case _:
                     raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
             if not opts.weights:
@@ -986,11 +987,11 @@ def load_config(conf: Keyvalues) -> None:
                 opts.small_weights.setdefault(size, 0)
         else:
             # Signage, Overlays always use the Random generator.
-            generator = GenRandom
+            generator_cls = GenRandom
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, opts)
+        GENERATORS[gen_key] = gentor = generator_cls(gen_cat, gen_orient, gen_portal, opts)
 
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
@@ -1139,6 +1140,7 @@ class Generator(abc.ABC):
     weights: Mapping[TileSize, int]
     # Alt weights, used when a tile is smaller than 128x128
     small_weights: Mapping[TileSize, int]
+
     def __init__(
         self,
         category: GenCat,
