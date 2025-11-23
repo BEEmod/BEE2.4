@@ -58,11 +58,15 @@ def _points(*pattern: str) -> list[tuple[int, int]]:
 @pytest.mark.parametrize('pattern', [
     [(x, y) for x in range(5) for y in range(5)],
     _points(
-        '0...3',
-        '.....',
-        '...1.',
-        '.....',
-        '2...4',
+        '0......3',
+        '........',
+        '........',
+        '...5....',
+        '........',
+        '......1.',
+        '........',
+        '....6...',
+        '2.......4',
     ),
     _points(
         '.7..8',
@@ -71,17 +75,25 @@ def _points(*pattern: str) -> list[tuple[int, int]]:
         '.534.',
         '...9.',
     ), _points(
-        '0.4..',
-        '.1.9.',
-        '.2..8',
-        '53.7.',
-        '...6.',
+        '0.........4',
+        '.1.9.......',
+        '.2......8..',
+        '53......7..',
+        '........6..',
     ), _points(
-        '...8.',
-        '.7..1',
-        '.2.6.',
-        '..3..',
-        '54..0',
+        '......8..',
+        '..7.....1',
+        '.........',
+        '..2...6..',
+        '.........',
+        '....3....',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '.........',
+        '54.....0.',
     ),
 ], ids=['order', 'patA', 'patB', 'patC', 'patD'])
 def test_grid_insertion_complex(pattern: list[tuple[int, int]], off_x: int, off_y: int) -> None:
@@ -122,15 +134,16 @@ def test_grid_views() -> None:
     grid: PlaneGrid[int | None] = PlaneGrid()
     grid[0, 4] = 1
     grid[2, -5] = None
-    grid[0, 5] = 3
+    grid[12, 72] = 9
+    grid[0, 50] = 3
     grid[0, 7] = 2
     grid[5, 3] = 2
 
     assert (0, 4) in grid.keys()
-    assert (1, 4) not in grid.keys()
+    assert (10, 4) not in grid.keys()
     assert (2, -5) in grid.keys()
     assert set(grid.keys()) == {
-        (0, 4), (2, -5), (0, 5), (0, 7), (5, 3),
+        (0, 4), (2, -5), (12, 72), (0, 50), (0, 7), (5, 3),
     }
 
     # Check illegal values don't error.
@@ -141,17 +154,17 @@ def test_grid_views() -> None:
     assert 1 in grid.values()
     assert 45 not in grid.values()
     assert None in grid.values()
-    assert Counter(grid.values()) == {1: 1, 2: 2, 3: 1, None: 1}
+    assert Counter(grid.values()) == {1: 1, 2: 2, 3: 1, 9: 1, None: 1}
 
-    assert ((0, 5), 3) in grid.items()
+    assert ((0, 50), 3) in grid.items()
     assert ((2, -5), 4) not in grid.items()
-    assert ((3, 4), 2) not in grid.items()
+    assert ((30, 4), 2) not in grid.items()
     # Check illegal values don't error.
     assert 45 not in grid.items()  # type: ignore[operator]
     assert (1, ) not in grid.items()  # type: ignore[operator]
     assert (1, 2, 3, 4) not in grid.items()  # type: ignore[operator]
     assert set(grid.items()) == {
-        ((0, 4), 1), ((2, -5), None), ((0, 5), 3), ((0, 7), 2), ((5, 3), 2),
+        ((0, 4), 1), ((2, -5), None), ((0, 50), 3), ((0, 7), 2), ((12, 72), 9), ((5, 3), 2),
     }
 
     # Check keys, values, items is in the same order.
@@ -164,7 +177,9 @@ def test_grid_illegal_positions() -> None:
     """Test invalid positions produce a KeyError."""
     grid = PlaneGrid()
     grid[1, 2] = 5
+    grid[82, 5] = 3
     assert grid[1.0, 2.0] == 5
+    assert grid[82.0, 5.0] == 3
     with pytest.raises(KeyError):
         _ = grid[45, 9, 2]
     with pytest.raises(KeyError):
@@ -203,16 +218,16 @@ def test_grid_deletion() -> None:
     grid = PlaneGrid[int]()
     grid[5, 5] = 4
     grid[4, 5] = 3
-    grid[5, 4] = 3
-    grid[6, 5] = 3
-    grid[5, 6] = 3
+    grid[5, 12] = 3
+    grid[6, 13] = 3
+    grid[5, 14] = 3
     assert len(grid) == 5
     for _ in 1, 2:
         # Test they can be re-deleted.
         del grid[4, 5]
-        del grid[5, 4]
-        del grid[6, 5]
-        del grid[5, 6]
+        del grid[5, 12]
+        del grid[6, 13]
+        del grid[5, 14]
     # Never-set is fine.
     del grid[5, 23]
     del grid[-10, 4]
