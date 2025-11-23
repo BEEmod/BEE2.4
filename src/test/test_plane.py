@@ -118,9 +118,9 @@ def test_grid_insertion_complex(pattern: list[tuple[int, int]], off_x: int, off_
             max_x = x
         if y > max_y:
             max_y = y
-        assert grid.mins == (min_x, min_y)
-        assert grid.maxes == (max_x, max_y)
-        assert grid.dimensions == (max_x - min_x, max_y - min_y)
+        assert grid.mins == (min_x, min_y), grid
+        assert grid.maxes == (max_x, max_y), grid
+        assert grid.dimensions == (max_x - min_x, max_y - min_y), grid
 
         assert set(grid) == set(backup.keys())
         assert set(grid.keys()) == set(backup.keys())
