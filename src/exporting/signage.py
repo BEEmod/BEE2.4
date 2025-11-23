@@ -317,7 +317,8 @@ def make_legend(
         legend = Image.alpha_composite(legend, overlay)
     assert legend.size == LEGEND_SIZE, legend
     assert legend.mode == 'RGBA', legend
-    vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.DXT5)
+    # No point compressing, it's only on the user's disk.
+    vtf = VTF(*LEGEND_SIZE, fmt=ImageFormats.RGBA8888)
     vtf.get().copy_from(legend.tobytes(), ImageFormats.RGBA8888)
     vtf.clear_mipmaps()
     vtf.flags |= VTFFlags.ANISOTROPIC
@@ -327,13 +328,4 @@ def make_legend(
     LOGGER.info('Writing {}...', sign_path)
 
     with sign_path.open('wb') as f:
-        try:
-            vtf.save(f)
-        except NotImplementedError:
-            LOGGER.warning('No DXT compressor, using BGRA8888.')
-            # No libsquish, so DXT compression doesn't work.
-            vtf.format = vtf.low_format = ImageFormats.BGRA4444
-
-            f.truncate(0)
-            f.seek(0)
-            vtf.save(f)
+        vtf.save(f)
