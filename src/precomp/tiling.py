@@ -1507,7 +1507,7 @@ class TileDef:
 
     def is_simple(self) -> bool:
         """Check if this tile is a simple tile that can merge with neighbours."""
-        if self.panels or self.bullseye_count > 0 or self.override is not None:
+        if self.panels or self.bullseye_count > 0:
             return False
 
         return True

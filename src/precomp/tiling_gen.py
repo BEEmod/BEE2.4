@@ -19,6 +19,7 @@ from precomp import rand, texturing, brushLoc
 from precomp.conditions import fetch_debug_visgroup
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize, GenCat
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile, Axis
+from precomp.template_brush import ScalingTemplate
 import consts
 
 
@@ -80,6 +81,8 @@ class TexDef:
     u_off: float = 0.0
     v_off: float = 0.0
     scale: float = 0.25  # 0.25 or 0.5 for double.
+    # For tiledef overrides only.
+    scale_temp: ScalingTemplate | None = ''
 
 
 # We're making huge numbers of these, cache them.
@@ -491,7 +494,7 @@ def generate_brushes(vmf: VMF) -> None:
             )
     for tile in TILES.values():
         # First, if not a simple tile, we have to deal with it individually.
-        if not tile.is_simple():
+        if tile.panels or tile.bullseye_count > 0:
             tile.export(vmf)
             continue
         # Otherwise, decompose into a big plane dict, for dynamic merging.
@@ -807,17 +810,34 @@ def generate_plane(
     fizzler_split_v: PlaneGrid[SubTile] = PlaneGrid()
     # And then planes storing the tiledefs themselves, for generating the nodraw.
 
+    texture_plane: PlaneGrid[TexDef] = PlaneGrid()
+
     for tile in tiles:
         pos = tile.pos_front
         antigel = tile.is_antigel()
         tile_u = int((pos[u_axis] - 64) // 32)
         tile_v = int((pos[v_axis] - 64) // 32)
         fizz_split = tile.get_fizz_orient()
+        tile_override: TexDef | None
+        if tile.override is not None:
+            # Tiledef defined an override for materials. We apply this to all regular tiles.
+            mat_conf, scale_temp = tile.override
+            # TODO: The scale template is offset per-instance, so it won't deduplicate.
+            tile_override = TexDef(mat_conf, scale_temp=scale_temp)
+        else:
+            tile_override = None
         for u, v, tile_type in tile:
             if tile_type is TileType.VOID:
                 continue
             key = (tile_u + u, tile_v + v)
             grid_pos[key] = tile
+            if tile_type.is_tile and tile_override is not None:
+                if fizz_split is not None:
+                    raise NotImplementedError(
+                        'Cannot use material overrides on a tile with centered fizzlers for now.'
+                    )
+                texture_plane[key] = tile_override
+                continue
             # If the tiledef is fizzler-split, extract the middle row/column pair into the alternate.
             # In all cases, we add to the original tiles plane, for bevelling calculations.
             orig_tiles[key] = subtile = make_subtile(tile_type, antigel)
@@ -836,8 +856,6 @@ def generate_plane(
                         subtile_pos[key] = subtile
                 case never:
                     assert_never(never)
-
-    texture_plane: PlaneGrid[TexDef] = PlaneGrid()
 
     # Check if the P1 style bottom trim option is set, and if so apply it.
     gen = texturing.gen(texturing.GenCat.NORMAL, plane_key.normal, Portalable.BLACK)
@@ -875,12 +893,16 @@ def generate_plane(
             antigel=tex_def.antigel,
         )
         vmf.add_brush(brush)
-        tile_min = norm_off + Vec.with_axes(
-            u_axis, -32 * tex_def.u_off,
-            v_axis, -32 * tex_def.v_off,
-        )
-        front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / front.uaxis.scale)
-        front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
+        if tex_def.scale_temp is not None:
+            # If the texture isn't supplied, use the one from the template.
+            tex_def.scale_temp.apply(front, change_mat=not tex_def.tex)
+        else:
+            tile_min = norm_off + Vec.with_axes(
+                u_axis, -32 * tex_def.u_off,
+                v_axis, -32 * tex_def.v_off,
+            )
+            front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / front.uaxis.scale)
+            front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
 
         tiledefs = set()
         for u in range(math.floor(min_u), math.ceil(max_u)):
