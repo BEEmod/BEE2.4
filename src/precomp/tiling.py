@@ -898,7 +898,6 @@ class TileDef:
         panels: A list of "panels" for the tiledef, allowing moving or split parts.
           If present, each of these "steals" some UV positions and instead
           generates them (potentially offset) as a brush entity.
-        force_antigel: If this is marked to not accept gel.
     """
     __slots__ = [
         'pos',
@@ -910,7 +909,6 @@ class TileDef:
         'bullseye_count',
         '_portal_helper',
         'panels',
-        'force_antigel',
     ]
 
     pos: Vec
@@ -942,7 +940,6 @@ class TileDef:
         self.panels = []
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
-        self.force_antigel = False
 
     @property
     def pos_voxel(self) -> Vec:
@@ -1168,8 +1165,6 @@ class TileDef:
 
     def is_antigel(self) -> bool:
         """Check if this tile is at an antigel position."""
-        if self.force_antigel:
-            return True
         try:
             plane = texturing.ANTIGEL_BY_NORMAL[self.normal.freeze()]
         except KeyError:
