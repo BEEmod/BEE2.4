@@ -32,7 +32,7 @@ import trio
 from user_errors import (
     ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo, PackageTranslations,
     TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
-    TOK_WEBPAGE_ARCHIVE_INFO, TOK_WEBPAGE_ARCHIVE_BTN,
+    TOK_WEBPAGE_ARCHIVE_INFO, TOK_WEBPAGE_ARCHIVE_BTN, TOK_WEBPAGE_BUG_LINKS,
     TOK_WEBPAGE_TITLE_PREVIEW, TOK_WEBPAGE_TITLE_VBSP, TOK_WEBPAGE_TITLE_VRAD,
 )
 import utils
@@ -68,6 +68,7 @@ async def route_display_errors() -> str:
     return await quart.render_template(
         'index.html.jinja2',
         error_text=current_error.message.translate_html(),
+        bug_reports=TOK_WEBPAGE_BUG_LINKS.translate_html(),
         context=current_error.context,
         log_vbsp=LOGS['vbsp'],
         log_vrad=LOGS['vrad'],

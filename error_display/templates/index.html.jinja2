@@ -10,13 +10,18 @@
 
 <body>
 <main>
-	<article>
+	<p>
+		<p>
 		{{ error_text }}
+		</p>
 		{% if context %}
 			<aside>{{ context }}</aside>
 		{% endif %}
+		<p>
+		{{ bug_reports }}
+		</p>
 		<aside>
-			{{ trans_archive_info }}
+			{{ trans_archive_info }} <br>
 			<button type=button id="archive-btn">{{ trans_archive_btn }}</button>
 		</aside>
 	</article>

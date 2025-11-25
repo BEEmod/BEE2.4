@@ -6,14 +6,15 @@
   `gridPos` option combined with two positions.
 * #2142: Fix flickering when hovering over additional labels in drag/drop icons
 * #2147: Fix piston platforms not killing objects when retracting.
-* Fix the infinite value not working in any item properties options.
+* Fixed the infinite value not working in any item properties options.
 * Ensure signage reconfiguration applies to exports even if window is not closed.
-* Add support for barrier holes on "Start Reversed" offset glass/grating.
+* Added support for barrier holes on "Start Reversed" offset glass/grating.
 * Added some additional compatibility logic to make styles with old corridor definitions work in some additional cases.
 * Switch more package loading errors to be displayed in the more friendly error window.
-* Add support for Connection Signage producing blue/orange frames.
+* Addes support for Connection Signage producing blue/orange frames.
 * Added ability to use `<marker>` for filenames in editoritems, to generate a unique file 
   for cases where instances should be replaced by conditions.
+* Added links to the issue pages to the error display.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.

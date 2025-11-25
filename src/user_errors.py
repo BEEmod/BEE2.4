@@ -6,6 +6,7 @@ from typing import ClassVar, Literal, TypedDict
 
 from collections.abc import Collection, Iterable
 from pathlib import Path
+import html
 
 from srctools import FrozenVec, Vec, logger
 import attrs
@@ -141,7 +142,7 @@ class UserError(BaseException):
                 ctx = ''
             else:
                 if ctx:
-                    ctx = f'Error occured in: <code>{ctx}</code>'
+                    ctx = f'Error occured in: <code>{html.escape(ctx)}</code>'
         else:
             ctx = ''
 
@@ -188,6 +189,15 @@ TOK_COOP_SHOWURL = TransToken.ui(
 )
 
 # Used to format the webpage
+TOK_WEBPAGE_BUG_LINKS = TransToken.ui(
+    'You can submit bug reports here for <a href="{packages}">default items</a>, '
+    '<a href="{music}">music</a> or the <a href="{app}">compiler</a>.'
+).format(
+    # Linking to the new-issue page requires a login, more friendly to show current issues.
+    packages='https://github.com/BEEmod/BEE2-items/issues',
+    app='https://github.com/BEEmod/BEE2.4/issues/',
+    music='https://github.com/BEEmod/BEE2-music/issues',
+)
 TOK_WEBPAGE_ARCHIVE_INFO = TransToken.ui(
     'If submitting a bug report, please include this map archive. It contains your level, '
     'the displayed preview, relevant log files and configs to help with identifying the issue. '
