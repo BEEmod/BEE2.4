@@ -82,7 +82,7 @@ class TexDef:
     v_off: float = 0.0
     scale: float = 0.25  # 0.25 or 0.5 for double.
     # For tiledef overrides only.
-    scale_temp: ScalingTemplate | None = ''
+    scale_temp: ScalingTemplate | None = None
 
 
 # We're making huge numbers of these, cache them.
