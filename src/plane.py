@@ -2,7 +2,7 @@
 
 """
 from __future__ import annotations
-from typing import Any, Final, overload
+from typing import Any, Final, overload, ClassVar
 
 from collections.abc import (
     ItemsView, Iterable, Iterator, Mapping, MutableMapping, ValuesView, Sequence,
@@ -12,11 +12,13 @@ import copy
 from srctools.math import AnyVec, FrozenMatrix, FrozenVec, Vec
 import attrs
 
+__all__ = ['PlaneKey', 'PlaneGrid']
 
 # Sentinel object for empty slots and parameter defaults. TODO use PEP 661
 _UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 # Size of each plane grid cell.
 CELL_SIZE = 8
+CELL_SIZE_SQR = CELL_SIZE ** 2
 # Corresponding coordinates in a cell, cached so we can zip this with the contents.
 CELL_COORDS: Sequence[tuple[int, int]] = [
     (x, y) for y in range(CELL_SIZE) for x in range(CELL_SIZE)
@@ -114,9 +116,38 @@ class Cell[ValT]:
     def __repr__(self) -> str:
         return f'Cell({self.count}, {self.array!r})'
 
+    def copy(self) -> 'Cell[ValT]':
+        """Shallow-copy the cell."""
+        return Cell(self.count, self.array.copy())
+
     def validate(self) -> None:
         """Check the count is accurate."""
         assert self.count == sum(v is not _UNSET for v in self.array), self
+
+
+class SingleCell[ValT]:
+    """Represents a cell entirely filled with a single value."""
+    count: ClassVar[int] = CELL_SIZE_SQR
+    # Should not be unset!
+    value: ValT
+    def __init__(self, value: ValT) -> None:
+        assert value is not _UNSET
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f'SingleCell({self.count}, {self.value!r})'
+
+    def copy(self) -> 'SingleCell[ValT]':
+        """Shallow-copy the cell."""
+        return SingleCell(self.value)
+
+    def validate(self) -> None:
+        """Does nothing."""
+        pass
+
+    def inflate(self) -> 'Cell[ValT]':
+        """Inflate the array to full size."""
+        return Cell(CELL_SIZE_SQR, [self.value] * CELL_SIZE_SQR)
 
 
 class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
@@ -124,7 +155,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
 
     We store items in CELL_SIZE^2 arrays.
     """
-    _cells: dict[tuple[int, int], Cell[ValT]]
+    _cells: dict[tuple[int, int], Cell[ValT] | SingleCell[ValT]]
     def __init__(
         self,
         contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
@@ -187,7 +218,9 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
             res: PlaneGrid[ValT] = cls.__new__(cls)
             res.__dict__.update(source.__dict__)  # Immutables
             res._cells = {
-                pos: Cell(cell.count, [value if orig is not _UNSET else _UNSET for orig in cell.array])
+                pos: SingleCell(value)
+                if isinstance(cell, SingleCell) else
+                Cell(cell.count, [value if orig is not _UNSET else _UNSET for orig in cell.array])
                 for pos, cell in source._cells.items()
             }
             return res
@@ -202,7 +235,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__)  # Immutables
         cpy._cells = {
-            pos: Cell(cell.count, cell.array.copy())
+            pos: cell.copy()
             for pos, cell in self._cells.items()
         }
         return cpy
@@ -213,7 +246,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         """Deep-copy the plane."""
         cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__)  # Immutables
-        cpy._data = copy.deepcopy(self._cells, memodict)
+        cpy._cells = copy.deepcopy(self._cells, memodict)
         return cpy
 
     def __getitem__(self, pos: tuple[float, float]) -> ValT:
@@ -236,7 +269,10 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
             cell = self._cells[cell_x, cell_y]
         except KeyError:
             return False
-        return cell.array[y * CELL_SIZE + x] is not _UNSET
+        if isinstance(cell, SingleCell):
+            return True
+        else:
+            return cell.array[y * CELL_SIZE + x] is not _UNSET
 
     @overload
     def get(self, key: tuple[float, float], /) -> ValT | None: ...
@@ -265,8 +301,10 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
                 raise KeyError(pos) from None
             else:
                 return default
-
-        value = cell.array[y * CELL_SIZE + x]
+        if isinstance(cell, SingleCell):
+            return cell.value
+        else:
+            value = cell.array[y * CELL_SIZE + x]
         if value is _UNSET:
             if default is _UNSET:
                 raise KeyError(pos) from None
@@ -304,9 +342,11 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
             cell = self._cells[cell_x, cell_y]
         except KeyError:
             # Missing, we don't need to check for _UNSET
-            cell = self._cells[cell_x, cell_y] = Cell(1, [_UNSET] * (CELL_SIZE * CELL_SIZE))
+            cell = self._cells[cell_x, cell_y] = Cell(1, [_UNSET] * CELL_SIZE_SQR)
             cell.array[ind] = val
         else:
+            if isinstance(cell, SingleCell):
+                self._cells[cell_x, cell_y] = cell = cell.inflate()
             if cell.array[ind] is _UNSET:
                 cell.count += 1
             cell.array[ind] = val
@@ -316,9 +356,13 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         for (cell_x, cell_y), cell in self._cells.items():
             cell_x *= CELL_SIZE
             cell_y *= CELL_SIZE
-            for (x, y), value in zip(CELL_COORDS, cell.array):
-                if value is not _UNSET:
+            if isinstance(cell, SingleCell):
+                for x, y in CELL_COORDS:
                     yield (cell_x + x, cell_y + y)
+            else:
+                for (x, y), value in zip(CELL_COORDS, cell.array):
+                    if value is not _UNSET:
+                        yield (cell_x + x, cell_y + y)
 
     def __delitem__(self, pos: tuple[float, float]) -> None:
         """Remove the value at a given position, doing nothing if not set."""
@@ -337,7 +381,11 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
             pass
         else:
             ind = y * CELL_SIZE + x
-            if cell.array[ind] is not _UNSET:
+            if isinstance(cell, SingleCell):
+                self._cells[cell_x, cell_y] = cell = cell.inflate()
+                cell.count -= 1
+                cell.array[ind] = _UNSET
+            elif cell.array[ind] is not _UNSET:
                 if cell.count == 1:
                     # Emptied completely, just discard.
                     del self._cells[cell_x, cell_y]
@@ -358,6 +406,16 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         """D.items() -> a set-like object providing a view on D's items"""
         return GridItems(self)
 
+    def compact(self) -> None:
+        """Look for cells with the same value, and consolidate them."""
+        for pos, cell in list(self._cells.items()):
+            if cell.count == 0:
+                del self._cells[pos]
+            elif isinstance(cell, Cell) and cell.count == CELL_SIZE_SQR:
+                first = cell.array[0]
+                if all(value == first for value in cell.array):
+                    self._cells[pos] = SingleCell(first)
+
     def largest_index(self) -> tuple[int, int, ValT]:
         """Find a high index position, then return it plus the value."""
         # TODO: Replace with an iterator or something, this isn't very efficient to call repeatedly.
@@ -368,6 +426,8 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         cell = self._cells[pos]
         cell_x *= CELL_SIZE
         cell_y *= CELL_SIZE
+        if isinstance(cell, SingleCell):
+            return (cell_x + CELL_SIZE - 1, cell_y + CELL_SIZE - 1, cell.value)
         for (x, y), value in zip(reversed(CELL_COORDS), reversed(cell.array)):
             if value is not _UNSET:
                 return (cell_x + x, cell_y + y, value)
@@ -383,16 +443,24 @@ class GridValues[ValT](ValuesView[ValT]):
     def __contains__(self, item: object) -> bool:
         """Check if the provided item is a value."""
         for cell in self._mapping._cells.values():
-            if item in cell.array:
-                return True
+            if isinstance(cell, SingleCell):
+                if cell.value == item:
+                    return True
+            else:
+                if item in cell.array:
+                    return True
         return False
 
     def __iter__(self) -> Iterator[ValT]:
         """Produce all values in the plane."""
         for cell in self._mapping._cells.values():
-            for value in cell.array:
-                if value is not _UNSET:
-                    yield value
+            if isinstance(cell, SingleCell):
+                for _ in range(CELL_SIZE_SQR):
+                    yield cell.value
+            else:
+                for value in cell.array:
+                    if value is not _UNSET:
+                        yield value
 
 
 # noinspection PyProtectedMember
@@ -418,6 +486,10 @@ class GridItems[ValT](ItemsView[tuple[int, int], ValT]):
         for (cell_x, cell_y), cell in self._mapping._cells.items():
             cell_x *= CELL_SIZE
             cell_y *= CELL_SIZE
-            for (x, y), value in zip(CELL_COORDS, cell.array):
-                if value is not _UNSET:
-                    yield (cell_x + x, cell_y + y), value
+            if isinstance(cell, SingleCell):
+                for x, y in CELL_COORDS:
+                    yield (cell_x + x, cell_y + y), cell.value
+            else:
+                for (x, y), value in zip(CELL_COORDS, cell.array):
+                    if value is not _UNSET:
+                        yield (cell_x + x, cell_y + y), value

@@ -908,6 +908,9 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
         if filename in frame_inst:  # Frames are useless, we'll make our own.
             inst.remove()
 
+    for grid in BARRIERS.values():
+        grid.compact()
+
     for entities, material, barrier_type, fixup_value in [
         (vmf.by_class['func_detail'], consts.Special.GLASS, BARRIER_TYPES[GLASS_ID], 'glass'),
         (vmf.by_class['func_brush'], consts.Special.GRATING, BARRIER_TYPES[GRATE_ID], 'grating'),
@@ -1346,6 +1349,7 @@ def find_plane_groups(grid: PlaneGrid[Barrier]) -> Iterator[tuple[Barrier, Plane
                     (x, y - 1),
                     (x, y + 1),
                 }
+        group.compact()
         yield cmp_value, group
 
 

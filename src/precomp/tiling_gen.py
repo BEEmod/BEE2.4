@@ -179,6 +179,7 @@ def bevel_split(
             if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
                 bevels[u, v] &= ~bevel
 
+    # Don't compact bevels, it's unlikely be continuous.
     todo_plane = texture_plane.copy()
 
     if dump_path is not None:
@@ -654,6 +655,7 @@ def calculate_plane(
             for v in range(max_v - height + 1, max_v + 1):
                 del subtile_pos[u, v]
                 texture_plane[u, v] = tex_def
+    texture_plane.compact()
 
 
 def calculate_bottom_trim(
@@ -795,7 +797,7 @@ def generate_plane(
     subtile_pos: PlaneGrid[SubTile] = PlaneGrid(default=SubTile(TileType.VOID, False))
     # We also preserve an unmodified copy to consult.
     # We clear the default to ensure an error is raised if indexed incorrectly.
-    orig_tiles: PlaneGrid[SubTile] = PlaneGrid(subtile_pos)
+    orig_tiles: PlaneGrid[SubTile] = PlaneGrid()
 
     if dump_path is not None:
         dump_path /= (
@@ -857,6 +859,8 @@ def generate_plane(
                 case never:
                     assert_never(never)
 
+    subtile_pos.compact()
+    orig_tiles.compact()
     # Check if the P1 style bottom trim option is set, and if so apply it.
     gen = texturing.gen(texturing.GenCat.NORMAL, plane_key.normal, Portalable.BLACK)
     if gen.bottom_trim_pattern:
