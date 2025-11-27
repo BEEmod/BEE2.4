@@ -25,7 +25,9 @@ DEFAULT_WARN_DESC = TransToken.ui_plural(
     "Multiple errors occurred while performing this task, but it was partially successful:",
 )
 TRANS_WARNING_SEP = TransToken.ui("The following warnings also occurred:")
-TRANS_TOO_MANY_ERRORS = TransToken.ui("Too many errors ({count}) occurred, see log for details.")
+TRANS_TOO_MANY_ERRORS = TransToken.ui(
+    "Too many errors ({count}) occurred, display is incomplete. See log for full list."
+)
 
 
 class Result(Enum):
