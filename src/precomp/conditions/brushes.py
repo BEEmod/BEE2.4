@@ -1089,10 +1089,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     normal: Vec = round(props.vec('normal', 0, 0, 1) @ orient, 6)
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
+    inst_name = inst['targetname']
 
-    add_debug = conditions.fetch_debug_visgroup(vmf, 'EditPanel')
+    add_debug_points = conditions.fetch_debug_visgroup(vmf, 'EditPanel - Point')
+    add_debug_bevel = conditions.fetch_debug_visgroup(vmf, 'EditPanel - Bevel')
+    add_debug_template = conditions.fetch_debug_visgroup(vmf, 'EditPanel - Template')
 
     points: set[FrozenVec] = set()
+    brush_ent: Entity | None
 
     if 'point' in props:
         points |= {
@@ -1119,13 +1123,13 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         try:
             tile, u, v = tiling.find_tile(fpos, normal, force=create)
         except KeyError:
-            add_debug('info_null', origin=fpos, angles=normal_ang, targetname='point')
+            add_debug_points('info_null', origin=fpos, angles=normal_ang, targetname=inst_name)
             continue
-        add_debug('info_target', origin=fpos, angles=normal_ang, targetname='point')
+        add_debug_points('info_target', origin=fpos, angles=normal_ang, targetname=inst_name)
         tiles_to_uv[tile].add((u, v))
 
     if not tiles_to_uv:
-        LOGGER.warning('"{}": No tiles found for panels!', inst['targetname'])
+        LOGGER.warning('"{}": No tiles found for panels!', inst_name)
         return
 
     # If bevels is provided, parse out the overall world positions.
@@ -1140,7 +1144,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             # Individually specifying offsets.
             for bevel_str in bevel_prop.as_array():
                 bevel_point = Vec.from_str(bevel_str) @ orient + origin
-                add_debug('info_target', origin=bevel_point, targetname='bevel')
+                add_debug_bevel('info_target', origin=bevel_point, targetname=inst_name)
                 bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
         elif srctools.conv_bool(bevel_prop.value):
             # Fill the bounding box.
@@ -1149,11 +1153,11 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             bbox_min -= off
             bbox_max += off
             for fpos in FrozenVec.iter_grid(bbox_min, bbox_max, 32):
-                add_debug('info_target', origin=fpos, targetname='bevel')
+                add_debug_bevel('info_target', origin=fpos, targetname=inst_name)
                 if fpos not in points:
                     bevel_world.add((int(fpos[uaxis]), int(fpos[vaxis])))
         # else: No bevels.
-    panels: list[tiling.Panel] = []
+    panels: list[tuple[tiling.Panel, tiling.TileDef]] = []
 
     # If editing, allow specifying a subset of points to mean the same panel.
     exact = props.bool('exact', True)
@@ -1174,9 +1178,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 ):
                     break
             else:
-                LOGGER.warning('No panel to modify found for "{}"!', inst['targetname'])
+                LOGGER.warning('No panel to modify found for "{}"!', inst_name)
                 continue
-        panels.append(panel)
+        panels.append((panel, tile))
 
         if 'type' in props:
             pan_type = props['type']
@@ -1191,7 +1195,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 raise ValueError(
                     '"{}": Invalid panel thickess {}!\n'
                     'Must be 2, 4 or 8.',
-                    inst['targetname'],
+                    inst_name,
                     thickness,
                 )
             panel.thickness = thickness
@@ -1209,23 +1213,21 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         if 'offset' in props:
             panel.offset = conditions.resolve_offset(inst, props['offset'])
             panel.offset -= Vec.from_str(inst['origin'])
-        if 'template' in props:
-            # We only want the template inserted once. So remove it from all but one.
-            if len(panels) == 1:
-                panel.template = inst.fixup.substitute(props['template'])
-            else:
-                panel.template = ''
         if 'nodraw' in props:
             panel.nodraw = srctools.conv_bool(inst.fixup.substitute(props['nodraw'], allow_invert=True))
         if 'seal' in props:
             panel.seal = srctools.conv_bool(inst.fixup.substitute(props['seal'], allow_invert=True))
         if 'move_bullseye' in props:
             panel.steals_bullseye = srctools.conv_bool(inst.fixup.substitute(props['move_bullseye'], allow_invert=True))
+
+    if not panels:
+        return # Didn't match anything?
+
     if 'keys' in props or 'localkeys' in props:
         # First grab the existing ent, so we can edit it.
         # These should all have the same value, unless they were independently
         # edited with mismatching point sets. In that case destroy all those existing ones.
-        existing_ents: set[Entity | None] = {panel.brush_ent for panel in panels}
+        existing_ents: set[Entity | None] = {panel.brush_ent for panel, tile in panels}
         try:
             [brush_ent] = existing_ents
         except ValueError:
@@ -1233,7 +1235,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 'Multiple independent panels for "{}" were made, then the '
                 'brush entity was edited as a group! Discarding '
                 'individual ents...',
-                inst['targetname']
+                inst_name
             )
             for brush_ent in existing_ents:
                 if brush_ent is not None and brush_ent in vmf.entities:
@@ -1250,7 +1252,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             if create:  # This doesn't make sense, you could just omit the prop.
                 LOGGER.warning(
                     'No classname provided for panel "{}"!',
-                    inst['targetname'],
+                    inst_name,
                 )
             # Make it a world brush.
             brush_ent.remove()
@@ -1273,8 +1275,55 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             if brush_ent['classname'] == 'func_detail':
                 brush_ent.clear_keys()
                 brush_ent['classname'] = 'func_detail'
-        for panel in panels:
+        for panel, tile in panels:
             panel.brush_ent = brush_ent
+
+    template_kv = props.find_key('template', or_blank=True)
+    if template_kv:
+        # This is tricky, todo need to redesign.
+        # Templates must be inserted only once. If there's one panel, we're fine, just assign it to that.
+        # But if there's multiple panels, users need to specify which tiledef they apply to.
+        # If they don't, fall back to picking the tiledef closest to the instance origin.
+        if template_kv.has_children():
+            template_pos = {
+                (
+                    (FrozenVec.from_str(child.real_name) - (0, 0, 64))
+                    @ orient + origin
+                ): inst.fixup.substitute(child.value)
+                for child in template_kv
+            }
+            for pos in template_pos:
+                add_debug_template('bee2_template_conf', origin=pos)
+            for panel, tile in panels:
+                try:
+                    panel.template = template_pos[tile.pos_front.freeze()]
+                except KeyError:
+                    add_debug_template(
+                        'info_null',
+                        targetname=inst_name,
+                        origin=tile.pos_front,
+                    )
+                else:
+                    add_debug_template(
+                        'info_target',
+                        targetname=inst_name,
+                        origin=tile.pos_front,
+                        comment=panel.template,
+                    )
+        else:  # One template name.
+            if len(panels) == 1:
+                [(panel, tile)] = panels
+            else:
+                # One template, multiple panels.
+                LOGGER.warning(
+                    'A panel instance "{}" straddles multiple voxels, and has a template '
+                    'defined. The template needs to specify which tile it should apply to.\nSub-panels: {}',
+                    inst_name,
+                    panels,
+                )
+                # Pick the one with the closest origin.
+                panel, tile = min(panels, key=lambda tup: (tup[1].pos - origin).mag_sq())
+            panel.template = inst.fixup.substitute(template_kv.value)
 
 
 def _fill_norm_rotations() -> dict[tuple[FrozenVec, FrozenVec], Matrix]:
