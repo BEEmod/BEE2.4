@@ -1,4 +1,5 @@
 """UI implementation for the packages-sync tool."""
+from typing import override
 from collections.abc import Awaitable, Callable
 from pathlib import PurePath
 import contextlib
@@ -44,6 +45,7 @@ class WxUI(SyncUIBase):
 
         self.check_apply_all = wx.CheckBox(pan_pack_header, label="Apply To All")
         sizer_actions.Add(self.check_apply_all, 0, 0, 0)
+        self.check_apply_all.Bind(wx.EVT_CHECKBOX, self.evt_set_apply_all)
 
         sizer_paths = wx.BoxSizer(wx.VERTICAL)
         sizer_pan_header.Add(sizer_paths, 1, wx.EXPAND, 0)
@@ -83,6 +85,9 @@ class WxUI(SyncUIBase):
         label_confirm = wx.StaticText(MAIN_WINDOW, wx.ID_ANY, "Confirm copying files:")
         sizer_confirm.Add(label_confirm)
 
+        self.button_reset_apply_all = wx.Button(MAIN_WINDOW, label="Reset Package")
+        sizer_confirm.Add(self.button_reset_apply_all)
+
         self.check_confirm = wx.CheckListBox(
             MAIN_WINDOW, wx.ID_ANY,
             choices=[], style=wx.LB_ALWAYS_SB | wx.LB_MULTIPLE,
@@ -103,6 +108,7 @@ class WxUI(SyncUIBase):
         sizer_confirm.Fit(MAIN_WINDOW)
         MAIN_WINDOW.Bind(wx.EVT_CLOSE, lambda evt: app.quit_app())
         self.button_skip.Bind(wx.EVT_BUTTON, self.evt_confirm_skip)
+        self.button_reset_apply_all.Bind(wx.EVT_BUTTON, self.evt_reset_apply_all)
         self.button_ok.Bind(wx.EVT_BUTTON, self.evt_confirm_ok)
 
         MAIN_WINDOW.Layout()
@@ -135,26 +141,36 @@ class WxUI(SyncUIBase):
             async for self.button_ok.Enabled in agen:
                 pass
 
+    @override
     def ui_set_ask_pack(self, src: trio.Path, dest: PurePath, /) -> None:
         self.lbl_file_src.LabelText = str(src)
         self.lbl_file_dest.LabelText = str(dest)
         self.frm_pack.Show()
 
-    def evt_set_sort(self, evt: wx.CommandEvent) -> None:
+    @override
+    def ui_set_reset_applies(self, enabled: bool, text: str) -> None:
+        self.button_reset_apply_all.Enable(enabled)
+        self.button_reset_apply_all.Label = text
+
+    def evt_set_sort(self, _: wx.CommandEvent) -> None:
         """Apply the radio's selections."""
         self.pack_sort_by_id.value = self.radio_sort_order.Selection == 1
 
-    def evt_skip(self, event: wx.Event) -> None:
+    def evt_set_apply_all(self, _: wx.CommandEvent) -> None:
+        """Apply the applies-to-all checkbox."""
+        self.applies_to_all.value = self.check_apply_all.Value
+
+    def evt_skip(self, _: wx.Event) -> None:
         """Skip the specified file."""
         self.selected_pack.trigger(None)
         self.frm_pack.Hide()
 
-    def evt_confirm_ok(self, event: wx.Event, /) -> None:
+    def evt_confirm_ok(self, _: wx.Event, /) -> None:
         """Files were confirmed, process them."""
         if self.can_confirm.value:
             self.confirmed.set()
 
-    def evt_confirm_skip(self, event: wx.Event) -> None:
+    def evt_confirm_skip(self, _: wx.Event) -> None:
         """Skip the current set of files."""
         for i in range(self.check_confirm.Count):
             self.check_confirm.Check(i, False)
@@ -164,27 +180,28 @@ class WxUI(SyncUIBase):
         return 0  # Not used
 
     async def _ui_reposition_items(self, /) -> None:
-        def make_func(pack: Package) -> Callable[[wx.CommandEvent], None]:
+        def make_evt_handler(pack: Package) -> Callable[[wx.CommandEvent], None]:
             """Create the event handler."""
-            def func(evt: wx.CommandEvent) -> None:
+            def btn_handler(_: wx.CommandEvent, /) -> None:
                 """Handle a button being pressed."""
                 self.selected_pack.trigger(pack)
                 self.frm_pack.Hide()
-            return func
+            return btn_handler
 
         self.sizer_packages.Clear(delete_windows=True)
         flags = wx.SizerFlags().Border()
         for pack in self.packages:
             btn = wx.Button(self.pan_pack, wx.ID_ANY, f"{pack.disp_name}\n<{pack.id}>")
-            btn.Bind(wx.EVT_BUTTON, make_func(pack))
+            btn.Bind(wx.EVT_BUTTON, make_evt_handler(pack))
             self.sizer_packages.Add(btn, flags)
         self.sizer_packages.Layout()
 
+    @override
     def ui_reset(self, /) -> None:
-        """Reset the list of confirmed items, and the 'applies to all' checkbox."""
+        """Reset the list of confirmed items."""
         self.check_confirm.Clear()
-        self.applies_to_all.value = False
 
+    @override
     def ui_add_confirm_file(self, src: trio.Path, dest: trio.Path, /) -> None:
         item = self.check_confirm.Append(
             f'{self.short_path(src)} {RIGHT_ARROW} {self.short_path(dest)} ',
@@ -193,6 +210,7 @@ class WxUI(SyncUIBase):
         self.check_confirm.Check(item, True)
         MAIN_WINDOW.Fit()
 
+    @override
     def ui_get_files(self, /) -> list[tuple[trio.Path, trio.Path]]:
         """Get selected files."""
         return [
