@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        If this is your first time opening an issue here, please read the [contributing guidelines](https://github.com/BEEmod/.github/blob/c865feea6f7f4bd9a65e8aaecac9c7731db9628f/contributing.md).
+        If this is your first time opening an issue here, please read the [contributing guidelines](https://github.com/BEEmod/.github/blob/master/contributing.md).
 
         Additionally, please check the [frequently rejected suggestions](https://github.com/BEEmod/.github/blob/master/rejected_suggestions.md) page to make sure your suggestion hasn't already been made and rejected before.
 

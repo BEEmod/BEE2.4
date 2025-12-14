@@ -8,7 +8,7 @@ body:
         Compiler bugs are errors or unexpected behaviors in the BEEmod compiler, **NOT** compiler crashes!
         Compiler crashes should be reported in the [BEE2-items repo](https://github.com/BEEmod/BEE2-items/).
 
-        If this is your first time opening an issue here, please read the [contributing guidelines](https://github.com/BEEmod/.github/blob/c865feea6f7f4bd9a65e8aaecac9c7731db9628f/contributing.md).
+        If this is your first time opening an issue here, please read the [contributing guidelines](https://github.com/BEEmod/.github/blob/master/contributing.md).
 
         Remember:
         - Do not open an issue if you are not using the latest BEEmod application and packages.
