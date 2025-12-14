@@ -11,9 +11,9 @@ body:
         - Do not open an issue if you are not using the latest BEEmod application and packages.
         - Make sure you're in the right place. Item and style related issues should go in the [BEE2-items repo](https://github.com/BEEmod/BEE2-items/).
         - Perform a search to make sure this issue hasn't already been reported.
-        - Do not use the issue tracker to ask questions.
+        - Please keep questions and general conversations to the Discussions tab or the Discord server, not the issue tracker.
         - Issues should not be combined, unless they are very closely related (e.g. two bugs with a specific item in a specific case).
-        - Make absolutely sure the issue is not UCP (User Created Packages) related
+        - Make absolutely sure the issue is not caused by a user-created package
   - type: input
     attributes:
       label: BEE2 Application Version
@@ -26,22 +26,13 @@ body:
       description: Specify the version of BEE2.4 packages (ex. 4.40.0). Don't use "latest", that isn't useful when looking back on issues in the future.
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: OS
     attributes:
       label: What operating system are you running on?
-      multiple: true
-      options:
-        - Windows 11
-        - Windows 10 (64bit)
-        - Windows 10 (32bit)
-        - Windows 8 (64bit)
-        - Windows 8 (32bit)
-        - Windows 7 (64bit)
-        - Windows 7 (32bit)
-        - Mac
-        - Linux
-        - Other
+      description: If you are using Windows, please specify the version. If you are using Linux, please specify the distro and version.
+    validations:
+      required: true
   - type: textarea
     attributes:
       label: Description of the bug
