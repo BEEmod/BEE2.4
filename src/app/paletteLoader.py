@@ -541,7 +541,7 @@ async def load_palettes(dialogs: Dialogs) -> list[Palette]:
                         continue
             elif os.path.isdir(path):
                 # Open from the subfolder
-                with(
+                with (
                     open(os.path.join(path, 'positions.txt'), encoding='ascii', errors='ignore') as pos_file,
                     open(os.path.join(path, 'properties.txt'), encoding='ascii', errors='ignore') as prop_file,
                 ):

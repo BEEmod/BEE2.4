@@ -244,10 +244,10 @@ async def transfer_game2pack(
         found = await ui.ask_package(file, rel_loc)
         if found is not None:
             await transfers.send((file, trio.Path(found.fsys.path, rel_loc)))
-        if ui.applies_to_all.value:
-            # Checkbox enabled, store that package.
-            ui.applied_package = found
-            ui.ui_set_reset_applies(True, f'Reset auto package: {found.disp_name}')
+            if ui.applies_to_all.value:
+                # Checkbox enabled, store that package.
+                ui.applied_package = found
+                ui.ui_set_reset_applies(True, f'Reset auto package: {found.disp_name}')
 
 
 def filter_filename(file_path: trio.Path) -> trio.Path | None:

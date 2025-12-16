@@ -109,6 +109,7 @@ class Cell[ValT]:
     """Stores a CELL_SIZE x CELL_SIZE grid of values."""
     array: list[ValT]
     count: int
+
     def __init__(self, count: int, data: list[ValT]) -> None:
         self.array = data
         self.count = count
@@ -116,7 +117,7 @@ class Cell[ValT]:
     def __repr__(self) -> str:
         return f'Cell({self.count}, {self.array!r})'
 
-    def copy(self) -> 'Cell[ValT]':
+    def copy(self) -> Cell[ValT]:
         """Shallow-copy the cell."""
         return Cell(self.count, self.array.copy())
 
@@ -130,6 +131,7 @@ class SingleCell[ValT]:
     count: ClassVar[int] = CELL_SIZE_SQR
     # Should not be unset!
     value: ValT
+
     def __init__(self, value: ValT) -> None:
         assert value is not _UNSET
         self.value = value
@@ -137,7 +139,7 @@ class SingleCell[ValT]:
     def __repr__(self) -> str:
         return f'SingleCell({self.count}, {self.value!r})'
 
-    def copy(self) -> 'SingleCell[ValT]':
+    def copy(self) -> SingleCell[ValT]:
         """Shallow-copy the cell."""
         return SingleCell(self.value)
 
@@ -145,7 +147,7 @@ class SingleCell[ValT]:
         """Does nothing."""
         pass
 
-    def inflate(self) -> 'Cell[ValT]':
+    def inflate(self) -> Cell[ValT]:
         """Inflate the array to full size."""
         return Cell(CELL_SIZE_SQR, [self.value] * CELL_SIZE_SQR)
 
@@ -156,6 +158,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
     We store items in CELL_SIZE^2 arrays.
     """
     _cells: dict[tuple[int, int], Cell[ValT] | SingleCell[ValT]]
+
     def __init__(
         self,
         contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
@@ -360,7 +363,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
                 for x, y in CELL_COORDS:
                     yield (cell_x + x, cell_y + y)
             else:
-                for (x, y), value in zip(CELL_COORDS, cell.array):
+                for (x, y), value in zip(CELL_COORDS, cell.array, strict=True):
                     if value is not _UNSET:
                         yield (cell_x + x, cell_y + y)
 
@@ -428,7 +431,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         cell_y *= CELL_SIZE
         if isinstance(cell, SingleCell):
             return (cell_x + CELL_SIZE - 1, cell_y + CELL_SIZE - 1, cell.value)
-        for (x, y), value in zip(reversed(CELL_COORDS), reversed(cell.array)):
+        for (x, y), value in zip(reversed(CELL_COORDS), reversed(cell.array), strict=True):
             if value is not _UNSET:
                 return (cell_x + x, cell_y + y, value)
         raise AssertionError(f'Cell {pos} is empty? {self._cells}')
@@ -490,6 +493,6 @@ class GridItems[ValT](ItemsView[tuple[int, int], ValT]):
                 for x, y in CELL_COORDS:
                     yield (cell_x + x, cell_y + y), cell.value
             else:
-                for (x, y), value in zip(CELL_COORDS, cell.array):
+                for (x, y), value in zip(CELL_COORDS, cell.array, strict=True):
                     if value is not _UNSET:
                         yield (cell_x + x, cell_y + y), value

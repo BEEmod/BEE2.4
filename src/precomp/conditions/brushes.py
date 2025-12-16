@@ -1221,7 +1221,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             panel.steals_bullseye = srctools.conv_bool(inst.fixup.substitute(props['move_bullseye'], allow_invert=True))
 
     if not panels:
-        return # Didn't match anything?
+        return  # Didn't match anything?
 
     if 'keys' in props or 'localkeys' in props:
         # First grab the existing ent, so we can edit it.
@@ -1292,8 +1292,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 ): inst.fixup.substitute(child.value)
                 for child in template_kv
             }
-            for pos in template_pos:
-                add_debug_template('bee2_template_conf', origin=pos)
+            for fpos in template_pos:
+                add_debug_template('bee2_template_conf', origin=fpos)
             for panel, tile in panels:
                 try:
                     panel.template = template_pos[tile.pos_front.freeze()]
