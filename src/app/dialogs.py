@@ -44,10 +44,11 @@ class Dialogs(abc.ABC):
     This is passed in to processing code, allowing it to do some basic UI interaction.
     These block in Tkinter, but they're still async in case other libs can avoid that.
     """
-    INFO: ClassVar[Literal[Icon.INFO]]
-    ERROR: ClassVar[Literal[Icon.ERROR]]
-    QUESTION: ClassVar[Literal[Icon.QUESTION]]
-    WARNING: ClassVar[Literal[Icon.WARNING]]
+    # Shorthands to avoid needing to import the icon enum.
+    INFO: ClassVar[Literal[Icon.INFO]] = Icon.INFO
+    ERROR: ClassVar[Literal[Icon.ERROR]] = Icon.ERROR
+    QUESTION: ClassVar[Literal[Icon.QUESTION]] = Icon.QUESTION
+    WARNING: ClassVar[Literal[Icon.WARNING]] = Icon.WARNING
 
     @abc.abstractmethod
     async def show_info(
@@ -159,10 +160,10 @@ async def test_generic_msg(dialog: Dialogs) -> None:
     # No need to translate tests.
     tt = TransToken.untranslated
 
-    await dialog.show_info(tt("Info dialog."))
-    await dialog.show_info(tt("Question dialog"), title=tt("A title"), icon=Icon.QUESTION)
-    await dialog.show_info(tt("Warning dialog"), title=tt("A title"), icon=Icon.WARNING)
-    await dialog.show_info(tt("Error dialog"), title=tt("A title"), icon=Icon.ERROR)
+    await dialog.show_info(tt("Info dialog."), icon=dialog.INFO)
+    await dialog.show_info(tt("Question dialog"), title=tt("A title"), icon=dialog.QUESTION)  # Verify these are defined.
+    await dialog.show_info(tt("Warning dialog"), title=tt("A title"), icon=dialog.WARNING)
+    await dialog.show_info(tt("Error dialog"), title=tt("A title"), icon=dialog.ERROR)
 
     assert await dialog.ask_ok_cancel(tt("Press Ok for warning"), icon=Icon.WARNING) is True
     assert await dialog.ask_ok_cancel(tt("Press Cancel for error"), icon=Icon.ERROR) is False

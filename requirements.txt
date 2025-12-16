@@ -1,6 +1,6 @@
 # Misc
 attrs >= 22.1.0
-srctools == 2.6.1
+srctools == 2.6.2
 typing_extensions >= 4.13.0
 rtree >= 0.9.7
 # Async
