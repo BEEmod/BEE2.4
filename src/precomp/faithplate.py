@@ -5,11 +5,11 @@ If paint bombs are also present, we create a copy of the triggers filtered for t
 size to reliably launch them.
 """
 from __future__ import annotations
-from typing import ClassVar
+from typing import ClassVar, Literal
 import collections
 
 import attrs
-from srctools import Entity, FrozenVec, Matrix, Vec, VMF, Angle, conv_float, logger
+from srctools import Entity, FrozenVec, Matrix, Vec, VMF, Angle, conv_float, logger, conv_bool
 
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions, options
 from precomp.corridor import Info
@@ -41,7 +41,7 @@ class FaithPlate:
     template: str | None = attrs.field(init=False, default=None)
 
     # Alternate template with bigger radius, to reliably launch paint bombs.
-    template_paint: str | None = attrs.field(init=False, default=None)
+    template_paint: str | None = attrs.field(init=False, default='BEE2_FAITHPLATE_PAINT_BOMB_TRIG')
     # Whether we perform paint bomb fixes. Disabled for PaintDropper.
     paint_bomb_fix: bool = True
 
@@ -250,18 +250,18 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
     has_paint_bomb = info.has_attr('GelDropperBomb')
 
     # Plate filter is for the standard trigger.
-    # If the plate-paint filter is set, spawn this too to reliably throw paint bombs.
-    plate_filter = plate_paint_filter = ''
+    # If the paint filter is set, spawn this too to reliably throw paint bombs.
+    norm_filter = paint_filter = ''
     if any(plate.paint_bomb_fix for plate in PLATES.values()):
         if has_paint_bomb:
             if has_superpos:
                 # Need combined filters.
-                plate_filter = '@faithplate_trig_filter'
-                plate_paint_filter = '@faithplate_paint_trig_filter'
+                norm_filter = '@faithplate_trig_filter'
+                paint_filter = '@faithplate_paint_trig_filter'
                 global_loc = options.GLOBAL_ENTS_LOC()
                 vmf.create_ent(
                     'filter_multi',
-                    targetname=plate_filter,
+                    targetname=norm_filter,
                     origin=global_loc,
                     filtertype=0,  # AND
                     negated=0,
@@ -270,7 +270,7 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
                 )
                 vmf.create_ent(
                     'filter_multi',
-                    targetname=plate_paint_filter,
+                    targetname=paint_filter,
                     origin=global_loc,
                     filtertype=0,  # AND
                     negated=0,
@@ -278,15 +278,34 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
                     filter02=FILTER_NOT_GHOST,
                 )
             else:
-                plate_filter = FILTER_NOT_PAINT
-                plate_paint_filter = FILTER_IS_PAINT
+                norm_filter = FILTER_NOT_PAINT
+                paint_filter = FILTER_IS_PAINT
         elif has_superpos:
-            plate_filter = FILTER_NOT_GHOST
+            norm_filter = FILTER_NOT_GHOST
     # Else, nothing needs the filters.
 
     for plate in PLATES.values():
         plate_orient = Matrix.from_angstr(plate.inst['angles'])
         use_paint_trigs = has_paint_bomb and plate.paint_bomb_fix
+
+        trigs: list[tuple[Entity, Literal['normal', 'helper', 'paint']]]
+        paint_trig: Entity | None = None
+        if isinstance(plate, StraightPlate):
+            if use_paint_trigs:
+                trigs = [
+                    (plate.trig, 'normal'),
+                    (plate.helper_trig, 'helper'),
+                    (paint_trig := plate.trig.copy(), 'paint'),
+                ]
+                vmf.add_ent(paint_trig)
+            else:
+                trigs = [(plate.trig, 'normal'), (plate.helper_trig, 'helper')]
+        else:
+            if use_paint_trigs:
+                trigs = [(plate.trig, 'normal'), (paint_trig := plate.trig.copy(), 'paint')]
+                vmf.add_ent(paint_trig)
+            else:
+                trigs = [(plate.trig, 'normal')]
 
         if plate.target is not None:
             targ_pos: FrozenVec | tiling.TileDef
@@ -301,18 +320,16 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
                 if isinstance(plate, StraightPlate)
                 else plate.trig
             )
+            if paint_trig is not None:
+                pos_to_trigs[targ_pos].append(paint_trig)
 
-        if isinstance(plate, StraightPlate):
-            trigs = [plate.trig, plate.helper_trig]
-        else:
-            trigs = [plate.trig]
-
-        for trig in trigs:
+        for trig, trig_type in trigs:
             trig_origin = trig.get_origin()
-            if plate.template is not None:
+            template = plate.template_paint if trig_type == 'paint' else plate.template
+            if template is not None:
                 trig.solids = template_brush.import_template(
                     vmf,
-                    plate.template,
+                    template,
                     trig_origin + plate.trig_offset,
                     plate_orient,
                     force_type=template_brush.TEMP_TYPES.world,
@@ -321,15 +338,21 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
-            if use_paint_trigs:
-                trig['filtername'] = plate_filter
+            if isinstance(trig_type, PaintDropper):
+                # May as well filter paint droppers for bombs.
+                trig['filtername'] = FILTER_IS_PAINT
+            if use_paint_trigs and trig_type != 'helper':
+                # The helper is used for both, so it just needs to filter superpos ghosts.
+                trig['filtername'] = paint_filter if trig_type == 'paint' else norm_filter
+            elif has_superpos:
+                trig['filtername'] = FILTER_NOT_GHOST
             # Safeguard - if the speed == 0, force it to be valid.
             for keyvalue in ['playerspeed', 'physicsspeed']:
                 if conv_float(trig[keyvalue]) < 1.0:
                     trig[keyvalue] = 1.0
 
     # Now, generate each target needed.
-    for pos_or_tile, trigs in pos_to_trigs.items():
+    for pos_or_tile, trig_list in pos_to_trigs.items():
         target = vmf.create_ent(
             'info_target',
             angles='0 0 0',
@@ -344,5 +367,5 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
 
         target.make_unique('faith_target')
 
-        for trig in trigs:
+        for trig in trig_list:
             trig['launchTarget'] = target['targetname']

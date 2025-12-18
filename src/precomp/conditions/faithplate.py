@@ -62,7 +62,7 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
     """
     conf_temp_name = LazyValue.parse(res['template', ''])
     conf_paint_temp_name = LazyValue.parse(res['templatePaintBomb', ''])
-    conf_paint_bomb_fix = LazyValue.parse(res['paintBombFix']).as_opt_bool()
+    conf_paint_bomb_fix = LazyValue.parse(res['paintBombFix', '']).as_opt_bool()
 
     try:
         offset_str = res['offset']
@@ -95,8 +95,9 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
                 # We silently ignore if you also disabled the paint bomb fixing.
                 if plate.paint_bomb_fix:
                     LOGGER.warning(
-                        'Faithplate trigger "{}" provided for item "{}", but no paint template '
-                        'was provided. Paint bomb interaction is disabled.'
+                        'Faithplate trigger template "{}" provided for item "{}", '
+                        'but no paint template was provided. Paint bomb interaction is disabled.',
+                        temp_name, inst['targetname'],
                     )
                     plate.paint_bomb_fix = False
                 # Set the template so you get reasonable behaviour if paint bomb fixing is turned
