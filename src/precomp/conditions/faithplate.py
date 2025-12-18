@@ -51,16 +51,19 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
 
     This can also be used to modify the catapult for bomb-type Gel Droppers.
 
+    - `paintBombFix`: Controls whether to make paint bomb launching
+      reliable, by using an additional larger trigger. Disable to save ents if your plate
+      can't come in contact with those.
     - `template`: The template used for the catapult trigger. For the additional
       helper trigger, it will be offset upward.
+    - `templatePaintBomb`: If set, should be a larger template used for paint bombs.
+       This should also be provided if you override the template, and have this enabled.
     - `offset`: Allow shifting the triggers around.
     """
-    temp_name = res['template', '']
+    conf_temp_name = LazyValue.parse(res['template', ''])
+    conf_paint_temp_name = LazyValue.parse(res['templatePaintBomb', ''])
+    conf_paint_bomb_fix = LazyValue.parse(res['paintBombFix']).as_opt_bool()
 
-    if temp_name:
-        template = template_brush.get_template(temp_name)
-    else:
-        template = None
     try:
         offset_str = res['offset']
     except LookupError:
@@ -77,10 +80,29 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
                 'No faithplate for item with name "{}"!',
                 inst['targetname'],
             )
-        else:
-            if template is not None:
-                plate.template = template
+            return
 
-            if offset is not None:
-                plate.trig_offset = offset(inst) @ Angle.from_str(inst['angles'])
+        temp_name = conf_temp_name(inst)
+        paint_temp_name = conf_paint_temp_name(inst)
+        paint_bomb_fix = conf_paint_bomb_fix(inst)
+        if paint_bomb_fix is not None:
+            plate.paint_bomb_fix = paint_bomb_fix
+        if temp_name:
+            plate.template = temp_name
+            if paint_temp_name:
+                plate.template_paint = paint_temp_name
+            else:
+                # We silently ignore if you also disabled the paint bomb fixing.
+                if plate.paint_bomb_fix:
+                    LOGGER.warning(
+                        'Faithplate trigger "{}" provided for item "{}", but no paint template '
+                        'was provided. Paint bomb interaction is disabled.'
+                    )
+                    plate.paint_bomb_fix = False
+                # Set the template so you get reasonable behaviour if paint bomb fixing is turned
+                # on later again.
+                plate.template_paint = temp_name
+
+        if offset is not None:
+            plate.trig_offset = offset(inst) @ Angle.from_str(inst['angles'])
     return apply_attrs
