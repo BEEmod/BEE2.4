@@ -1695,7 +1695,7 @@ async def main(argv: list[str]) -> None:
         tiling.generate_goo(vmf)
         tiling.bind_overlays()
 
-        faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
+        faithplate.gen_faithplates(vmf, info)
         change_overlays(vmf)
         fix_worldspawn(vmf, info)
 

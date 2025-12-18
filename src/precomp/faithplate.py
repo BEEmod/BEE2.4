@@ -9,7 +9,8 @@ import collections
 import attrs
 from srctools import Entity, FrozenVec, Matrix, Vec, VMF, Angle, conv_float, logger
 
-from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
+from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions, options
+from precomp.corridor import Info
 
 
 COND_MOD_NAME: str | None = None
@@ -18,6 +19,11 @@ LOGGER = logger.get_logger(__name__)
 # Targetname -> plate.
 # Spell out the union to allow type narrowing.
 PLATES: dict[str, AngledPlate | StraightPlate | PaintDropper] = {}
+
+# Filter names, present in global_pti_ents for paint bombs.
+FILTER_NOT_PAINT = '@not_paint_bomb'
+FILTER_IS_PAINT = '@is_paint_bomb'
+FILTER_NOT_GHOST = '@not_superpos_ghost_filter'
 
 
 @attrs.define(kw_only=True, repr=False)
@@ -222,13 +228,53 @@ def associate_faith_plates(vmf: VMF) -> None:
     ]))
 
 
-def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
+def gen_faithplates(vmf: VMF, info: Info) -> None:
     """Place the targets and catapults into the map."""
+    if not PLATES:
+        return  # Nothing to do.
     # Target positions -> list of triggers wanting to aim there.
     pos_to_trigs: dict[
         FrozenVec | tiling.TileDef,
         list[Entity]
     ] = collections.defaultdict(list)
+    has_superpos = info.has_attr('superposition')
+    has_paint_bomb = info.has_attr('GelDropperBomb')
+    has_faithplate = any(not isinstance(plate, PaintDropper) for plate in PLATES.values())
+
+    # Plate filter is for the standard trigger.
+    # If the plate-paint filter is set, spawn this too to reliably throw paint bombs.
+    plate_filter = plate_paint_filter = ''
+    if has_faithplate:
+        if has_paint_bomb:
+            if has_superpos:
+                # Need combined filters.
+                plate_filter = '@faithplate_trig_filter'
+                plate_paint_filter = '@faithplate_paint_trig_filter'
+                global_loc = options.GLOBAL_ENTS_LOC()
+                vmf.create_ent(
+                    'filter_multi',
+                    targetname=plate_filter,
+                    origin=global_loc,
+                    filtertype=0,  # AND
+                    negated=0,
+                    filter01=FILTER_NOT_PAINT,
+                    filter02=FILTER_NOT_GHOST,
+                )
+                vmf.create_ent(
+                    'filter_multi',
+                    targetname=plate_paint_filter,
+                    origin=global_loc,
+                    filtertype=0,  # AND
+                    negated=0,
+                    filter01=FILTER_IS_PAINT,
+                    filter02=FILTER_NOT_GHOST,
+                )
+            else:
+                plate_filter = FILTER_NOT_PAINT
+                plate_paint_filter = FILTER_IS_PAINT
+        elif has_superpos:
+            plate_filter = FILTER_NOT_GHOST
+    # Else, we just have paint droppers, they shouldn't use this.
 
     for plate in PLATES.values():
         plate_orient = Matrix.from_angstr(plate.inst['angles'])
@@ -266,8 +312,8 @@ def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
-            if has_superpos:
-                trig['filtername'] = '@not_superpos_ghost_filter'
+            if not isinstance(plate, PaintDropper):
+                trig['filtername'] = plate_filter
             # Safeguard - if the speed == 0, force it to be valid.
             for keyvalue in ['playerspeed', 'physicsspeed']:
                 if conv_float(trig[keyvalue]) < 1.0:
