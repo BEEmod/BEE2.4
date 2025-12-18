@@ -19,7 +19,7 @@ pyglet >= 2.0.15
 pygtrie >= 2.4.0
 babel >= 2.15.0
 # Web server
-hypercorn >= 0.14.3
-quart >= 0.19.4
-quart-trio >= 0.11.1
+hypercorn >= 0.18.0
+quart >= 0.20.0
+quart-trio >= 0.12.0
 psutil >= 5.9.8
