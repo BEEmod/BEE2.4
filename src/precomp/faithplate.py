@@ -1,6 +1,8 @@
 """Implement Faith Plates and allow customising trigger sizes/shapes.
 
 This also handles Bomb-type Paint Droppers.
+If paint bombs are also present, we create a copy of the triggers filtered for those, with a larger
+size to reliably launch them.
 """
 from __future__ import annotations
 from typing import ClassVar
@@ -36,7 +38,12 @@ class FaithPlate:
     target: Vec | tiling.TileDef | None
 
     trig_offset: Vec = attrs.field(init=False, factory=Vec().copy)
-    template: template_brush.Template | None = attrs.field(init=False, default=None)
+    template: str | None = attrs.field(init=False, default=None)
+
+    # Alternate template with bigger radius, to reliably launch paint bombs.
+    template_paint: str | None = attrs.field(init=False, default=None)
+    # Whether we perform paint bomb fixes. Disabled for PaintDropper.
+    paint_bomb_fix: bool = True
 
     @property
     def name(self) -> str:
@@ -221,6 +228,8 @@ def associate_faith_plates(vmf: VMF) -> None:
             inst=instances[name],
             trig=trig,
             target=pos,
+            # This would interfere with the dropper!
+            paint_bomb_fix=False,
         )
 
     LOGGER.debug('Plates:\n{}', '\n'.join([
@@ -239,12 +248,11 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
     ] = collections.defaultdict(list)
     has_superpos = info.has_attr('superposition')
     has_paint_bomb = info.has_attr('GelDropperBomb')
-    has_faithplate = any(not isinstance(plate, PaintDropper) for plate in PLATES.values())
 
     # Plate filter is for the standard trigger.
     # If the plate-paint filter is set, spawn this too to reliably throw paint bombs.
     plate_filter = plate_paint_filter = ''
-    if has_faithplate:
+    if any(plate.paint_bomb_fix for plate in PLATES.values()):
         if has_paint_bomb:
             if has_superpos:
                 # Need combined filters.
@@ -274,10 +282,11 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
                 plate_paint_filter = FILTER_IS_PAINT
         elif has_superpos:
             plate_filter = FILTER_NOT_GHOST
-    # Else, we just have paint droppers, they shouldn't use this.
+    # Else, nothing needs the filters.
 
     for plate in PLATES.values():
         plate_orient = Matrix.from_angstr(plate.inst['angles'])
+        use_paint_trigs = has_paint_bomb and plate.paint_bomb_fix
 
         if plate.target is not None:
             targ_pos: FrozenVec | tiling.TileDef
@@ -312,7 +321,7 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
-            if not isinstance(plate, PaintDropper):
+            if use_paint_trigs:
                 trig['filtername'] = plate_filter
             # Safeguard - if the speed == 0, force it to be valid.
             for keyvalue in ['playerspeed', 'physicsspeed']:
