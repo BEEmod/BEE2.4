@@ -2,6 +2,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 import contextlib
+import importlib.metadata
 import os
 import shutil
 import sys
@@ -138,6 +139,7 @@ print('DATA:', data_files)
 version_val = f'''\
 BEE_VERSION={utils.get_git_version(SPECPATH)!r}
 HA_VERSION={HA_VERSION!r}
+SRC_VERSION={importlib.metadata.version('srctools')!r}
 '''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')

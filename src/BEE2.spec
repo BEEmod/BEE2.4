@@ -1,11 +1,12 @@
-import io
-import os
-import sys
-import shutil
-import zipfile
+from typing import Iterable, List, Optional, Tuple, Union
 from pathlib import Path
 import contextlib
-from typing import Iterable, List, Optional, Tuple, Union
+import importlib.metadata
+import io
+import os
+import shutil
+import sys
+import zipfile
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -256,6 +257,7 @@ if utils.WIN:
 version_val = f'''\
 BEE_VERSION={utils.get_git_version(SPECPATH)!r}
 HA_VERSION={HA_VERSION!r}
+SRC_VERSION={importlib.metadata.version('srctools')!r}
 '''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')

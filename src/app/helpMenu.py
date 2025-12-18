@@ -453,7 +453,7 @@ def get_versions() -> dict[str, str]:
         'mistletoe_ver': mistletoe.__version__,
         'pygtrie_ver': pygtrie.__version__,
         'pil_ver': PIL.__version__,
-        'srctools_ver': srctools.__version__,
+        'srctools_ver': utils.SRCTOOLS_VERSION,
         'ha_ver': utils.HA_VERSION,
     }
 

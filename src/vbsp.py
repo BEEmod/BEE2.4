@@ -1530,7 +1530,10 @@ async def main(argv: list[str]) -> None:
     """Main program code.
 
     """
-    LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
+    LOGGER.info(
+        "BEE{} VBSP hook initiallised, srctools v{}, HammerAddons v{}.",
+        utils.BEE_VERSION, utils.SRCTOOLS_VERSION, utils.HA_VERSION,
+    )
     await trio.lowlevel.checkpoint()
 
     # Warn if srctools Cython code isn't installed.
