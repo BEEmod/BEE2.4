@@ -247,7 +247,10 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
         list[Entity]
     ] = collections.defaultdict(list)
     has_superpos = info.has_attr('superposition')
-    has_paint_bomb = info.has_attr('GelDropperBomb')
+    has_paint_bomb = info.has_attr('GelDropperBomb') and options.get_itemconf(
+        ('VALVE_TEST_ELEM', 'FaithPlatePaintBomb'),
+        True,
+    )
 
     # Plate filter is for the standard trigger.
     # If the paint filter is set, spawn this too to reliably throw paint bombs.
