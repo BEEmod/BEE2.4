@@ -491,8 +491,18 @@ class BBox:
 
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> BBox:
         """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
-        matrix, mins, maxes = self._rotate_bbox(other)
-        return self._with_points(mins, maxes)
+        matrix = to_matrix(other)
+        if all(
+            any(abs(v) > 0.9 for v in vec)
+            for vec in [matrix.forward(), matrix.left(), matrix.up()]
+        ):
+            # If the matrix is orthogonal, the result is a bbox. That means one axis is approximately
+            # 1 or -1, the others are zero. We can just check for a 1 in each, since they're normalised.
+            matrix, mins, maxes = self._rotate_bbox(other)
+            return self._with_points(mins, maxes)
+        else:
+            # Convert to a volume.
+            return self.as_volume() @ matrix
 
     def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Shift the bounding box forwards by this amount."""
