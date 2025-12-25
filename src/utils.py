@@ -4,7 +4,7 @@ from typing import (
     TYPE_CHECKING, Any, Final, Literal, NewType, NoReturn, Protocol,
     SupportsInt, TypeGuard, overload,
 )
-from typing_extensions import deprecated
+from typing_extensions import deprecated, TypeForm
 
 from collections import deque
 from collections.abc import (
@@ -27,8 +27,10 @@ import trio_util
 
 __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
+    'BEE_VERSION', 'HA_VERSION', 'SRCTOOLS_VERSION',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
-    'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props',
+    'run_bg_daemon', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props',
+    'not_none', 'coerce',
     'PackagePath', 'get_indent', 'iter_grid', 'check_cython',
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
@@ -130,6 +132,7 @@ try:
     # This module is generated when the app is compiled.
     from _compiled_version import (  # type: ignore
         BEE_VERSION as BEE_VERSION, HA_VERSION as HA_VERSION,
+        SRC_VERSION as SRCTOOLS_VERSION
     )
 except ImportError:
     # We're running from src/, so data is in the folder above that.
@@ -141,6 +144,9 @@ except ImportError:
     HA_VERSION = get_git_version(_INSTALL_ROOT / 'hammeraddons')
     FROZEN = False
     DEV_MODE = True
+    from importlib.metadata import version as _importlib_version
+    SRCTOOLS_VERSION = _importlib_version('srctools')
+    del _importlib_version
 else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
@@ -487,6 +493,12 @@ def not_none[T](value: T | None) -> T:
     """Assert that the value is not None, inline."""
     if value is None:
         raise AssertionError('Value was none!')
+    return value
+
+
+# noinspection PyUnusedLocal
+def coerce[T](typedef: TypeForm[T], value: T) -> T:
+    """Explicitly convert value to the specified type, in a sound manner."""
     return value
 
 

@@ -89,7 +89,7 @@ async def main(argv: list[str]) -> None:
     """Main VRAD script."""
     LOGGER.info(
         "BEE{} VRAD hook initialised, srctools v{}, Hammer Addons v{}",
-        utils.BEE_VERSION, srctools.__version__, utils.HA_VERSION,
+        utils.BEE_VERSION, utils.SRCTOOLS_VERSION, utils.HA_VERSION,
     )
 
     # Warn if srctools Cython code isn't installed.
