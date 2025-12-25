@@ -822,12 +822,21 @@ class Item(PakObject, needs_foreground=True):
 
     def get_version_names(self, cur_style: PakRef[Style]) -> tuple[list[str], list[str]]:
         """Get a list of the names and corresponding IDs for the item."""
-        # item folders are reused, so we can find duplicates.
-        style_obj_ids = {
-            id(self.versions[ver_id].styles[cur_style.id])
-            for ver_id in self.version_id_order
-        }
         versions = list(self.version_id_order)
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = set()
+        for ver_id in self.version_id_order:
+            try:
+                ver = self.versions[ver_id]
+            except KeyError:
+                LOGGER.warning('Version "{}" for item {} is not valid.', ver_id, self.id)
+                return ([], [])
+            try:
+                style_obj_ids.add(ver.styles[cur_style.id])
+            except KeyError:
+                LOGGER.warning('Style "{}" for item {} and version {} is not valid.', cur_style.id, self.id, ver_id)
+                continue
+
         if len(style_obj_ids) == 1:
             # All the variants are the same, so we effectively have one
             # variant. Disable the version display.

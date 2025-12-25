@@ -7,13 +7,14 @@ import copy
 import operator
 import re
 
-from srctools import EmptyMapping, Keyvalues
+from srctools import EmptyMapping, Keyvalues, conv_bool
 import srctools.logger
 import trio
 
 from app import lazy_conf
 from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
+from config.widgets import WidgetConfig
 from connections import INDICATOR_CHECK_ID
 from consts import DefaultItems
 from editoritems import DesiredFacing, InstCount, Item as EditorItem
@@ -140,6 +141,18 @@ def get_export_data(
 async def step_unlock_defaults(exp_data: ExportData) -> None:
     """If the unlock defaults option is set, unlock the default items."""
     await trio.lowlevel.checkpoint()
+    try:
+        conf = exp_data.config.get(WidgetConfig, 'VALVE_MANDATORY:unlockdefault')
+    except KeyError:
+        LOGGER.debug('No config option defined.')
+        return   # Not defined, must be off.
+    if not isinstance(conf.values, str):
+        LOGGER.warning('Unlock Default option is a timer??')
+        return
+    result = conv_bool(conf.values)
+    LOGGER.debug('Unlock defaults: {}', result)
+    if not result:
+        return  # Actually disabled.
 
     for i, item in enumerate(exp_data.all_items):
         # If the Unlock Default Items option is enabled, we

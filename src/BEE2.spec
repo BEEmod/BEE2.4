@@ -183,7 +183,7 @@ def build_fgd() -> None:
             "// These are a minimal copy of HA FGDs for comp_ entities, so they can be collapsed.\n"
             "// If you want to use Hammer Addons, install that manually, don't use these.\n"
         )
-        fgd.export(file)
+        fgd.export(file, custom_syntax=False)
 
 
 do_localisation()
