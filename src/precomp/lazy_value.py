@@ -94,6 +94,10 @@ class LazyValue[U](abc.ABC):
         """Call conv_bool()."""
         return self.map(lambda x: conv_bool(x, default), 'conv_bool')
 
+    def as_opt_bool(self: LazyValue[str], default: bool = False) -> LazyValue[bool | None]:
+        """Call conv_bool, but treat a blank value as None instead."""
+        return self.map(lambda x: conv_bool(x, default) if x else None, 'conv_opt_bool')
+
     def as_vec(self: LazyValue[str], x: float = 0.0, y: float = 0.0, z: float = 0.0) -> LazyValue[Vec]:
         """Call Vec.from_str()."""
         return self.map(lambda val: Vec.from_str(val, x, y, z), 'Vec')

@@ -135,7 +135,7 @@ def res_breakable_glass(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
           appear on the border.)
     * `material`: Name of the func_breakable_surf material.
     """
-    glass_items: Any = ...
+    glass_items: Any = eval('not implemented')
 
     damage_filter: Entity | None = None
 

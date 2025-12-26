@@ -1546,14 +1546,16 @@ def try_place_hole(
                 # be more optimal. To pick, arbitrarily make the upper one
                 # be in charge.
                 if corn_v > (hole.plane_pos[1] // 32):
-                    hole_temp.append(hole.variant.template_diagonal + (corn_mat, ))
+                    brushes, collide = hole.variant.template_diagonal
+                    hole_temp.append((brushes, collide, corn_mat))
                 continue
             # This bit of the glass is present, so include it in our brush, then clear.
             if (corn_u, corn_v) in grid:
-                hole_temp.append(hole.variant.template_square + (corn_mat, ))
+                brushes, collide = hole.variant.template_square
                 grid[corn_u, corn_v] = BARRIER_EMPTY
             else:
-                hole_temp.append(hole.variant.template + (corn_mat, ))
+                brushes, collide = hole.variant.template
+            hole_temp.append((brushes, collide, corn_mat))
 
     else:
         orient = Matrix.from_basis(

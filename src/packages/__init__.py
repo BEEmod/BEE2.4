@@ -2,7 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Any, ClassVar, NewType, NoReturn, Self, cast, overload
+from typing import Any, ClassVar, NewType, NoReturn, Self, cast, overload, final
 
 from collections import defaultdict
 from collections.abc import (
@@ -10,6 +10,7 @@ from collections.abc import (
 )
 from enum import Enum
 from pathlib import Path
+import builtins
 import os
 import zipfile
 
@@ -202,7 +203,7 @@ class AttrDef:
     def bool(
         cls, attr_id: str,
         desc: TransToken = TransToken.BLANK,
-        default: bool = False,
+        default: builtins.bool = False,
     ) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
         return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
@@ -459,12 +460,12 @@ class ParseData(PackErrorInfo):
         warning: AppError | TransToken | None = None,
     ) -> None:
         """If this package/the specified package is a developer one, emit a warning."""
-        if isinstance(package, str):
+        if isinstance(package, TransToken) or isinstance(package, AppError):
+            super().warn_auth(self.pak_id, package)
+        else:
             if warning is None:
                 raise TypeError("warn_auth() missing warning parameter.")
             super().warn_auth(package, warning)
-        else:
-            super().warn_auth(self.pak_id, package)
 
     @overload
     def warn_auth_fatal(self, warning: AppError | TransToken, /) -> None: ...
@@ -476,12 +477,12 @@ class ParseData(PackErrorInfo):
         warning: AppError | TransToken | None = None,
     ) -> None:
         """If this package/the specified package is a developer one, emit a fatal warning."""
-        if isinstance(package, str):
+        if isinstance(package, TransToken) or isinstance(package, AppError):
+            super().warn_auth_fatal(self.pak_id, package)
+        else:
             if warning is None:
                 raise TypeError("warn_auth() missing warning parameter.")
             super().warn_auth_fatal(package, warning)
-        else:
-            super().warn_auth_fatal(self.pak_id, package)
 
 
 @attrs.define
@@ -647,6 +648,7 @@ class SelPakObject(PakObject):
         return getter
 
 
+@final
 @attrs.frozen
 class PakRef[PakT: PakObject]:
     """Encapsulates an ID for a specific pakobject class."""
@@ -678,6 +680,7 @@ class PakRef[PakT: PakObject]:
         return self.id
 
 
+@final
 @attrs.define(eq=False)
 class ExportKey[T]:
     """Keys which define the types required to export different package objects.
