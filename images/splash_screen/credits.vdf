@@ -96,7 +96,7 @@
 	"workshopid" "2770142234"
 	}
 
-// These are bespoke setups, see BEEmod/BEE2.4#438
+// These are bespoke setups, see BEE2.4#438
 
 "splash_fling"
 	{
@@ -127,4 +127,15 @@
 	{
 	"title" "\"Square Root of Minus Portal + Portals\""
 	"author" "Byzarru"
+	}
+
+"linco_pellets" // BEE2.4#2169
+	{
+	"title" "\"Pellets\""
+	"author" "LincoCompany00"
+	}
+"linco_lasers" // BEE2.4#2169
+	{
+	"title"  "\"Lasers\""
+	"author" "LincoCompany00"
 	}
