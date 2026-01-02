@@ -112,8 +112,10 @@ class ItemVariant:
         self.editor = editoritems
         self.editor_extra = editor_extra
         self.vbsp_config = vbsp_config
-        self.pak_id = pak_id
-        self.source = source  # Original location of configs
+        self.pak_id = pak_id  # The package which defined this variant.
+        # Freeform string, describing the exact source used for debugging.
+        # It'll include all parent folders, and is displayed in dev mode.
+        self.source = source
 
         self.authors = authors
         self.tags = tags

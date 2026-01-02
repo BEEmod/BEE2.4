@@ -130,6 +130,7 @@ TRANS_MISSING_ITEM = TransToken.ui(
     'Alternatively, this item may have been replaced or merged into another.\n\n'
     'Export is not possible while this is present on the palette.'
 )
+TRANS_SOURCE_PAK = TransToken.ui('Source: {pack}')
 
 
 def pos_for_item(item: Item, ind: int) -> int | None:
@@ -298,6 +299,20 @@ class ContextWinBase:
         # Dump out the instances used in this item.
         if DEV_MODE.value:
             desc += variant.instance_desc()
+            # And tell the user exactly where the item came from
+            source = TransToken.untranslated(
+                f'{variant.source.replace("from", "\nfrom")}\n'
+                f'-> {self.selected}'
+            )
+        else:
+            # Otherwise, just use the friendly name for the package.
+            try:
+                package = self.packset.packages[variant.pak_id]
+            except KeyError:
+                LOGGER.warning('No package "{}"?', variant.pak_id)
+                source = TRANS_SOURCE_PAK.format(pack=variant.pak_id)
+            else:
+                source = TRANS_SOURCE_PAK.format(pack=package.disp_name)
 
         self.ui_set_props_main(
             name=subtype.name,
@@ -305,14 +320,9 @@ class ContextWinBase:
                 map(TransToken.untranslated, variant.authors), sort=True,
             ),
             desc=desc,
+            source=source,
             ent_count=variant.ent_count or '??',
         )
-
-        if DEV_MODE.value:
-            source = variant.source.replace("from", "\nfrom")
-            self.ui_set_debug_itemid(f'{source}\n-> {self.selected}')
-        else:
-            self.ui_set_debug_itemid('')
 
         self.ui_set_defaults_enabled(PropertyWindow.can_edit(variant.editor))
 
@@ -569,8 +579,9 @@ class ContextWinBase:
         raise NotImplementedError
 
     def ui_set_props_main(
-        self,
+        self, *,
         name: TransToken,
+        source: TransToken,
         authors: TransToken,
         desc: MarkdownData,
         ent_count: str,
@@ -580,10 +591,6 @@ class ContextWinBase:
 
     def ui_set_props_icon(self, ind: int, icon: img.Handle, selected: bool) -> None:
         """Set the palette icon in the menu."""
-        raise NotImplementedError
-
-    def ui_set_debug_itemid(self, itemid: str) -> None:
-        """Set the debug item ID, or hide it if blank."""
         raise NotImplementedError
 
     def ui_get_icon_offset(self, ind: int) -> tuple[int, int]:

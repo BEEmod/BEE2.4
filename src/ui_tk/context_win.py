@@ -93,9 +93,9 @@ class ContextWin(ContextWinBase):
         self.wid_name = ttk.Label(f, text="", anchor="center")
         self.wid_name.grid(row=1, column=0, columnspan=3, sticky="EW")
 
-        self.wid_item_id = ttk.Label(f, text="", anchor="center")
-        self.wid_item_id.grid(row=2, column=0, columnspan=3, sticky="EW")
-        tooltip.add_tooltip(self.wid_item_id)
+        self.wid_source = ttk.Label(f, text="", anchor="center")
+        self.wid_source.grid(row=2, column=0, columnspan=3, sticky="EW")
+        tooltip.add_tooltip(self.wid_source)
 
         self.wid_ent_count = ttk.Label(
             f,
@@ -350,8 +350,9 @@ class ContextWin(ContextWinBase):
 
     @override
     def ui_set_props_main(
-        self,
+        self, *,
         name: TransToken,
+        source: TransToken,
         authors: TransToken,
         desc: MarkdownData,
         ent_count: str,
@@ -359,6 +360,7 @@ class ContextWin(ContextWinBase):
         """Set the main set of widgets for properties."""
         set_text(self.wid_author, authors)
         set_text(self.wid_name, name)
+        set_text(self.wid_source, source)
         self.wid_ent_count['text'] = ent_count
         self.wid_desc.set_text(desc)
 
@@ -368,15 +370,6 @@ class ContextWin(ContextWinBase):
         widget = self.wid_subitem[ind]
         self.tk_img.apply(widget, icon)
         widget['relief'] = 'raised' if selected else 'flat'
-
-    @override
-    def ui_set_debug_itemid(self, item_id: str) -> None:
-        """Set the debug item ID, or hide it if blank."""
-        if item_id:
-            self.wid_item_id['text'] = item_id
-            self.wid_item_id.grid()
-        else:
-            self.wid_item_id.grid_remove()
 
     @override
     def ui_show_sign_config(self) -> None:

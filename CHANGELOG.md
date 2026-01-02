@@ -6,6 +6,7 @@
   `gridPos` option combined with two positions.
 * #2142: Fix flickering when hovering over additional labels in drag/drop icons
 * #2147: Fix piston platforms not killing objects when retracting.
+* #2167: Display the source package for items.
 * BEEMod/BEE2-items#3880: Fix Refractable Floor Buttons sometimes leaving behind tiles.
 * Fixed the infinite value not working in any item properties options.
 * Ensure signage reconfiguration applies to exports even if window is not closed.
