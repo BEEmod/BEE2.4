@@ -341,7 +341,7 @@ def gen_faithplates(vmf: VMF, info: Info) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
-            if isinstance(trig_type, PaintDropper):
+            if trig_type == 'paint':
                 # May as well filter paint droppers for bombs.
                 trig['filtername'] = FILTER_IS_PAINT
             if use_paint_trigs and trig_type != 'helper':
