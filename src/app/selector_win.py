@@ -78,7 +78,11 @@ TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").
 TRANS_GROUPLESS = TransToken.ui('Other')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
-TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
+# Show the source package names.
+TRANS_PACKAGES = TransToken.ui('**Packages:** {pack}')
+# For dev purposes, show the IDs.
+TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** `{item}`')
+TRANS_DEV_ITEM_ID_PACKAGES = TransToken.untranslated('**ID:** `{item}`  \n**Packages:** {pack}')
 TRANS_LOADING = TransToken.ui('Loading...')
 IMG_ZOOM = img.Handle.builtin('BEE2/expand', 16, 16)
 
@@ -788,13 +792,26 @@ class SelectorWinBase[ButtonT, WinT, GroupHeaderT: GroupHeaderBase](ReflowWindow
             self._ui_props_set_icon(data.large_icon, 'sample' if has_sample else None)
 
         if DEV_MODE.value:
-            # Show the ID of the item in the description
-            text = MarkdownData(TRANS_DEV_ITEM_ID.format(
-                item=f'`{', '.join(data.packages)}`:`{item_id}`\n' if data.packages else f'`{item_id}`\n',
-            ), None)
-            self._ui_props_set_desc(text + data.desc)
-        else:
-            self._ui_props_set_desc(data.desc)
+            # Show the ID of the item and package sources in the description.
+            if data.packages:
+                prefix = TRANS_DEV_ITEM_ID_PACKAGES.format(
+                    item=item_id,
+                    pack=TransToken.list_and([
+                        TransToken.untranslated(f'`{pack}`')
+                        for pack in data.packages
+                    ], sort=True)
+                )
+            else:
+                prefix = TRANS_DEV_ITEM_ID.format(item=item_id)
+        elif data.packages: # Just show the friendly names.
+            prefix = TRANS_PACKAGES.format(pack=TransToken.list_and(
+                map(self._packset.package_disp_name, data.packages),
+                sort=True
+            ))
+        else:  # No packages, show nothing?
+            prefix = TransToken.BLANK
+        if prefix:
+            self._ui_props_set_desc(MarkdownData(prefix, None) + data.desc)
 
         try:
             button = self._id_to_button[self.selected]

@@ -306,13 +306,7 @@ class ContextWinBase:
             )
         else:
             # Otherwise, just use the friendly name for the package.
-            try:
-                package = self.packset.packages[variant.pak_id]
-            except KeyError:
-                LOGGER.warning('No package "{}"?', variant.pak_id)
-                source = TRANS_SOURCE_PAK.format(pack=variant.pak_id)
-            else:
-                source = TRANS_SOURCE_PAK.format(pack=package.disp_name)
+            source = TRANS_SOURCE_PAK.format(pack=self.packset.package_disp_name(variant.pak_id))
 
         self.ui_set_props_main(
             name=subtype.name,

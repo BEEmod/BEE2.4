@@ -248,7 +248,7 @@ class SelitemData:
     group_id: str
     sort_key: str
     # The packages used to define this, used for debugging.
-    packages: frozenset[str] = attrs.Factory(frozenset)
+    packages: frozenset[utils.ObjectID] = attrs.Factory(frozenset)
 
     @property
     def context_lbl(self) -> TransToken:
@@ -325,11 +325,10 @@ class SelitemData:
             )
         except LookupError:
             icon = None
-        large_key: Keyvalues | None
         try:
             large_key = info.find_key('iconLarge')
         except LookupError:
-            large_icon = large_key = None
+            large_icon = None
         else:
             large_icon = img.Handle.parse(
                 large_key,
@@ -815,7 +814,10 @@ class PackagesSet:
     # Stores keys used to avoid warning multiple times about errors.
     # Since this is stored here, reloading packages automatically resets. If None,
     # warnings repeat each time.
-    _warnings: set[tuple[PakRef[Any], str, *tuple[object, ...]]] | None = attrs.Factory(set)
+    _warnings: set[
+        tuple[PakRef[Any], str, *tuple[object, ...]] |
+        tuple[type[Package], utils.ObjectID]
+    ] | None = attrs.Factory(set)
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.
@@ -866,6 +868,23 @@ class PackagesSet:
         elif key not in self._warnings:
             LOGGER.warning(message, *args)
             self._warnings.add(key)
+
+    def package_disp_name(self, pak_id: utils.ObjectID) -> TransToken:
+        """Look up the friendly name for a package.
+
+        If not found, warn once in the logs, return the ID untranslated.
+        """
+        try:
+            return self.packages[pak_id].disp_name
+        except KeyError:
+            pass
+        key = (Package, pak_id)
+        if self._warnings is None:
+            LOGGER.warning('No package "{}"?', pak_id)
+        elif key not in self._warnings:
+            LOGGER.warning('No package "{}"?', pak_id)
+            self._warnings.add(key)
+        return TransToken.untranslated(pak_id)
 
     def ready(self, cls: type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
