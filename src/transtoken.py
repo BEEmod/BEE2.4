@@ -279,7 +279,7 @@ class TransToken:
                     return formatter.vformat(text, (), self.parameters)
                 else:
                     return text.format_map(self.parameters)
-            except KeyError:
+            except LookupError:
                 LOGGER.warning('Could not format {!r} with {}', text, self.parameters)
                 return text
         else:
