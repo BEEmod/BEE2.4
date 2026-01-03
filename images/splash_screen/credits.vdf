@@ -131,11 +131,11 @@
 
 "linco_pellets" // BEE2.4#2169
 	{
-	"title" "\"Pellets\""
+	"title" "\"Switching the Fields\""
 	"author" "LincoCompany00"
 	}
 "linco_lasers" // BEE2.4#2169
 	{
-	"title"  "\"Lasers\""
+	"title"  "\"Considering the Angles\""
 	"author" "LincoCompany00"
 	}
