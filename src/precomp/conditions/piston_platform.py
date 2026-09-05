@@ -76,6 +76,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
     * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
     * `speed`: Speed of the piston in units per second. Defaults to 150.
+    * `down_speed`: Speed of the piston when moving backward in units per second. Defaults to `speed`
     * `dn_fizz_name`: The name of the 'downward' hurt trigger.
        This is enabled to kill players/objects only if the piston gets jammed when retracting.
        If blank, this is disabled.
@@ -119,6 +120,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     snd_loop = res['snd_loop', '']
     snd_stop = res['snd_stop', '']
     speed_var = res['speed', '150']
+    down_speed_var = res['down_speed', speed_var]
 
     # Previously, we just had a boolean, and hardcoded the name
     if not dn_fizz_name and res.bool('has_dn_fizz'):
@@ -130,6 +132,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         max_pos = inst.fixup.int(FixupVars.PIST_TOP)
         start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
         speed = inst.fixup.substitute(speed_var)
+        down_speed = inst.fixup.substitute(down_speed_var)
 
         if len(ITEMS[inst['targetname']].inputs) == 0:
             # No inputs. Check for the 'auto' var if applicable.
@@ -147,7 +150,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 conditions.ALL_INST.add(fname.casefold())
                 return
 
-        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}; DN_FIZZ_NAME <- `{dn_fizz_name}`'
+        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}; DN_FIZZ_NAME <- `{dn_fizz_name}`; SPEED_UP <- {speed}; SPEED_DOWN <- {down_speed}'
 
         if snd_start and snd_stop:
             packing.pack_files(vmf, snd_start, snd_stop, file_type='sound')
@@ -166,7 +169,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         script_ent = vmf.create_ent(
             classname='info_target',
             targetname=conditions.local_name(inst, 'script'),
-            vscripts='BEE2/piston/common.nut',
+            vscripts='BEE2/piston/common.nut',#From valve/clean_style
             vscript_init_code=init_script,
             thinkfunction='Think',
             origin=script_pos,
