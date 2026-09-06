@@ -324,6 +324,7 @@ class BarrierType:
     # Sorta a hack, force frame brushwork to be world brushes, so they don't get carved.
     # Tinted Glass needs this due to its nodraw clip.
     frame_world_brush: bool = False
+    solid: bool = True
 
     def __repr__(self) -> str:
         return f'<BarrierType "{self.id}">'
@@ -365,6 +366,10 @@ class BarrierType:
             floorbeam = FloorbeamConf.parse(barrier_id, kv.find_key('floorbeam'))
         else:
             floorbeam = None
+            
+        solid = True
+        if 'solid' in kv:
+            solid = False if kv['solid'].casefold() == 'false' else True #There's probably a better way, but idk it
 
         return BarrierType(
             id=barrier_id,
@@ -375,6 +380,7 @@ class BarrierType:
             hole_variants=hole_variants,
             mergeable=kv.bool('mergeable'),
             frame_world_brush=kv.bool('frame_world_brush'),
+            solid=solid,
         )
 
 
@@ -569,19 +575,20 @@ class Segment:
     def place(
         self, vmf: VMF, plane: PlaneKey, lighting_origin: str,
         u: float, v: float, angles: AnyMatrix,
-        frame_world_brush: bool,
+        frame_world_brush: bool, solid: bool,
     ) -> None:
         """Place the segment at the specified location."""
         rotation = to_matrix(angles) @ plane.orient
         origin = plane.plane_to_world(u, v) + self.offset @ rotation
         self._place(
-            vmf, origin, self.orient @ rotation, lighting_origin, frame_world_brush,
+            vmf, origin, self.orient @ rotation, lighting_origin, frame_world_brush, solid,
         )
 
     def _place(
         self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
         lighting_origin: str,
         frame_world_brush: bool,
+        solid: bool,
     ) -> None:
         """Place the segment at the specified location."""
         raise NotImplementedError
@@ -597,6 +604,7 @@ class SegmentProp(Segment):
         self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
         lighting_origin: str,
         frame_world_brush: bool,
+        solid: bool,
     ) -> None:
         """Place the segment at the specified location."""
         vmf.create_ent(
@@ -605,7 +613,7 @@ class SegmentProp(Segment):
             angles=angles,
             model=self.model,
             skin=0,
-            solid=6,
+            solid=6 if solid else 0,
             lightingorigin=lighting_origin,
         )
 
@@ -620,6 +628,7 @@ class SegmentBrush(Segment):
         self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
         lighting_origin: str,
         frame_world_brush: bool,
+        solid: bool,
     ) -> None:
         """Place the segment at the specified location."""
         template_brush.import_template(
@@ -1476,6 +1485,7 @@ def place_concave_corner(
                 32. * u + 16. * off_u + 16.0,
                 32. * v + 16. * off_v + 16.0,
                 orient, barrier.type.frame_world_brush,
+                barrier.type.solid,
             )
 
 
@@ -1692,7 +1702,8 @@ def place_straight_run(
                     piece.place(vmf, plane, lighting_origin,
                                 32. * start_u + off_u * off + pos_u,
                                 32. * start_v + off_v * off + pos_v, orient,
-                                barrier.type.frame_world_brush)
+                                barrier.type.frame_world_brush,
+                                barrier.type.solid)
 
                 if not backwards:
                     off += size
@@ -1724,6 +1735,7 @@ def place_convex_corner(
                 vmf, plane, lighting_origin,
                 32.0 * u, 32.0 * v, orient,
                 barrier.type.frame_world_brush,
+                barrier.type.solid
             )
 
 
