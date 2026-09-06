@@ -367,9 +367,7 @@ class BarrierType:
         else:
             floorbeam = None
             
-        solid = True
-        if 'solid' in kv:
-            solid = False if kv['solid'].casefold() == 'false' else True #There's probably a better way, but idk it
+        solid = kv.bool('solid',True)
 
         return BarrierType(
             id=barrier_id,
