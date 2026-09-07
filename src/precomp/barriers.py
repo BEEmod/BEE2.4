@@ -639,7 +639,7 @@ class SegmentBrush(Segment):
         )
         if not solid:
             temp.detail['classname'] = 'func_brush'
-            temp.detail['solid'] = 0
+            temp.detail['solidity'] = 1
 
     def place_sized(
         self,
@@ -679,7 +679,7 @@ class SegmentBrush(Segment):
             faces = temp.detail.sides()
             if not solid:
                 temp.detail['classname'] = 'func_brush'
-                temp.detail['solid'] = 0
+                temp.detail['solidity'] = 1
 
         diff = direction * (length - STRAIGHT_LEN)
         for face in faces:
