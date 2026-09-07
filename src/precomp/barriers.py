@@ -629,14 +629,17 @@ class SegmentBrush(Segment):
         solid: bool,
     ) -> None:
         """Place the segment at the specified location."""
-        template_brush.import_template(
+        temp = template_brush.import_template(
             vmf,
             self.brush,
             origin, angles,
             force_type=template_brush.TEMP_TYPES.world
-            if frame_world_brush else
+            if frame_world_brush and solid else
             template_brush.TEMP_TYPES.detail,
         )
+        if not solid:
+            temp.detail['classname'] = 'func_brush'
+            temp.detail['solid'] = 0
 
     def place_sized(
         self,
@@ -646,13 +649,14 @@ class SegmentBrush(Segment):
         direction: Vec,
         length: float,
         frame_world_brush: bool,
+        solid: bool,
     ) -> None:
         """Place this template, but resize it to match the specified length."""
         rotation = orient @ plane.orient
         origin = plane.plane_to_world(u, v) + self.offset @ rotation
         faces: Iterable[Side]
 
-        if frame_world_brush:
+        if frame_world_brush and solid:
             temp = template_brush.import_template(
                 vmf,
                 self.brush,
@@ -673,6 +677,9 @@ class SegmentBrush(Segment):
             if temp.detail is None:
                 return  # No brushes?
             faces = temp.detail.sides()
+            if not solid:
+                temp.detail['classname'] = 'func_brush'
+                temp.detail['solid'] = 0
 
         diff = direction * (length - STRAIGHT_LEN)
         for face in faces:
@@ -1710,7 +1717,8 @@ def place_straight_run(
         for brush_seg in frame.seg_straight_brush:
             brush_seg.place_sized(vmf, plane, 32.0 * start_u + off_u * off + pos_u,
                                   32.0 * start_v + off_v * off + pos_v, orient, direction,
-                                  frame_length, barrier.type.frame_world_brush)
+                                  frame_length, barrier.type.frame_world_brush,
+                                  barrier.type.solid)
     # Only one of these has an actual length.
     for u in range(start_u, end_u + 1):
         for v in range(start_v, end_v + 1):
