@@ -554,10 +554,12 @@ class Segment:
         offset = FrozenVec.from_str(kv['offset', '0 0 0'])
 
         if 'model' in kv:
+            ent_kvs = {child.name: child.value for child in kv.find_children('keys')}
             return SegmentProp(
                 model=kv['model'],
                 orient=orient,
                 offset=offset,
+                keyvalues=ent_kvs,
             )
         else:
             return SegmentBrush(
@@ -591,6 +593,7 @@ class Segment:
 class SegmentProp(Segment):
     """A model, placed with an optional offset."""
     model: str
+    keyvalues: Mapping[str, str] = EmptyMapping
 
     @override
     def _place(
@@ -607,7 +610,7 @@ class SegmentProp(Segment):
             skin=0,
             solid=6,
             lightingorigin=lighting_origin,
-        )
+        ).update(self.keyvalues)
 
 
 @attrs.frozen(eq=False, kw_only=True)
