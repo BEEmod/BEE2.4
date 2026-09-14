@@ -2,9 +2,11 @@
 from collections.abc import Callable
 
 import utils
-from precomp import connections, conditions
+from precomp import connections, conditions, instanceLocs
 from srctools import Keyvalues, Entity, Output, logger
 import srctools
+
+from precomp.lazy_value import LazyValue
 
 COND_MOD_NAME = 'I/O'
 LOGGER = logger.get_logger(__name__, alias='cond.connections')
@@ -159,3 +161,32 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
             setattr(item, name, getattr(item, name) + out_tup)
 
     return append_to
+
+@conditions.make_test('OutputsTo',valid_before=conditions.MetaCond.LinkedItems)
+def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
+    """Check if this instance outputs to the specified instance
+    
+    Parameters:
+    * `instance`: The instance that this item outputs to.
+    * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `copyto`: Copies fixup vars from the searching instance to the output instance. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
+      The value is in the form `$src $dest`.
+    """
+    inst_list = LazyValue.parse(kv['instance']).map(instanceLocs.resolve_filter)(inst)
+    remove_connection = kv.bool('removeConnection',False)
+    conns = connections.ITEMS[inst['targetname']]
+    for out in list(conns.outputs):
+        targ_item = out.to_item
+        if targ_item.inst['file'].casefold() not in inst_list:
+            continue
+        if remove_connection:
+            out.remove()
+        for child in kv.find_all('copyto'):
+            src, dest = child.value.split(' ', 1)
+            targ_item.inst.fixup[dest] = inst.fixup[src]
+        for child in kv.find_all('copyfrom'):
+            src, dest = child.value.split(' ', 1)
+            inst.fixup[dest] = targ_item.inst.fixup[src]
+        return True
+    return False
