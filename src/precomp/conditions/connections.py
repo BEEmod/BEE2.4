@@ -173,14 +173,16 @@ def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
     * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
       The value is in the form `$src $dest`.
     """
-    inst_list = LazyValue.parse(kv['instance']).map(instanceLocs.resolve_filter)(inst)
-    remove_connection = kv.bool('removeConnection',False)
+    inst_list = kv['instance'] if kv.has_children() else kv.value
+    inst_list = LazyValue.parse(inst_list).map(instanceLocs.resolve_filter)(inst)
     conns = connections.ITEMS[inst['targetname']]
     for out in list(conns.outputs):
         targ_item = out.to_item
         if targ_item.inst['file'].casefold() not in inst_list:
             continue
-        if remove_connection:
+        if not kv.has_children():
+            return True
+        if kv.bool('removeConnection',False):
             out.remove()
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
