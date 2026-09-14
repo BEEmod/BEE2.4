@@ -162,22 +162,13 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
 
     return append_to
 
-@conditions.make_test('OutputsTo',valid_before=conditions.MetaCond.LinkedItems)
-def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
-    """Check if this instance outputs to the specified instance
-    
-    Parameters:
-    * `instance`: The instance that this item outputs to.
-    * `removeConnection`: If true, removes the connection. Defaults to false. 
-    * `copyto`: Copies fixup vars from the searching instance to the output instance. The value is in the form `$src $dest`.
-    * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
-      The value is in the form `$src $dest`.
-    """
+def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
+    """Called by check_inputs and check_outputs"""
     inst_list = kv['instance'] if kv.has_children() else kv.value
     inst_list = LazyValue.parse(inst_list).map(instanceLocs.resolve_filter)(inst)
     conns = connections.ITEMS[inst['targetname']]
-    for out in list(conns.outputs):
-        targ_item = out.to_item
+    for out in list(conns.inputs if input else conns.outputs):
+        targ_item = out.from_item if input else out.to_item
         if targ_item.inst['file'].casefold() not in inst_list:
             continue
         if not kv.has_children():
@@ -192,3 +183,29 @@ def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
             inst.fixup[dest] = targ_item.inst.fixup[src]
         return True
     return False
+
+@conditions.make_test('OutputsTo',valid_before=conditions.MetaCond.LinkedItems)
+def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
+    """Check if this instance outputs to the specified instance
+    
+    Parameters:
+    * `instance`: The instance that this item outputs to.
+    * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `copyto`: Copies fixup vars from the searching instance to the output instance. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
+      The value is in the form `$src $dest`.
+    """
+    return check_io(inst, kv, input = False)
+
+@conditions.make_test('InputsFrom',valid_before=conditions.MetaCond.LinkedItems)
+def check_inputs(inst: Entity, kv: Keyvalues) -> bool:
+    """Check if this instance has inputs from the specified instance
+    
+    Parameters:
+    * `instance`: The instance that this item receives inputs from.
+    * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `copyto`: Copies fixup vars from the searching instance to the input instance. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the input instance to the searching instance.
+      The value is in the form `$src $dest`.
+    """
+    return check_io(inst, kv, input = True)
