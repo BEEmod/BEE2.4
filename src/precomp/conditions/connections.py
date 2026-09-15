@@ -6,7 +6,6 @@ from precomp import connections, conditions, instanceLocs
 from srctools import Keyvalues, Entity, Output, logger
 import srctools
 
-from precomp.lazy_value import LazyValue
 
 COND_MOD_NAME = 'I/O'
 LOGGER = logger.get_logger(__name__, alias='cond.connections')
@@ -165,7 +164,7 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
 def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
     """Called by check_inputs and check_outputs"""
     inst_list = kv['instance'] if kv.has_children() else kv.value
-    inst_list = LazyValue.parse(inst_list).map(instanceLocs.resolve_filter)(inst)
+    inst_list = frozenset([i.casefold() for i in instanceLocs.resolve(inst_list)])
     conns = connections.ITEMS[inst['targetname']]
     for out in list(conns.inputs if input else conns.outputs):
         targ_item = out.from_item if input else out.to_item
