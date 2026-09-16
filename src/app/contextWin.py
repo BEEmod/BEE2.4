@@ -531,7 +531,6 @@ class ContextWinBase:
         if item is not None:
             ind = ind_for_pos(item, pos)
             if ind is not None:
-                sound.fx('expand')
                 slot, pal_pos = self.picker.find_matching_slot(
                     self.selected.with_subtype(ind),
                     check_palette=self.selected_pal_pos is not None,
