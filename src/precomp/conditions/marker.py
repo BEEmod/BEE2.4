@@ -187,22 +187,24 @@ def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
     match = name_matcher(marker)
     conns = connections.ITEMS[inst['targetname']]
     
-    def match_inst(ent: Entity) -> bool:
+    def match_inst(ent: Entity) -> None | Marker:
         if ent not in ENT_MARKERS:
-            return False
+            return None
         for mark in ENT_MARKERS[ent]:
             if match(mark.name):
-                return True
-        return False
+                return mark
+        return None
     
     for conn in list(conns.inputs if input else conns.outputs):
         targ_item = conn.from_item if input else conn.to_item
-        if not match_inst(targ_item.inst):
+        if (mark := match_inst(targ_item.inst)) is None:
             continue
         if not kv.has_children():
             return True
         if kv.bool('removeConnection',False):
             conn.remove()
+        if kv.bool('removeMarker',False):
+            ENT_MARKERS[targ_item.inst].remove(mark)
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
             targ_item.inst.fixup[dest] = inst.fixup[src]
@@ -219,6 +221,8 @@ def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
     The value should be the name of a marker, or a block of options:
     * `marker`: The name of the marker that was set by an item this item outputs to.
     * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `removeMarker`: If true, remove the found marker. If you don't need it, this will improve
+      performance. Defaults to false. 
     * `copyto`: Copies fixup vars from the searching instance to the output instance. The value is in the form `$src $dest`.
     * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
       The value is in the form `$src $dest`.
@@ -232,6 +236,8 @@ def check_inputs(inst: Entity, kv: Keyvalues) -> bool:
     The value should be the name of a marker, or a block of options:
     * `marker`: The name of the marker that was set by an item that outputs to this item.
     * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `removeMarker`: If true, remove the found marker. If you don't need it, this will improve
+      performance. Defaults to false. 
     * `copyto`: Copies fixup vars from the searching instance to the input instance. The value is in the form `$src $dest`.
     * `copyfrom`: Copies fixup vars from the input instance to the searching instance.
       The value is in the form `$src $dest`.
