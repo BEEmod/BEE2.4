@@ -201,9 +201,9 @@ def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
             continue
         if not kv.has_children():
             return True
-        if kv.bool('removeConnection',False):
+        if srctools.conv_bool(inst.fixup.substitute(kv['removeConnection','False'], allow_invert=True)):
             conn.remove()
-        if kv.bool('removeMarker',False):
+        if srctools.conv_bool(inst.fixup.substitute(kv['removeMarker','False'], allow_invert=True)):
             ENT_MARKERS[targ_item.inst].remove(marker)
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
