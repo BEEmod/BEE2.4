@@ -517,7 +517,6 @@ class ContextWinBase:
         ind = ind_for_pos(item, pos)
         # Can only change the subitem on the preview window
         if self.selected_pal_pos is not None and ind is not None:
-            sound.fx('config')
             ref = self.selected.with_subtype(ind)
             if self.picker.change_pal_subtype(self.selected_slot, ref):
                 # Redisplay the window to refresh data and move it to match
