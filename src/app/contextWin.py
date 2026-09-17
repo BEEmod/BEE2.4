@@ -522,6 +522,9 @@ class ContextWinBase:
             if self.picker.change_pal_subtype(self.selected_slot, ref):
                 # Redisplay the window to refresh data and move it to match
                 self.show_prop(self.selected_slot, self.selected_pal_pos, warp_cursor=True)
+        else:
+            # Display different subtype if in the all items panel
+            self.sub_open(pos)
 
     def sub_open(self, pos: int, _: object = None, /) -> None:
         """Move the context window to apply to the given item."""
