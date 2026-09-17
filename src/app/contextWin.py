@@ -475,12 +475,11 @@ class ContextWinBase:
         self.selected_pal_pos = pal_pos
 
         sound.fx('expand')
-        self.ui_show_window(x, y)
-        self.adjust_position()
 
         if offset is not None:
             self.ui_set_cursor_offset(offset)
         self.load_item_data()
+        self.adjust_position()
 
     async def _moreinfo_task(self) -> None:
         """Task to handle clicking on the 'more info' URL."""
