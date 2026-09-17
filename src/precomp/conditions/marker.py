@@ -5,7 +5,7 @@ import attrs
 from srctools import Keyvalues, Entity, Vec, Matrix, VMF
 import srctools.logger
 
-from precomp import conditions
+from precomp import conditions, connections
 from precomp.lazy_value import LazyValue
 
 
@@ -13,6 +13,8 @@ COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
 MARKERS: list[Marker] = []
 LOGGER = srctools.logger.get_logger(__name__)
+
+ENT_MARKERS: dict[Entity,list[Marker]] = {}
 
 
 @attrs.define
@@ -59,10 +61,28 @@ def res_set_marker(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
         mark = Marker(pos, name, inst=inst, debug_ent=debug_ent)
         MARKERS.append(mark)
+        ENT_MARKERS[inst] = [mark] if inst not in ENT_MARKERS else ENT_MARKERS[inst].append(mark)
         LOGGER.debug('Marker added: {}', mark)
 
     return create
 
+#Not marker related, should be renamed. Also perhaps this should use a regex
+def marker_matcher(name: str) -> Callable[[str],bool]:
+    if '*' in name:
+        try:
+            prefix, suffix = name.split('*')
+        except ValueError:
+            raise ValueError(f'Name "{name}" must only have 1 *!') from None
+
+        def match(val: str) -> bool:
+            """Match a prefix or suffix."""
+            val = val.casefold()
+            return val.startswith(prefix) and val.endswith(suffix)
+    else:
+        def match(val: str) -> bool:
+            """Match an exact name."""
+            return val.casefold() == name
+    return match
 
 @conditions.make_test('CheckMarker')
 def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
@@ -86,20 +106,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     orient = Matrix.from_angstr(inst['angles'])
 
     name = inst.fixup.substitute(kv['name']).casefold()
-    if '*' in name:
-        try:
-            prefix, suffix = name.split('*')
-        except ValueError:
-            raise ValueError(f'Name "{name}" must only have 1 *!') from None
-
-        def match(val: str) -> bool:
-            """Match a prefix or suffix."""
-            val = val.casefold()
-            return val.startswith(prefix) and val.endswith(suffix)
-    else:
-        def match(val: str) -> bool:
-            """Match an exact name."""
-            return val.casefold() == name
+    match = marker_matcher(name)
 
     try:
         is_global = srctools.conv_bool(inst.fixup.substitute(kv['global'], allow_invert=True))
@@ -169,3 +176,60 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
             inst.fixup[dest] = marker.inst.fixup[src]
         return True
     return False
+
+def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
+    """Called by check_inputs and check_outputs"""
+    marker = (kv['marker'] if kv.has_children() else kv.value).casefold()
+    match = marker_matcher(marker)
+    conns = connections.ITEMS[inst['targetname']]
+    
+    def match_inst(ent: Entity) -> bool:
+        if ent not in ENT_MARKERS:
+            return False
+        for mark in ENT_MARKERS[ent]:
+            if match(mark.name):
+                return True
+        return False
+    
+    for conn in list(conns.inputs if input else conns.outputs):
+        targ_item = conn.from_item if input else conn.to_item
+        if not match_inst(targ_item.inst):
+            continue
+        if not kv.has_children():
+            return True
+        if kv.bool('removeConnection',False):
+            conn.remove()
+        for child in kv.find_all('copyto'):
+            src, dest = child.value.split(' ', 1)
+            targ_item.inst.fixup[dest] = inst.fixup[src]
+        for child in kv.find_all('copyfrom'):
+            src, dest = child.value.split(' ', 1)
+            inst.fixup[dest] = targ_item.inst.fixup[src]
+        return True
+    return False
+
+@conditions.make_test('OutputsTo',valid_before=conditions.MetaCond.LinkedItems)
+def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
+    """Check if this instance outputs to an instance with the specified marker. 
+    
+    The value should be the name of a marker, or a block of options:
+    * `marker`: The name of the marker that was set by an item this item outputs to.
+    * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `copyto`: Copies fixup vars from the searching instance to the output instance. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
+      The value is in the form `$src $dest`.
+    """
+    return check_io(inst, kv, input = False)
+
+@conditions.make_test('InputsFrom',valid_before=conditions.MetaCond.LinkedItems)
+def check_inputs(inst: Entity, kv: Keyvalues) -> bool:
+    """Check if this instance takes inputs from an instance with the specified marker. 
+    
+    The value should be the name of a marker, or a block of options:
+    * `marker`: The name of the marker that was set by an item that outputs to this item.
+    * `removeConnection`: If true, removes the connection. Defaults to false. 
+    * `copyto`: Copies fixup vars from the searching instance to the input instance. The value is in the form `$src $dest`.
+    * `copyfrom`: Copies fixup vars from the input instance to the searching instance.
+      The value is in the form `$src $dest`.
+    """
+    return check_io(inst, kv, input = True)
