@@ -66,8 +66,8 @@ def res_set_marker(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     return create
 
-#Not marker related, should be renamed. Also perhaps this should use a regex
-def marker_matcher(name: str) -> Callable[[str],bool]:
+#Perhaps this should use a regex
+def name_matcher(name: str) -> Callable[[str],bool]:
     if '*' in name:
         try:
             prefix, suffix = name.split('*')
@@ -106,7 +106,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     orient = Matrix.from_angstr(inst['angles'])
 
     name = inst.fixup.substitute(kv['name']).casefold()
-    match = marker_matcher(name)
+    match = name_matcher(name)
 
     try:
         is_global = srctools.conv_bool(inst.fixup.substitute(kv['global'], allow_invert=True))
@@ -180,7 +180,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
 def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
     """Called by check_inputs and check_outputs"""
     marker = (kv['marker'] if kv.has_children() else kv.value).casefold()
-    match = marker_matcher(marker)
+    match = name_matcher(marker)
     conns = connections.ITEMS[inst['targetname']]
     
     def match_inst(ent: Entity) -> bool:
