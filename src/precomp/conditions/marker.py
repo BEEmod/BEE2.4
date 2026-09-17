@@ -25,6 +25,11 @@ class Marker:
     inst: Entity = attrs.field(kw_only=True)
     # If dev mode is enabled, the info_target/_null to identify this.
     debug_ent: Entity = attrs.field(kw_only=True)
+    
+    def remove(self) -> None:
+        self.debug_ent['classname'] = 'info_null'
+        MARKERS.remove(self)
+        ENT_MARKERS[self.inst].remove(self)
 
 
 @conditions.make_result('SetMarker')
@@ -165,8 +170,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
             inst.fixup[kv['namevar']] = marker.name
         if srctools.conv_bool(inst.fixup.substitute(kv['removeFound'], allow_invert=True)):
             LOGGER.debug('Removing found marker {}', marker)
-            marker.debug_ent['classname'] = 'info_null'
-            del MARKERS[i]
+            marker.remove()
 
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
