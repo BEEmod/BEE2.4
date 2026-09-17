@@ -183,28 +183,28 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
 
 def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
     """Called by check_inputs and check_outputs"""
-    marker = (kv['marker'] if kv.has_children() else kv.value).casefold()
-    match = name_matcher(marker)
+    marker_name = (kv['marker'] if kv.has_children() else kv.value).casefold()
+    match = name_matcher(marker_name)
     conns = connections.ITEMS[inst['targetname']]
     
     def match_inst(ent: Entity) -> None | Marker:
         if ent not in ENT_MARKERS:
             return None
-        for mark in ENT_MARKERS[ent]:
-            if match(mark.name):
-                return mark
+        for marker in ENT_MARKERS[ent]:
+            if match(marker.name):
+                return marker
         return None
     
     for conn in list(conns.inputs if input else conns.outputs):
         targ_item = conn.from_item if input else conn.to_item
-        if (mark := match_inst(targ_item.inst)) is None:
+        if (marker := match_inst(targ_item.inst)) is None:
             continue
         if not kv.has_children():
             return True
         if kv.bool('removeConnection',False):
             conn.remove()
         if kv.bool('removeMarker',False):
-            ENT_MARKERS[targ_item.inst].remove(mark)
+            ENT_MARKERS[targ_item.inst].remove(marker)
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
             targ_item.inst.fixup[dest] = inst.fixup[src]
