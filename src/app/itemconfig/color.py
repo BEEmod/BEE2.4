@@ -29,10 +29,8 @@ async def widget_color_single(
 
     Values can be provided as #RRGGBB, but will be written as 3 0-255 values.
     """
-    # The frame isolates the swatch so that it doesn't resize.
-    frame = ttk.Frame(parent)
     async with trio.open_nursery() as nursery:
-        swatch = await nursery.start(make_color_swatch, frame, tk_img, holder, 24)
+        swatch = await nursery.start(make_color_swatch, parent, tk_img, holder, 16)
         swatch.grid(row=0, column=0, sticky='w')
         task_status.started(swatch)
 

@@ -19,6 +19,7 @@
   for cases where instances should be replaced by conditions.
 * Added `CalcRotation` condition result.
 * Added links to the issue pages to the error display.
+* Fixed non-timer `ConfigGroup` color widgets not being visible.
 
 # Version 4.46.1
 * Fix FGD export producing invalid syntax.
