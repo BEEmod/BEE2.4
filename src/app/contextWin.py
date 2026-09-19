@@ -475,12 +475,11 @@ class ContextWinBase:
         self.selected_pal_pos = pal_pos
 
         sound.fx('expand')
-        self.ui_show_window(x, y)
-        self.adjust_position()
 
         if offset is not None:
             self.ui_set_cursor_offset(offset)
         self.load_item_data()
+        self.adjust_position()
 
     async def _moreinfo_task(self) -> None:
         """Task to handle clicking on the 'more info' URL."""
@@ -518,11 +517,13 @@ class ContextWinBase:
         ind = ind_for_pos(item, pos)
         # Can only change the subitem on the preview window
         if self.selected_pal_pos is not None and ind is not None:
-            sound.fx('config')
             ref = self.selected.with_subtype(ind)
             if self.picker.change_pal_subtype(self.selected_slot, ref):
                 # Redisplay the window to refresh data and move it to match
                 self.show_prop(self.selected_slot, self.selected_pal_pos, warp_cursor=True)
+        else:
+            # Display different subtype if in the all items panel
+            self.sub_open(pos)
 
     def sub_open(self, pos: int, _: object = None, /) -> None:
         """Move the context window to apply to the given item."""

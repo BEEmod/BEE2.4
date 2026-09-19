@@ -219,6 +219,12 @@ class ItemVariant:
             tags = sep_values(kv['tags', ''])
         else:
             tags = self.tags.copy()
+        
+        # strip tabs to fix formatting
+        if 'ent_count' in kv:
+            ent_count = re.sub(r'[\t]', '', kv['ent_count', ''])
+        else:
+            ent_count = self.ent_count
 
         variant = ItemVariant(
             pak_id,
@@ -229,7 +235,7 @@ class ItemVariant:
             tags=tags,
             desc=desc,
             icons=self.icons.copy(),
-            ent_count=kv['ent_count', self.ent_count],
+            ent_count=ent_count,
             url=kv['url', self.url],
             all_name=self.all_name,
             all_icon=self.all_icon,
@@ -1212,7 +1218,7 @@ async def parse_item_folder(
         authors=sep_values(props['authors', '']),
         tags=sep_values(props['tags', '']),
         desc=desc_parse(props, f'{data.pak_id}:{prop_path}', data.pak_id),
-        ent_count=props['ent_count', ''],
+        ent_count=re.sub(r'[\t]', '', props['ent_count', '']),
         url=props['infoURL', None],
         icons=icons,
         all_name=all_name,
