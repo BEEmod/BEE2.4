@@ -114,7 +114,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             if other_slot is slot:
                 continue
             match other_slot.contents:
-                case SubItemRef(item=ref.item):
+                case SubItemRef(item=ref.item, subtype=ref.subtype):
                     other_slot.contents = None
                 case _:
                     pass  # Empty, or an unrelated item.
