@@ -6,6 +6,7 @@ from precomp import connections, conditions
 from srctools import Keyvalues, Entity, Output, logger
 import srctools
 
+
 COND_MOD_NAME = 'I/O'
 LOGGER = logger.get_logger(__name__, alias='cond.connections')
 
