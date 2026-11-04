@@ -93,6 +93,18 @@ def name_matcher(name: str) -> Callable[[str], bool]:
             return val.casefold() == name
     return match
 
+
+def copy_kvs(marker: Marker, inst: Entity, kv: Keyvalues) -> None:
+    """Implements copyto/copyfrom keyvalues."""
+    for child in kv.find_all('copyto'):
+        src, dest = child.value.split(' ', 1)
+        marker.inst.fixup[dest] = inst.fixup[src]
+
+    for child in kv.find_all('copyfrom'):
+        src, dest = child.value.split(' ', 1)
+        inst.fixup[dest] = marker.inst.fixup[src]
+
+
 @conditions.make_test('CheckMarker')
 def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
     """Check if markers are present at a position.
@@ -176,12 +188,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
             LOGGER.debug('Removing found marker {}', marker)
             marker.remove()
 
-        for child in kv.find_all('copyto'):
-            src, dest = child.value.split(' ', 1)
-            marker.inst.fixup[dest] = inst.fixup[src]
-        for child in kv.find_all('copyfrom'):
-            src, dest = child.value.split(' ', 1)
-            inst.fixup[dest] = marker.inst.fixup[src]
+        copy_kvs(marker, inst, kv)
         return True
     return False
 
@@ -211,12 +218,8 @@ def check_io(
             conn.remove()
         if srctools.conv_bool(inst.fixup.substitute(kv['removeMarker','False'], allow_invert=True)):
             marker.remove()
-        for child in kv.find_all('copyto'):
-            src, dest = child.value.split(' ', 1)
-            targ_item.inst.fixup[dest] = inst.fixup[src]
-        for child in kv.find_all('copyfrom'):
-            src, dest = child.value.split(' ', 1)
-            inst.fixup[dest] = targ_item.inst.fixup[src]
+
+        copy_kvs(marker, inst, kv)
         return True
     return False
 
