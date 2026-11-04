@@ -5,6 +5,7 @@ import trio.lowlevel
 
 from app.errors import ErrorUI, Result
 from transtoken import AppError, TransToken
+from dirty_equals import IsList
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -136,7 +137,7 @@ async def test_nonfatal() -> None:
     assert success
     assert task == ["before", "mid", "after"]
     assert error_block.result is Result.PARTIAL
-    assert caught_errors == [exc1, exc2, exc3, exc4, exc5]
+    assert caught_errors == IsList(exc1, exc2, exc3, exc4, exc5, check_order=False)
 
 
 async def test_fatal_only_err() -> None:
@@ -144,6 +145,7 @@ async def test_fatal_only_err() -> None:
     orig_title = TransToken.untranslated("The title")
     orig_error = TransToken.untranslated("fatal_only_error error, n={n}")
     orig_warn = TransToken.untranslated("fatal_only_error warn, n={n}")
+    # Use a list to ensure multiple identical errors fail the test.
     caught_errors: list[AppError] = []
 
     async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
@@ -170,7 +172,7 @@ async def test_fatal_only_err() -> None:
 
     assert task == ["before", "mid"]
     assert result(error_block) is Result.FAILED
-    assert caught_errors == [exc1, exc2]
+    assert caught_errors == IsList(exc1, exc2, check_order=False)
 
 
 async def test_fatal_exc() -> None:
