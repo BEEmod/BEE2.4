@@ -1,9 +1,12 @@
 """Conditions that read/write a set of positional markers."""
 from __future__ import annotations
 
-import attrs
+from collections.abc import Callable
+from collections import defaultdict
+
 from srctools import Keyvalues, Entity, Vec, Matrix, VMF
 import srctools.logger
+import attrs
 
 from precomp import conditions, connections
 from precomp.lazy_value import LazyValue
@@ -11,13 +14,13 @@ from precomp.lazy_value import LazyValue
 
 COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
-MARKERS: list[Marker] = []
+MARKERS: set[Marker] = set()
 LOGGER = srctools.logger.get_logger(__name__)
 
-ENT_MARKERS: dict[Entity,list[Marker]] = {}
+ENT_MARKERS: dict[Entity, set[Marker]] = defaultdict(set)
 
 
-@attrs.define
+@attrs.define(eq=False)
 class Marker:
     """A marker placed in the map."""
     pos: Vec
@@ -27,6 +30,7 @@ class Marker:
     debug_ent: Entity = attrs.field(kw_only=True)
     
     def remove(self) -> None:
+        """Remove this marker from the sets."""
         self.debug_ent['classname'] = 'info_null'
         MARKERS.remove(self)
         ENT_MARKERS[self.inst].remove(self)
@@ -65,14 +69,14 @@ def res_set_marker(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         )
 
         mark = Marker(pos, name, inst=inst, debug_ent=debug_ent)
-        MARKERS.append(mark)
-        ENT_MARKERS[inst] = [mark] if inst not in ENT_MARKERS else ENT_MARKERS[inst].append(mark)
+        MARKERS.add(mark)
+        ENT_MARKERS[inst].add(mark)
         LOGGER.debug('Marker added: {}', mark)
 
     return create
 
 #Perhaps this should use a regex
-def name_matcher(name: str) -> Callable[[str],bool]:
+def name_matcher(name: str) -> Callable[[str], bool]:
     if '*' in name:
         try:
             prefix, suffix = name.split('*')
@@ -153,7 +157,7 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
         radius = 1e-6
         LOGGER.debug('Searching for marker "{}" at ({})', name, pos)
 
-    for i, marker in enumerate(MARKERS):
+    for marker in list(MARKERS):
         if not marker.pos.in_bbox(bb_min, bb_max):
             continue
         if radius is not None and (marker.pos - pos).mag() > radius:
@@ -181,30 +185,32 @@ def check_marker(vmf: VMF, inst: Entity, kv: Keyvalues) -> bool:
         return True
     return False
 
-def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
-    """Called by check_inputs and check_outputs"""
+
+def check_io(
+    inst: Entity,
+    kv: Keyvalues,
+    source: list[tuple[connections.Connection, connections.Item]]
+) -> bool:
+    """Common logic for check_inputs() and check_outputs()."""
     marker_name = (kv['marker'] if kv.has_children() else kv.value).casefold()
     match = name_matcher(marker_name)
-    conns = connections.ITEMS[inst['targetname']]
-    
-    def match_inst(ent: Entity) -> None | Marker:
-        if ent not in ENT_MARKERS:
-            return None
-        for marker in ENT_MARKERS[ent]:
-            if match(marker.name):
-                return marker
-        return None
-    
-    for conn in list(conns.inputs if input else conns.outputs):
-        targ_item = conn.from_item if input else conn.to_item
-        if (marker := match_inst(targ_item.inst)) is None:
+
+    for conn, targ_item in source:
+        if targ_item.inst not in ENT_MARKERS:
             continue
+
+        for marker in ENT_MARKERS[targ_item.inst]:
+            if match(marker.name):
+                break
+        else:
+            continue
+
         if not kv.has_children():
             return True
         if srctools.conv_bool(inst.fixup.substitute(kv['removeConnection','False'], allow_invert=True)):
             conn.remove()
         if srctools.conv_bool(inst.fixup.substitute(kv['removeMarker','False'], allow_invert=True)):
-            ENT_MARKERS[targ_item.inst].remove(marker)
+            marker.remove()
         for child in kv.find_all('copyto'):
             src, dest = child.value.split(' ', 1)
             targ_item.inst.fixup[dest] = inst.fixup[src]
@@ -213,6 +219,7 @@ def check_io(inst: Entity, kv: Keyvalues, input: bool) -> bool:
             inst.fixup[dest] = targ_item.inst.fixup[src]
         return True
     return False
+
 
 @conditions.make_test('OutputsTo',valid_before=conditions.MetaCond.LinkedItems)
 def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
@@ -227,7 +234,9 @@ def check_outputs(inst: Entity, kv: Keyvalues) -> bool:
     * `copyfrom`: Copies fixup vars from the output instance to the searching instance.
       The value is in the form `$src $dest`.
     """
-    return check_io(inst, kv, input = False)
+    item = connections.ITEMS[inst['targetname']]
+    return check_io(inst, kv, [(conn, conn.to_item) for conn in item.outputs])
+
 
 @conditions.make_test('InputsFrom',valid_before=conditions.MetaCond.LinkedItems)
 def check_inputs(inst: Entity, kv: Keyvalues) -> bool:
@@ -242,4 +251,5 @@ def check_inputs(inst: Entity, kv: Keyvalues) -> bool:
     * `copyfrom`: Copies fixup vars from the input instance to the searching instance.
       The value is in the form `$src $dest`.
     """
-    return check_io(inst, kv, input = True)
+    item = connections.ITEMS[inst['targetname']]
+    return check_io(inst, kv, [(conn, conn.from_item) for conn in item.inputs])
