@@ -10,7 +10,8 @@ import trio
 
 from app.helpMenu import (
     ICONS, SEPERATOR, TRANS_CLOSE_BUTTON, TRANS_CREDITS_BUTTON,
-    TRANS_CREDITS_TITLE, WEB_RESOURCES, CreditsWindowBase, open_url, splash_btn_task
+    TRANS_CREDITS_TITLE, WEB_RESOURCES, CreditsWindowBase, open_url, splash_btn_task,
+    TRANS_COPY_VERSION, TRANS_COPY_CONFIRMATION
 )
 from app.mdown import MarkdownData
 import utils
@@ -85,6 +86,11 @@ class CreditsWindow(CreditsWindowBase):
         """Hide the window."""
         self.win.withdraw()
 
+async def copy_bee_version() -> None:
+    """Copy the BEE2 version to the clipboard and show a dialog."""
+    TK_ROOT.clipboard_clear()
+    TK_ROOT.clipboard_append(utils.BEE_VERSION)
+    await DIALOG.show_info(TRANS_COPY_CONFIRMATION)
 
 async def create(
     menu: tk.Menu, tk_img: TKImages,
@@ -115,6 +121,11 @@ async def create(
         credit_ind = menu.index('end')
         assert credit_ind is not None
         set_menu_text(menu, TRANS_CREDITS_BUTTON, credit_ind)
+
+        menu.add_command(command=lambda: nursery.start_soon(copy_bee_version))
+        version_ind = menu.index('end')
+        assert version_ind is not None
+        set_menu_text(menu, TRANS_COPY_VERSION, version_ind)
 
         def set_splash(text: TransToken, enabled: bool) -> None:
             """Set the state of the splash credits option."""

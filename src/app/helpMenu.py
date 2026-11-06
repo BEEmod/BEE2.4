@@ -89,6 +89,8 @@ TRANS_SPLASH_TITLE = TransToken.ui('Splash screen: {title}...')
 TRANS_SPLASH_AUTHOR = TransToken.ui('Splash screen by {author}...')
 TRANS_SPLASH_URL = TransToken.ui('Splash screen credits...')  # Have just a url, be vague.
 TRANS_SPLASH_UNKNOWN = TransToken.ui('Unknown splash screen')  # No url, no info, just error
+TRANS_COPY_VERSION = TransToken.ui('Copy BEE2 Version')
+TRANS_COPY_CONFIRMATION = TransToken.ui('BEE2 version has been copied to the clipboard.')
 
 # language=Markdown
 CREDITS_TEXT = '''\
