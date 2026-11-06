@@ -29,7 +29,7 @@ TRANS_OK = TransToken.ui('OK')
 TRANS_CANCEL = TransToken.ui('Cancel')
 
 
-async def _messagebox(
+def _messagebox(
     kind: str,
     parent: tk.Toplevel | tk.Tk,
     message: TransToken,
@@ -50,9 +50,8 @@ async def _messagebox(
     if detail:
         args += ('-detail', detail)
 
-    # Threading seems to work, not sure if safe...
     with suppress_screens():
-        return await trio.to_thread.run_sync(TK_ROOT.tk.call, *args)
+        return TK_ROOT.tk.call(*args)
 
 
 class BasicQueryValidator(simpledialog.Dialog):
@@ -298,7 +297,7 @@ class TkDialogs(Dialogs):
         detail: str = '',
     ) -> None:
         """Show a message box with some information."""
-        await _messagebox("ok", self.parent, message, title, icon, detail)
+        _messagebox("ok", self.parent, message, title, icon, detail)
 
     @override
     async def ask_ok_cancel(
@@ -309,7 +308,7 @@ class TkDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
-        res = await _messagebox("okcancel", self.parent, message, title, icon, detail)
+        res = _messagebox("okcancel", self.parent, message, title, icon, detail)
         if res == "ok":
             return True
         elif res == "cancel":
@@ -326,7 +325,7 @@ class TkDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
-        res = await _messagebox("yesno", self.parent, message, title, icon, detail)
+        res = _messagebox("yesno", self.parent, message, title, icon, detail)
         if res == "yes":
             return True
         elif res == "no":
@@ -343,7 +342,7 @@ class TkDialogs(Dialogs):
         detail: str = '',
     ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
-        res = await _messagebox("yesnocancel", self.parent, message, title, icon, detail)
+        res = _messagebox("yesnocancel", self.parent, message, title, icon, detail)
         if res == "yes":
             return True
         elif res == "no":
