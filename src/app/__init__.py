@@ -103,7 +103,9 @@ def on_error(
                 TransToken.ui('BEEMOD {version} Error!')
                 .format(version=utils.BEE_VERSION)
             ),
-            message=str(TransToken.ui(
+            # Using 'message' on Linux produces massively oversized text
+            # I think this should still work on Windows...
+            detail=str(TransToken.ui(
                 'An error occurred: \n{err}\n\n'
                 'This has been copied to the clipboard.'
             ).format(err=err)),
