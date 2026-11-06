@@ -20,6 +20,7 @@ import math
 import os
 import stat
 import sys
+import subprocess
 
 from srctools import Angle, conv_bool
 import trio_util
@@ -211,6 +212,8 @@ def display_directory(path: Path) -> None:
     """Try and open a window with this directory."""
     if WIN:
         os.startfile(path)
+    elif LINUX:
+        subprocess.Popen(['xdg-open', path])
     else:
         # TODO: Other OSes?
         raise NotImplementedError("Can't display directory on this platform?")
