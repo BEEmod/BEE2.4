@@ -49,7 +49,7 @@ HA_VERSION = utils.get_git_version(hammeraddons)
 def copy_datas(appfolder: Path, compiler_loc: str) -> None:
     """Copy `datas_files` files to the root of the app folder."""
     for gl_src, dest in data_files:
-        for filename in Path().glob(gl_src):
+        for filename in Path(SPECPATH).glob(gl_src):
             name = filename.name
             if name == 'INSTALL_GUIDE.txt':
                 # Special case, use a different name.
@@ -72,9 +72,10 @@ def do_localisation() -> None:
     """Build localisation."""
 
     # Make the directories.
-    i18n = Path('../i18n')
+    i18n = Path(SPECPATH, '..', 'i18n').resolve()
     i18n.mkdir(exist_ok=True)
 
+    print('i18n folder: ', i18n)
     print('Reading translations from source...', flush=True)
 
     catalog = Catalog(
@@ -178,7 +179,7 @@ def build_fgd() -> None:
             ]
 
     database.collapse_bases()
-    with open('../hammeraddons.fgd', 'w') as file:
+    with Path(SPECPATH, '..', 'hammeraddons.fgd').open('w') as file:
         file.write(f'// Hammer Addons version {HA_VERSION}\n')
         file.write(
             "// These are a minimal copy of HA FGDs for comp_ entities, so they can be collapsed.\n"
