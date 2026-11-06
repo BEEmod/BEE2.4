@@ -532,16 +532,16 @@ async def open_url(dialogs: Dialogs, url_key: str) -> None:
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
             await dialogs.show_info(
-                TransToken.ui('BEEMOD2 - Failed to open URL'),
-                TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
+                title=TransToken.ui('BEEMOD2 - Failed to open URL'),
+                message=TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
                 icon=dialogs.ERROR,
             )
             return
         except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
             await dialogs.show_info(
-                TransToken.ui('BEEMOD2 - Failed to open URL'),
-                TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
+                title=TransToken.ui('BEEMOD2 - Failed to open URL'),
+                message=TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
                 icon=dialogs.ERROR,
             )
             return
