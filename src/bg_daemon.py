@@ -668,6 +668,7 @@ class LogWindow:
         """Initialise the window."""
         self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
         self.queue = queue
+        tk_tools.set_window_icon(window)
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
         window.protocol('WM_DELETE_WINDOW', self.evt_close)
