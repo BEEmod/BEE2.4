@@ -195,12 +195,12 @@ elif utils.MAC:
 elif utils.LINUX:
     class Cursors(StrEnum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
-        REGULAR = 'arrow'
+        REGULAR = 'left_ptr' # Seems to be the correct default, 'arrow' uses an older design in some themes
         LINK = 'hand1'
         WAIT = 'watch'
-        ZOOM_IN = 'sizing'
-        STRETCH_VERT = 'bottom_side'
-        STRETCH_HORIZ = 'right_side'
+        ZOOM_IN = 'plus'
+        STRETCH_VERT = 'sb_v_double_arrow'
+        STRETCH_HORIZ = 'sb_h_double_arrow'
         MOVE_ITEM = 'fleur'
         DESTROY_ITEM = 'X_cursor'
         INVALID_DRAG = 'circle'
