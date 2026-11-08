@@ -1442,6 +1442,7 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         'helvetica neue.ttf',
         'tahoma.ttf',
         'ubuntu.ttf',
+        'NotoSans-Regular.ttf'
     ]:
         try:
             return ImageFont.truetype(filename, size)

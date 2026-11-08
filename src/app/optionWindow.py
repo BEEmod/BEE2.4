@@ -480,6 +480,11 @@ async def init_win_tab(
         f, 'keep_win_inside',
         desc=TransToken.ui('Keep windows inside screen'),
         tooltip=TransToken.ui(
+            # Windowing behavior is less consistent on Linux, so show a different message
+            "Prevent sub-windows from moving outside the screen borders. "
+            "Some window managers already do this by default. If you're unable "
+            "to move sub-windows across multiple monitors, disable this."
+            if utils.LINUX else
             'Prevent sub-windows from moving outside the screen borders. '
             'If you have multiple monitors, disable this.'
         ),
@@ -571,7 +576,7 @@ async def init_dev_tab(
         desc=TransToken.ui("Development Mode"),
         tooltip=TransToken.ui(
             'Enables displaying additional UI specific for '
-            'development purposes. Requires restart to have an effect.'
+            'development purposes. Requires a restart to fully take effect.'
         ),
     ).grid(row=0, column=1, sticky='W')
 
@@ -580,7 +585,8 @@ async def init_dev_tab(
         desc=TransToken.ui('Preserve Game Directories'),
         tooltip=TransToken.ui(
             'When exporting, do not copy resources to \n"bee2/" and "sdk_content/maps/bee2/".\n'
-            "Only enable if you're developing new content, to ensure it is not overwritten."
+            "Prevents modified files from being overwritten. Don't enable this unless you're "
+            "developing content, it will cause new packages and updates to break."
         ),
     ).grid(row=1, column=1, sticky='W')
     await trio.lowlevel.checkpoint()
@@ -589,8 +595,9 @@ async def init_dev_tab(
         frm_check, 'preserve_fgd',
         desc=TransToken.ui('Preserve FGD'),
         tooltip=TransToken.ui(
-            'When exporting, do not modify the FGD files.\n'
-            "Enable this if you have a custom one, to prevent it from being overwritten."
+            'When exporting, do not inject BEE2 and HammerAddons entities into the FGD files.\n'
+            "Don't enable this unless you're using a custom FGD which already includes these, "
+            "it will cause compiling maps to break."
         ),
     ).grid(row=2, column=1, sticky='W')
 
