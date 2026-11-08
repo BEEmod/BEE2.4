@@ -534,18 +534,18 @@ async def button_command_task(
 # I dug through the Tk docs but could not find any proper fix for this. As a workaround,
 # we measure the offset on startup, then offset coordinates obtained from WindowGeometry
 # based on the measured amount.
-_win_correct_x: int = 0
-_win_correct_y: int = 0
+win_correct_x: int = 0
+win_correct_y: int = 0
 
 def setup_win_correction(targ_x: int, targ_y: int, win: tk.Tk | tk.Toplevel) -> None:
     """Sets up the Linux window offset correction."""
-    global _win_correct_x, _win_correct_y
+    global win_correct_x, win_correct_y
     # Make sure it's zeroed out before using WindowGeometry
-    _win_correct_x, _win_correct_y = 0, 0
+    win_correct_x, win_correct_y = 0, 0
     geo = WindowGeometry(win)
-    _win_correct_x = targ_x - geo.x
-    _win_correct_y = targ_y - geo.y
-    LOGGER.info(f'Window positions will be corrected by {_win_correct_x}, {_win_correct_y}')
+    win_correct_x = targ_x - geo.x
+    win_correct_y = targ_y - geo.y
+    LOGGER.info(f'Window positions will be corrected by {win_correct_x}, {win_correct_y}')
 
 class WindowGeometry:
     """Convenience class for getting correct window geometry in a non-string format.
@@ -556,8 +556,8 @@ class WindowGeometry:
         geom = re.split(r'[=x+]', win.wm_geometry())
         self.width = int(geom[0])
         self.height = int(geom[1])
-        self.x = int(geom[2]) + _win_correct_x
-        self.y = int(geom[3]) + _win_correct_y
+        self.x = int(geom[2]) + win_correct_x
+        self.y = int(geom[3]) + win_correct_y
 
 def adjust_inside_screen(
     x: int,

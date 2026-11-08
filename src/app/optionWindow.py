@@ -492,7 +492,7 @@ async def init_win_tab(
 
     set_text(
         ttk.Button(f, command=reset_all_win),
-        TransToken.ui('Reset All Window Positions'),
+        TransToken.ui('Reset Window Layout'),
     ).grid(row=1, column=1, sticky='E')
     await trio.lowlevel.checkpoint()
 

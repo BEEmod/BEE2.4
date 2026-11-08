@@ -6,7 +6,7 @@ import tkinter as tk
 
 from app import sound
 from app.SubPane import PaneConf, SubPaneBase, TOOL_BTN_TOOLTIP
-from ui_tk import tk_tools, tooltip, wid_transtoken
+from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.img import TKImages
 import utils
 from ui_tk.tk_tools import WindowGeometry
@@ -76,10 +76,9 @@ class SubPane(SubPaneBase):
         width: int | None = None,
         height: int | None = None,
     ) -> None:
-        """Move the window to the specified position.
+        """Move the window to the specified position relative to the main window.
 
-        Effectively an easier-to-use form of Toplevel.geometry(), that
-        also updates `relX` and `relY`.
+        `relX` and `relY` will be updated accordingly.
         """
         geom = WindowGeometry(self.win)
         # If we're resizable, keep the current size. Otherwise, autosize to
@@ -88,15 +87,20 @@ class SubPane(SubPaneBase):
             width = geom.width if self.can_resize_x else self.win.winfo_reqwidth()
         if height is None:
             height = geom.height if self.can_resize_y else self.win.winfo_reqheight()
-        if x is None:
-            x = geom.x
-        if y is None:
-            y = geom.y
 
-        x, y = tk_tools.adjust_inside_screen(x, y, win=self.win)
-        self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
+        if x is not None:
+            self._rel_x = x
+        if y is not None:
+            self._rel_y = y
 
-        self._rel_x, self._rel_y = self._ui_get_pos()
+        main_geom = WindowGeometry(TK_ROOT)
+        abs_x, abs_y = tk_tools.adjust_inside_screen(
+            x=main_geom.x + self._rel_x,
+            y=main_geom.y + self._rel_y,
+            win=self.win
+        )
+        self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{abs_x!s}+{abs_y!s}')
+
         self.save_conf()
 
     def resize(self) -> None:

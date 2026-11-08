@@ -219,40 +219,49 @@ def reposition_panes() -> None:
     comp_win = CompilerPane.PANE
     opt_win = windows['opt']
     pal_win = windows['pal']
-    # The x-pos of the right side of the main window
-    xpos = min(
-        TK_ROOT.winfo_screenwidth()
-        - itemconfig.PANE.win.winfo_reqwidth(),
 
-        TK_ROOT.winfo_rootx()
-        + TK_ROOT.winfo_reqwidth()
-        + 25
-        )
-    # The x-pos for the palette and compiler panes
-    pal_x = TK_ROOT.winfo_rootx() - comp_win.win.winfo_reqwidth() - 25
+    # Tk sucking + Wayland not liking multi window apps = this mess
+
+    hspace = 50 if utils.LINUX else 25 # Spread out more on linux to prevent conflicts with window snap features
+    vspace = 25 - tk_tools.win_correct_y # Account for titlebar using the detected height
+
+    # For some reason TK_ROOT.winfo_reqheight() is not accounting for the menu bar, getting the
+    # menu bar's height directly did not return the correct values either, so I'm just hardcoding it.
+    # TODO: What is the right value here for windows?
+    main_height = TK_ROOT.winfo_reqheight() + (34 if utils.LINUX else 0)
+
+    # The x-pos of the right column, with the export and itemvar windows
+    x_right = TK_ROOT.winfo_reqwidth() + hspace
+    # The x-pos of the left column, with the palette and compiler windows
+    x_left = - comp_win.win.winfo_reqwidth() - hspace
+
+    # Reset main window size, but not position
+    TK_ROOT.geometry(f'{TK_ROOT.winfo_reqwidth()}x{TK_ROOT.winfo_reqheight()}')
+
+    # Move subpanes to the correct relative positions
     pal_win.move(
-        x=pal_x,
-        y=(TK_ROOT.winfo_rooty() - 50),
-        height=max(
-            TK_ROOT.winfo_reqheight() -
-            comp_win.win.winfo_reqheight() -
-            25,
-            30,
-        ),
+        x=x_left,
+        y=0,
+        height=main_height - comp_win.win.winfo_reqheight() - vspace,
         width=comp_win.win.winfo_reqwidth(),
     )
     comp_win.move(
-        x=pal_x,
-        y=pal_win.win.winfo_y() + pal_win.win.winfo_reqheight(),
+        x=x_left,
+        y=main_height - comp_win.win.winfo_reqheight(),
+        width=comp_win.win.winfo_reqwidth(),
+        # fixed height
     )
     opt_win.move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty()-40,
+        x=x_right,
+        y=0,
         width=itemconfig.PANE.win.winfo_reqwidth(),
+        # fixed height
     )
     itemconfig.PANE.move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty() + opt_win.win.winfo_reqheight() + 25,
+        x=x_right,
+        y=opt_win.win.winfo_reqheight() + vspace,
+        height=main_height - opt_win.win.winfo_reqheight() - vspace,
+        # fixed width
     )
 
 
@@ -805,13 +814,14 @@ async def init_windows(
     await tk_tools.wait_eventloop()
 
     # Position windows according to remembered settings:
-    start_x, start_y = TK_ROOT.winfo_rootx(), TK_ROOT.winfo_rooty()
+    geo = tk_tools.WindowGeometry(TK_ROOT)
+    start_x, start_y = geo.x, geo.y
     try:
         main_win_state = config.APP.get_cur_conf(WindowState, 'main_window')
     except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
-        if TK_ROOT.winfo_rootx() < windows['pal'].win.winfo_reqwidth() + 50:
+        if geo.x < windows['pal'].win.winfo_reqwidth() + 50:
             start_x = windows["pal"].win.winfo_reqwidth() + 50
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
