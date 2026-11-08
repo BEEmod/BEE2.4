@@ -28,7 +28,7 @@ import exporting
 import loadScreen
 import packages
 import utils
-
+from ui_tk.tk_tools import WindowGeometry
 
 LOGGER = srctools.logger.get_logger('BEE2')
 _TRACER = Tracer() if utils.CODE_DEV_MODE else None
@@ -96,9 +96,10 @@ async def init_app(core_nursery: trio.Nursery) -> None:
             # If our window isn't actually visible, this is set to nonsense -
             # ignore those values.
             if TK_ROOT.winfo_viewable():
+                geo = WindowGeometry(TK_ROOT)
                 config.APP.store_conf(WindowState(
-                    x=TK_ROOT.winfo_rootx(),
-                    y=TK_ROOT.winfo_rooty(),
+                    x=geo.x,
+                    y=geo.y,
                 ), 'main_window')
 
             try:
