@@ -77,6 +77,28 @@ def crasher(nursery: trio.Nursery, exc: BaseException) -> tuple[Callable[[], obj
 
     return fg_raise, lambda: nursery.start_soon(bg_raise)
 
+def log_win_geometry(the_window: tk.Toplevel, title: str) -> None:
+    wg_geo = tk_tools.WindowGeometry(the_window)
+    LOGGER.debug(f'{title}:\n'
+                 f'winfo x/y reports: +{the_window.winfo_x()}+{the_window.winfo_y()}\n'
+                 f'root x/y reports: +{the_window.winfo_rootx()}+{the_window.winfo_rooty()}\n'
+                 f'winfo geo reports: +{the_window.winfo_geometry().partition('+')[2]}\n'
+                 f'wm geo reports: +{the_window.wm_geometry().partition('+')[2]}\n'
+                 f'WindowGeometry reports: +{wg_geo.x}+{wg_geo.y}')
+
+async def test_win_geometry(the_window: tk.Toplevel) -> None:
+    log_win_geometry(the_window, "Before adjust")
+
+    LOGGER.debug('Adjusting using WindowGeometry')
+    wg_geo = tk_tools.WindowGeometry(the_window)
+    # Shift 1 pixel then back - it seems to ignore move requests to the "same" location
+    the_window.wm_geometry(f'+{wg_geo.x + 1}+{wg_geo.y + 1}')
+    await tk_tools.wait_eventloop()
+    the_window.wm_geometry(f'+{wg_geo.x}+{wg_geo.y}')
+    await tk_tools.wait_eventloop()
+
+    log_win_geometry(the_window, "After adjust")
+
 
 async def menu_task(menu: tk.Menu) -> None:
     """Create the TK menu bar."""
@@ -114,6 +136,8 @@ async def menu_task(menu: tk.Menu) -> None:
             label='Event Handler, Multi',
             command=lambda: TK_ROOT.event_generate('<<DevMenuMultiCrash>>'),
         )
+
+        menu.add_command(label='Test window geometry', command=lambda: nursery.start_soon(test_win_geometry, TK_ROOT))
 
         TK_ROOT.bind('<<DevMenuSingleCrash>>', event_raise)
         TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')

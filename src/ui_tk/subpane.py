@@ -9,6 +9,7 @@ from app.SubPane import PaneConf, SubPaneBase, TOOL_BTN_TOOLTIP
 from ui_tk import tk_tools, tooltip, wid_transtoken
 from ui_tk.img import TKImages
 import utils
+from ui_tk.tk_tools import WindowGeometry
 
 
 class SubPane(SubPaneBase):
@@ -80,16 +81,17 @@ class SubPane(SubPaneBase):
         Effectively an easier-to-use form of Toplevel.geometry(), that
         also updates `relX` and `relY`.
         """
+        geom = WindowGeometry(self.win)
         # If we're resizable, keep the current size. Otherwise, autosize to
         # contents.
         if width is None:
-            width = self.win.winfo_width() if self.can_resize_x else self.win.winfo_reqwidth()
+            width = geom.width if self.can_resize_x else self.win.winfo_reqwidth()
         if height is None:
-            height = self.win.winfo_height() if self.can_resize_y else self.win.winfo_reqheight()
+            height = geom.height if self.can_resize_y else self.win.winfo_reqheight()
         if x is None:
-            x = self.win.winfo_x()
+            x = geom.x
         if y is None:
-            y = self.win.winfo_y()
+            y = geom.y
 
         x, y = tk_tools.adjust_inside_screen(x, y, win=self.win)
         self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
@@ -99,10 +101,11 @@ class SubPane(SubPaneBase):
 
     def resize(self) -> None:
         """Resize the window to fit its contents."""
+        geom = WindowGeometry(self.win)
         # If we're resizable, keep the current size. Otherwise, autosize to
         # contents.
-        width = self.win.winfo_width() if self.can_resize_x else self.win.winfo_reqwidth()
-        height = self.win.winfo_height() if self.can_resize_y else self.win.winfo_reqheight()
+        width = geom.width if self.can_resize_x else self.win.winfo_reqwidth()
+        height = geom.height if self.can_resize_y else self.win.winfo_reqheight()
         self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}')
         self.save_conf()
 
@@ -120,17 +123,20 @@ class SubPane(SubPaneBase):
 
     @override
     def _ui_get_pos(self) -> tuple[int, int]:
+        self_geo = WindowGeometry(self.win)
+        parent_geo = WindowGeometry(self.parent)
         return (
-            self.win.winfo_x() - self.parent.winfo_x(),
-            self.win.winfo_y() - self.parent.winfo_y(),
+            self_geo.x - parent_geo.x,
+            self_geo.y - parent_geo.y,
         )
 
     @override
     def _ui_apply_relative(self) -> None:
         """Apply rel_x/rel_y."""
+        parent_geo = WindowGeometry(self.parent)
         x, y = tk_tools.adjust_inside_screen(
-            x=self.parent.winfo_x()+self._rel_x,
-            y=self.parent.winfo_y()+self._rel_y,
+            x=parent_geo.x+self._rel_x,
+            y=parent_geo.y+self._rel_y,
             win=self.win,
         )
         self.win.geometry(f'+{x}+{y}')
@@ -138,7 +144,8 @@ class SubPane(SubPaneBase):
 
     @override
     def _ui_get_size(self) -> tuple[int, int]:
-        return self.win.winfo_width(), self.win.winfo_height()
+        geom = WindowGeometry(self.win)
+        return geom.width, geom.height
 
     @override
     def _ui_set_size(self, width: int | None, height: int | None) -> None:

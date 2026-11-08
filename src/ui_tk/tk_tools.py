@@ -3,6 +3,8 @@ General code used for tkinter portions.
 
 """
 from __future__ import annotations
+
+import re
 from typing import (
     Any, Literal, NoReturn, Protocol, TypedDict, Unpack, cast, overload,
     override,
@@ -522,6 +524,40 @@ async def button_command_task(
         button['cursor'] = default_cursor
         button.state(('!disabled', ))
 
+# !!! HACKHACK !!!
+#
+# On at least some window managers (likely when running under XWayland), wm_geometry
+# does not return the correct value. According to the Tk docs, it is supposed to
+# account for the window border, but it does not do that. Setting the window position
+# DOES account for the border however, which results in a shift.
+#
+# I dug through the Tk docs but could not find any proper fix for this. As a workaround,
+# we measure the offset on startup, then offset coordinates obtained from WindowGeometry
+# based on the measured amount.
+_win_correct_x: int = 0
+_win_correct_y: int = 0
+
+def setup_win_correction(targ_x: int, targ_y: int, win: tk.Tk | tk.Toplevel) -> None:
+    """Sets up the Linux window offset correction."""
+    global _win_correct_x, _win_correct_y
+    # Make sure it's zeroed out before using WindowGeometry
+    _win_correct_x, _win_correct_y = 0, 0
+    geo = WindowGeometry(win)
+    _win_correct_x = targ_x - geo.x
+    _win_correct_y = targ_y - geo.y
+    LOGGER.info(f'Window positions will be corrected by {_win_correct_x}, {_win_correct_y}')
+
+class WindowGeometry:
+    """Convenience class for getting correct window geometry in a non-string format.
+
+    This correctly accounts for the menu bar (unlike Tkinter's winfo_ functions)
+    and applies the hack to fix window shifting in XWayland."""
+    def __init__(self, win: tk.Tk | tk.Toplevel):
+        geom = re.split(r'[=x+]', win.wm_geometry())
+        self.width = int(geom[0])
+        self.height = int(geom[1])
+        self.x = int(geom[2]) + _win_correct_x
+        self.y = int(geom[3]) + _win_correct_y
 
 def adjust_inside_screen(
     x: int,
@@ -537,8 +573,10 @@ def adjust_inside_screen(
     # Allow disabling this adjustment for multi-window setups
     if not config.APP.get_cur_conf(GenOptions).keep_win_inside:
         return x, y
-    max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
-    max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
+
+    geom = WindowGeometry(win)
+    max_x = win.winfo_screenwidth() - geom.width - horiz_bound
+    max_y = win.winfo_screenheight() - geom.height - vert_bound
 
     if x < horiz_bound:
         x = horiz_bound
@@ -557,8 +595,11 @@ def center_win(window: tk.Tk | tk.Toplevel, parent: tk.Tk | tk.Toplevel | None =
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
 
-    x = parent.winfo_rootx() + (parent.winfo_width() - window.winfo_width()) // 2
-    y = parent.winfo_rooty() + (parent.winfo_height() - window.winfo_height()) // 2
+    geom = WindowGeometry(window)
+    parent_geom = WindowGeometry(parent)
+
+    x = parent_geom.x + (parent_geom.width - geom.width) // 2
+    y = parent_geom.y + (parent_geom.height - geom.height) // 2
 
     x, y = adjust_inside_screen(x, y, window)
 
@@ -567,8 +608,9 @@ def center_win(window: tk.Tk | tk.Toplevel, parent: tk.Tk | tk.Toplevel | None =
 
 def center_onscreen(window: tk.Tk | tk.Toplevel) -> None:
     """Center a window onscreen."""
-    x = (window.winfo_screenwidth() - window.winfo_width()) // 2
-    y = (window.winfo_screenheight() - window.winfo_height()) // 2
+    geom = WindowGeometry(window)
+    x = (window.winfo_screenwidth() - geom.width) // 2
+    y = (window.winfo_screenheight() - geom.height) // 2
 
     window.geometry(f'+{x}+{y}')
 

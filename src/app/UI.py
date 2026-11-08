@@ -805,23 +805,26 @@ async def init_windows(
     await tk_tools.wait_eventloop()
 
     # Position windows according to remembered settings:
+    start_x, start_y = TK_ROOT.winfo_rootx(), TK_ROOT.winfo_rooty()
     try:
         main_win_state = config.APP.get_cur_conf(WindowState, 'main_window')
     except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
         if TK_ROOT.winfo_rootx() < windows['pal'].win.winfo_reqwidth() + 50:
-            TK_ROOT.geometry(
-                f'+{windows["pal"].win.winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
-            )
-        else:
-            TK_ROOT.geometry(f'+{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
+            start_x = windows["pal"].win.winfo_reqwidth() + 50
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
             main_win_state.x, main_win_state.y,
             win=TK_ROOT,
         )
-        TK_ROOT.geometry(f'+{start_x}+{start_y}')
+    TK_ROOT.geometry(f'+{start_x}+{start_y}')
+
+    # Set up the window offset hack for Linux
+    if utils.LINUX:
+        await tk_tools.wait_eventloop()
+        tk_tools.setup_win_correction(start_x, start_y, TK_ROOT)
+
     await tk_tools.wait_eventloop()
 
     # First move to default positions, then load the config.
