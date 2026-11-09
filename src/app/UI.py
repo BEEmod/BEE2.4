@@ -823,6 +823,10 @@ async def init_windows(
         # move the main window if needed to allow room for palette
         if geo.x < windows['pal'].win.winfo_reqwidth() + 50:
             start_x = windows["pal"].win.winfo_reqwidth() + 50
+        # Make sure we move by at least a pixel on linux so offset correction can work
+        if utils.LINUX:
+            start_x += 1
+            start_y += 1
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
             main_win_state.x, main_win_state.y,
