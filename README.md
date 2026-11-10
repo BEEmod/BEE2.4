@@ -2,8 +2,6 @@
 [![BEE2.4 Releases](https://img.shields.io/github/downloads/BEEmod/BEE2.4/total.svg?label=App)](https://github.com/BEEmod/BEE2.4/releases)
 [![Discord Server](https://img.shields.io/discord/293435914598744064?color=%235865F2&label=Discord)](https://discord.gg/hnGFJrz)
 
-### Please read the [Contributing Guidelines](https://github.com/BEEmod/.github/blob/master/contributing.md) and [FAQ](https://github.com/BEEmod/.github/blob/master/FAQ.md) before opening an issue.
-
 ![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/BEE2.ico)
 # Better Extended Editor 2 version 4 #
 ## Portal 2  Mod Tool
@@ -13,9 +11,11 @@ bugfixes and improvements.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
+[Discussion Forums](https://github.com/BEEmod/BEE2-items/discussions)
 [Discord Server](https://discord.gg/hnGFJrz)
 
 ## Download and Use
+### Windows
 - Download the latest releases of the BEE2.4 and items from the following pages:
   - [Application](https://github.com/BEEmod/BEE2.4/releases)
   - [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
@@ -23,24 +23,15 @@ The packages (item, style, etc definitions) are in the [BEE2-Items](https://gith
 - Place extracted package folder in the root BEE2 folder. _e.g. `C:\BEE2.4\packages`_
 - To run, locate the BEE2 application in the app folder and execute it. _e.g. `C:\BEE2.4\BEE2.exe`_
 
-### BEE2.4 on Mac
+### Linux
+Linux support exists, but is experimental. We do not currently provide precompiled releases. See the [BEE2.4 on Linux](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-Linux) wiki article for more information.
 
-As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki article](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-Mac) for more details and how you can still use the mod.
+### macOS
+BEE2.4 no longer supports macOS, and Portal 2 has not been able to run natively on the platform for many years at this point. See the [BEE2.4 on macOS](https://github.com/BEEmod/BEE2-items/wiki/BEE2.4-on-macOS) wiki article for more information.
 
-### Used Libraries ###
-- [Python](https://www.python.org/) 3.8 or later
-- [TKinter/TTK](https://tcl.tk/)
-- [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) (for sounds, not required)
-- [Pillow](https://python-pillow.github.io/)
-- [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
-- [mistletoe](https://github.com/miyuchina/mistletoe)
-- [cython](https://cython.org/)
-- [PyInstaller](http://www.pyinstaller.org/)
-- [babel](http://babel.pocoo.org/en/latest/index.html)
+## Technical Info ##
 
-## Building from Source ##
-
-### Compilation ###
+### Building from Source ###
 
 * You'll need Python 3.12 or later.
 * First, grab the repo and then clone the HammerAddons submodule:
@@ -70,3 +61,14 @@ This does the same thing, but additionally removes some unnessary content
 to decrease file sizes - comments, blank lines, hidden visgroups.
 
 * For Linux Compilation check out this wiki entry [Building from Source](https://github.com/BEEmod/BEE2-items/wiki/Building-from-source) 
+
+### Used Libraries ###
+- [Python](https://www.python.org/) 3.12 or later
+- [TKinter/TTK](https://tcl.tk/)
+- [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) (for sounds, not required)
+- [Pillow](https://python-pillow.github.io/)
+- [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
+- [mistletoe](https://github.com/miyuchina/mistletoe)
+- [cython](https://cython.org/)
+- [PyInstaller](http://www.pyinstaller.org/)
+- [babel](http://babel.pocoo.org/en/latest/index.html)
