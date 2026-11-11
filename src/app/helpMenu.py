@@ -89,12 +89,22 @@ TRANS_SPLASH_TITLE = TransToken.ui('Splash screen: {title}...')
 TRANS_SPLASH_AUTHOR = TransToken.ui('Splash screen by {author}...')
 TRANS_SPLASH_URL = TransToken.ui('Splash screen credits...')  # Have just a url, be vague.
 TRANS_SPLASH_UNKNOWN = TransToken.ui('Unknown splash screen')  # No url, no info, just error
-TRANS_COPY_VERSION = TransToken.ui('Copy BEE2 Version')
-TRANS_COPY_CONFIRMATION = TransToken.ui('BEE2 version has been copied to the clipboard.')
 
 # language=Markdown
 CREDITS_TEXT = '''\
-Used software / libraries in the BEE2.4:
+### BEEMOD v{bee_ver}
+
+The BEE2.4 is developed by TeamSpen210
+Based on the original BEEMOD created by BenVlodgi
+
+Also includes contributions from: birdstakes, ClassicOldSong, darindouglass, darvil82, ENDERZOMBI102, fourteentrees, \
+HalloIhr0, HugoBDesigner, Konclan, LautaroL20, marvin1099, Orsell, saismeesaimonsaimes, SP2G50000, vrad-exe
+
+Translators: Neshiro, CMSEv7 (French), Thedoczek (Polish), EricKotato, shaperones0 (Russian), Antecer (Chinese)
+
+For item author information, see their individual context menus (right-click on the item).
+
+Used software / libraries:
 
 * [srctools][srctools] `v{srctools_ver}` by TeamSpen210
 * [HammerAddons][hammeraddons] `v{ha_ver}` by TeamSpen210
@@ -457,6 +467,7 @@ def get_versions() -> dict[str, str]:
         'pil_ver': PIL.__version__,
         'srctools_ver': utils.SRCTOOLS_VERSION,
         'ha_ver': utils.HA_VERSION,
+        'bee_ver': utils.BEE_VERSION,
     }
 
 
