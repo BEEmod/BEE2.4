@@ -1028,6 +1028,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
 
     This returns True if at least one package was found.
     """
+    pak_dir = pak_dir.expanduser()
     found_pak = False
     try:
         contents = list(pak_dir.iterdir())
