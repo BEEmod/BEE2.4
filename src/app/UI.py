@@ -228,7 +228,10 @@ def reposition_panes() -> None:
     # For some reason TK_ROOT.winfo_reqheight() is not accounting for the menu bar, getting the
     # menu bar's height directly did not return the correct values either, so I'm just hardcoding it.
     # TODO: What is the right value here for windows?
-    main_height = TK_ROOT.winfo_reqheight() + (34 if utils.LINUX else 0)
+    main_height = TK_ROOT.winfo_reqheight() + TK_ROOT.winfo_pixels('34p' if utils.LINUX else '0p')
+    # Ensure minimum height for palette and itemvar windows
+    pal_min_height = TK_ROOT.winfo_pixels('160p')
+    item_min_height = TK_ROOT.winfo_pixels('160p')
 
     # The x-pos of the right column, with the export and itemvar windows
     x_right = TK_ROOT.winfo_reqwidth() + hspace
@@ -242,12 +245,18 @@ def reposition_panes() -> None:
     pal_win.move(
         x=x_left,
         y=0,
-        height=main_height - comp_win.win.winfo_reqheight() - vspace,
+        height=max(
+            main_height - comp_win.win.winfo_reqheight() - vspace,
+            pal_min_height
+        ),
         width=comp_win.win.winfo_reqwidth(),
     )
     comp_win.move(
         x=x_left,
-        y=main_height - comp_win.win.winfo_reqheight(),
+        y=max(
+            main_height - comp_win.win.winfo_reqheight(),
+            pal_min_height + vspace
+        ),
         width=comp_win.win.winfo_reqwidth(),
         # fixed height
     )
@@ -260,7 +269,10 @@ def reposition_panes() -> None:
     itemconfig.PANE.move(
         x=x_right,
         y=opt_win.win.winfo_reqheight() + vspace,
-        height=main_height - opt_win.win.winfo_reqheight() - vspace,
+        height=max(
+            main_height - opt_win.win.winfo_reqheight() - vspace,
+            item_min_height
+        ),
         # fixed width
     )
 
