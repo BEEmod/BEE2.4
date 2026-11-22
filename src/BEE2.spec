@@ -36,12 +36,11 @@ data_bin_files = [
 ]
 # src -> app subfolder, in 6.0+
 data_files = [
-    ('../images/BEE2/*.png', 'images/BEE2/'),
-    ('../images/icons/*.png', 'images/icons/'),
-    ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
-    ('../sounds/*.ogg', 'sounds'),
-    ('../INSTALL_GUIDE.txt', '.'),
-    ('../i18n/*.mo', 'i18n/')
+    ('images/BEE2/*.png', 'images/BEE2/'),
+    ('images/icons/*.png', 'images/icons/'),
+    ('images/splash_screen/*.jpg', 'images/splash_screen/'),
+    ('sounds/*.ogg', 'sounds'),
+    ('i18n/*.mo', 'i18n/')
 ]
 
 HA_VERSION = utils.get_git_version(hammeraddons)
@@ -49,20 +48,26 @@ HA_VERSION = utils.get_git_version(hammeraddons)
 
 def copy_datas(appfolder: Path, compiler_loc: str) -> None:
     """Copy `datas_files` files to the root of the app folder."""
+    root = Path(SPECPATH, '..').resolve()
     for gl_src, dest in data_files:
-        for filename in Path(SPECPATH).glob(gl_src):
+        gl_src = Path(root, gl_src).resolve()
+        for filename in gl_src.parent.rglob(gl_src.name):
             name = filename.name
-            if name == 'INSTALL_GUIDE.txt':
-                # Special case, use a different name.
-                name = 'README.txt'
-
             p_dest = Path(appfolder, dest, name)
 
             print(filename, '->', p_dest)
             p_dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(filename, p_dest)
+    # Some special cases:
 
+    # Make an empty folder ready for packages
     (appfolder / 'packages').mkdir(exist_ok=True)
+
+    # This is named differently in the repo
+    readme_src = Path(root, 'INSTALL_GUIDE.txt').resolve()
+    readme_dest = Path(appfolder, 'README.txt').resolve()
+    print(readme_src, '->', readme_dest)
+    shutil.copy(readme_src, readme_dest)
 
     compiler_dest = Path(appfolder, 'bin', 'compiler')
     print(compiler_loc, '->', compiler_dest)
@@ -277,7 +282,7 @@ COMPILER_LOC = f'../dist/{bitness}bit/compiler/'
 bee2_a = Analysis(
     ['BEE2_launch.py'],
     pathex=[workpath],
-    datas=data_files + data_bin_files,
+    datas=data_bin_files,
     hiddenimports=[
         'PIL._tkinter_finder',
         # Needed to unpickle the CLDR.
