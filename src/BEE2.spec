@@ -41,6 +41,7 @@ data_files = [
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
     ('../sounds/*.ogg', 'sounds'),
     ('../INSTALL_GUIDE.txt', '.'),
+    ('../i18n/*.mo', 'i18n/')
 ]
 
 HA_VERSION = utils.get_git_version(hammeraddons)
@@ -143,14 +144,10 @@ def do_localisation() -> None:
         with comp.open('wb') as dest:
             write_mo(dest, trans_cat)
 
-        data_files.append((str(comp), 'i18n/'))
-
     # Build out the English translation from the template.
     catalog.locale = 'en'
     with (i18n / 'en.mo').open('wb') as dest:
         write_mo(dest, catalog)
-
-    data_files.append((str(i18n / 'en.mo'), 'i18n/'))
 
 
 def build_fgd() -> None:
