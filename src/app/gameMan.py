@@ -464,7 +464,8 @@ async def add_game(dialogs: Dialogs) -> bool:
             name = await dialogs.prompt(
                 TransToken.ui("Enter the name of this game:"),
                 title=title,
-                initial_value=TransToken.untranslated(name),
+                # Gameinfo has PORTAL 2 in allcaps, force it to title case here
+                initial_value=TransToken.untranslated(name.title()),
             )
             if name is None:
                 return False
