@@ -526,26 +526,32 @@ async def button_command_task(
 
 # !!! HACKHACK !!!
 #
-# On at least some window managers (likely when running under XWayland), wm_geometry
-# does not return the correct value. According to the Tk docs, it is supposed to
-# account for the window border, but it does not do that. Setting the window position
-# DOES account for the border however, which results in a shift.
+# On at least some window managers, Tk geometry functions report the wrong values,
+# but setting the position uses the correct values, which results in a shift.
+# Apparently this is a longstanding bug which JUST got fixed in November 2026:
+# https://core.tcl-lang.org/tk/tktview/220791ffffffffffffff
 #
-# I dug through the Tk docs but could not find any proper fix for this. As a workaround,
-# we measure the offset on startup, then offset coordinates obtained from WindowGeometry
-# based on the measured amount.
-win_correct_x: int = 0
-win_correct_y: int = 0
+# Since the fix has yet to reach Python as of this writing, this is a temporary
+# bodge to get it working mostly right by measuring the offset on startup and
+# correcting for it manually. Hopefully we can remove this later.
+_win_correct_x: int = 0
+_win_correct_y: int = 0
 
 def setup_win_correction(targ_x: int, targ_y: int, win: tk.Tk | tk.Toplevel) -> None:
     """Sets up the Linux window offset correction."""
-    global win_correct_x, win_correct_y
-    # Make sure it's zeroed out before using WindowGeometry
-    win_correct_x, win_correct_y = 0, 0
+    global _win_correct_x, _win_correct_y
+    win.update() # Make sure dimensions are up to date
+    _win_correct_x, _win_correct_y = 0, 0 # Zero out offsets before using WindowGeometry
     geo = WindowGeometry(win)
-    win_correct_x = targ_x - geo.x
-    win_correct_y = targ_y - geo.y
-    LOGGER.info(f'Window positions will be corrected by {win_correct_x}, {win_correct_y}')
+    _win_correct_x = targ_x - geo.x
+    _win_correct_y = targ_y - geo.y
+    LOGGER.info(f'Window positions will be corrected by {_win_correct_x}, {_win_correct_y}')
+
+def reset_win_correction() -> None:
+    """Resets the Linux window offset correction."""
+    global _win_correct_x, _win_correct_y
+    _win_correct_x, _win_correct_y = 0, 0
+    LOGGER.info(f'Window positions correction disabled.')
 
 class WindowGeometry:
     """Convenience class for getting correct window geometry in a non-string format.
@@ -556,8 +562,8 @@ class WindowGeometry:
         geom = re.split(r'[=x+]', win.wm_geometry())
         self.width = int(geom[0])
         self.height = int(geom[1])
-        self.x = int(geom[2]) + win_correct_x
-        self.y = int(geom[3]) + win_correct_y
+        self.x = int(geom[2]) + _win_correct_x
+        self.y = int(geom[3]) + _win_correct_y
 
 def adjust_inside_screen(
     x: int,

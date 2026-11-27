@@ -223,7 +223,7 @@ def reposition_panes() -> None:
     # Tk sucking + Wayland not liking multi window apps = this mess
 
     hspace = 50 if utils.LINUX else 25 # Spread out more on linux to prevent conflicts with window snap features
-    vspace = 25 - tk_tools.win_correct_y # Account for titlebar using the detected height
+    vspace = 50 # Account for titlebars - TODO: is this right on windows?
 
     # For some reason TK_ROOT.winfo_reqheight() is not accounting for the menu bar, getting the
     # menu bar's height directly did not return the correct values either, so I'm just hardcoding it.
@@ -823,20 +823,19 @@ async def init_windows(
         # move the main window if needed to allow room for palette
         if geo.x < windows['pal'].win.winfo_reqwidth() + 50:
             start_x = windows["pal"].win.winfo_reqwidth() + 50
-        # Make sure we move by at least a pixel on linux so offset correction can work
-        if utils.LINUX:
-            start_x += 1
-            start_y += 1
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
             main_win_state.x, main_win_state.y,
             win=TK_ROOT,
         )
+    if utils.LINUX and start_x == geo.x and start_y == geo.y:
+        # Make sure we always move by at least a pixel so offset correction can work
+        start_x += 1
+
     TK_ROOT.geometry(f'+{start_x}+{start_y}')
 
     # Set up the window offset hack for Linux
-    if utils.LINUX:
-        await tk_tools.wait_eventloop()
+    if utils.LINUX and config.APP.get_cur_conf(config.gen_opts.GenOptions).linux_win_correction:
         tk_tools.setup_win_correction(start_x, start_y, TK_ROOT)
 
     await tk_tools.wait_eventloop()

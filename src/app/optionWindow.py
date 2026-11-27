@@ -31,6 +31,7 @@ from ui_tk import TK_ROOT, tk_tools
 
 LOGGER = srctools.logger.get_logger(__name__)
 AFTER_EXPORT_ACTION = tk.IntVar(name='OPT_after_export_action', value=AfterExport.MINIMISE.value)
+LINUX_WIN_CORRECTION = tk.BooleanVar(name='OPT_linux_win_correction', value=True)
 
 # action, launching_game -> suffix on the message box.
 AFTER_EXPORT_TEXT: dict[tuple[AfterExport, bool], TransToken] = {
@@ -63,7 +64,7 @@ TRANS_CACHE_RESET = TransToken.ui(
     'These will now be extracted during the next export.'
 )
 TRANS_CACHE_RESET_AND_NO_PRESERVE = TransToken.ui(
-    '{cache_reset}\n\n"Preserve Game Resources" has been disabled.'
+    '{cache_reset}\n\n"Preserve Game Directories" has been disabled.'
 ).format(cache_reset=TRANS_CACHE_RESET)
 TRANS_REBUILT_APP_LANG = TransToken.ui('UI translations rebuilt from sources successfully.')
 TRANS_REBUILD_PACK_LANG = TransToken.ui('Package translations rebuilt successfully.')
@@ -109,6 +110,15 @@ def save() -> None:
     config.APP.store_conf(FilterConf(compress=VAR_COMPRESS_ITEMS.get()))
     background_run(config.APP.apply_conf, FilterConf)
 
+    if utils.LINUX: # If window correction was just enabled, recompute it using the option window
+        if LINUX_WIN_CORRECTION.get() and not existing.linux_win_correction:
+            # This will be wrong, but it doesn't matter since the window is closing
+            geo = tk_tools.WindowGeometry(win)
+            win.geometry(f'+{geo.x + 1}+{geo.y + 1}')
+            tk_tools.setup_win_correction(geo.x + 1, geo.y + 1, win)
+        elif not LINUX_WIN_CORRECTION.get() and existing.linux_win_correction:
+            tk_tools.reset_win_correction()
+
 
 async def apply_config() -> None:
     """Apply the configuration to all windows whenever changed."""
@@ -121,6 +131,7 @@ async def apply_config() -> None:
             # We don't propagate compact splash, that isn't important after the UI loads.
             # TODO: What is this refreshing?
             # UI.refresh_palette_icons()
+
 
 
 async def clear_caches(dialogs: Dialogs) -> None:
@@ -496,17 +507,29 @@ async def init_win_tab(
     ).grid(row=1, column=1, sticky='E')
     await trio.lowlevel.checkpoint()
 
+    if utils.LINUX: # Allow disabling the window correction hack for unusual WMs
+        make_checkbox(
+            f, 'linux_win_correction',
+            desc=TransToken.ui('Correct window shifting'),
+            tooltip=TransToken.ui(
+                'Attempt to avoid issues with sub-windows shifting when moved. '
+                'Might break things more on certain window managers, so try '
+                'disabling this if subwindows are behaving erratically.'
+            ),
+            var=LINUX_WIN_CORRECTION,
+        ).grid(row=2, column=0, sticky='W')
+
     if not utils.FROZEN:  # Temporary button for testing.
         ttk.Button(
             f,
             text='Light mode',
             command=lambda: img.set_theme(Theme.LIGHT),
-        ).grid(row=2, column=0, sticky='EW')
+        ).grid(row=3, column=0, sticky='EW')
         ttk.Button(
             f,
             text='Dark mode',
             command=lambda: img.set_theme(Theme.DARK),
-        ).grid(row=2, column=1, sticky='EW')
+        ).grid(row=3, column=1, sticky='EW')
 
 
 async def init_dev_tab(

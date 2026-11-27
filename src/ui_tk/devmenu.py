@@ -98,7 +98,8 @@ async def test_win_geometry(the_window: tk.Toplevel) -> None:
     await tk_tools.wait_eventloop()
 
     log_win_geometry(the_window, "After adjust")
-
+    LOGGER.debug(f'tk.scaling reports: {TK_ROOT.call('tk', 'scaling')}')
+    LOGGER.debug(f'winfo_fpixels(72p) reports: {the_window.winfo_fpixels('72p')}')
 
 async def menu_task(menu: tk.Menu) -> None:
     """Create the TK menu bar."""
